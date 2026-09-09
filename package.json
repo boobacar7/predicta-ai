@@ -1,0 +1,11 @@
+{
+  "name": "predicta-ai",
+  "private": true,
+  "description": "PREDICTA AI monorepo. Phase 1 prototype lives in apps/web.",
+  "scripts": {
+    "dev:web": "npm run dev --prefix apps/web",
+    "build:web": "npm run build --prefix apps/web",
+    "lint:web": "npm run lint --prefix apps/web",
+    "test:web": "npm run test --prefix apps/web"
+  }
+}

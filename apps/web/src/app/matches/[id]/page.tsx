@@ -1,0 +1,6 @@
+import { MatchDetailView } from "@/features/matches";
+
+export default async function MatchPage({ params }: PageProps<"/matches/[id]">) {
+  const { id } = await params;
+  return <MatchDetailView matchId={id} />;
+}

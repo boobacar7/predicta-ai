@@ -2,7 +2,7 @@
 
 PREDICTA AI est une plateforme SaaS premium d'intelligence sportive. Elle transforme des données de football, basketball et tennis en statistiques, probabilités calibrées, signaux de valeur et explications traçables.
 
-> État du projet : fondation architecturale. Le frontend, le backend, les pipelines data et les modèles ML ne sont pas encore implémentés.
+> État du projet : fondation architecturale + prototype UI mock. Backend, ingestion, API réelle et modèles ML ne sont pas implémentés.
 
 ## Principes non négociables
 
@@ -37,6 +37,9 @@ Les workers constituent des frontières extractibles, mais aucune architecture m
 - [Roadmap](docs/development-roadmap.md)
 - [Contrat OpenAPI 3.1](contracts/openapi.yaml)
 - [Instructions obligatoires des agents](AGENTS.md)
+- [Design system UI](docs/ui-design-system.md)
+- [Handoff agent Frontend](docs/frontend-handoff.md)
+- [ADR 0001 — Fondation UI](docs/adr/0001-frontend-design-system.md)
 
 ## Flux cible
 
@@ -64,4 +67,15 @@ Avant tout développement parallèle :
 4. développer le prototype frontend contre la datasource mock conforme à OpenAPI;
 5. remplacer ensuite les mocks endpoint par endpoint, sans modifier les composants de présentation.
 
-Les commandes d'installation et d'exécution seront ajoutées avec les premiers scaffolds applicatifs. Aucun secret ne doit être commité; les futures variables requises seront documentées dans `.env.example`.
+Les commandes d'installation et d'exécution du prototype UI :
+
+```bash
+cd apps/web
+cp .env.example .env.local
+npm install
+npm run dev
+```
+
+Depuis la racine : `npm run dev:web`.
+
+Le prototype affiche exclusivement des fixtures fictives (`data_mode: mock`). Aucun secret ne doit être commité; les variables sont documentées dans `apps/web/.env.example`.
