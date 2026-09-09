@@ -1,0 +1,1922 @@
+openapi: 3.1.0
+info:
+  title: PREDICTA AI API
+  version: 1.0.0
+  summary: Canonical contract for the PREDICTA AI frontend and backend
+  description: |
+    Contract-first API for sports intelligence, calibrated model probabilities,
+    deterministic value calculations and fact-grounded AI explanations.
+
+    Probabilities are statistical estimates, never guarantees. `data_mode`
+    distinguishes mock payloads from live/provider-backed payloads. Availability
+    and freshness are carried by `DataQuality`; missing numeric data is `null`,
+    never silently replaced by zero.
+  contact:
+    name: PREDICTA AI Architecture
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+servers:
+  - url: /api/v1
+    description: Same-origin deployment
+security: []
+tags:
+  - name: Dashboard
+    description: Aggregate payload used by the dashboard.
+  - name: Matches
+    description: Match lists and detail aggregates.
+  - name: Statistics
+    description: Normalized sport-specific observations.
+  - name: Predictions
+    description: Versioned statistical and ML probability outputs.
+  - name: Odds
+    description: Timestamped bookmaker snapshots.
+  - name: Picks
+    description: Published model signals, never guaranteed outcomes.
+  - name: Value
+    description: Transparent deterministic value calculations.
+  - name: Performance
+    description: Backtest, calibration and model-health metrics.
+  - name: Analyst
+    description: Fact-grounded explanations downstream of model probabilities.
+  - name: Catalog
+    description: Sports, leagues, teams and players.
+
+paths:
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [Dashboard]
+      summary: Get the aggregate dashboard snapshot
+      description: |
+        Returns the frontend dashboard payload in one read. Filtering by sport
+        remains client-side because the dashboard includes the supported sports.
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      responses:
+        "200":
+          description: Dashboard snapshot
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationProblem"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /sports:
+    get:
+      operationId: getSports
+      tags: [Catalog]
+      summary: List supported sports
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      responses:
+        "200":
+          description: Supported sports
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SportsEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationProblem"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /leagues:
+    get:
+      operationId: getLeagues
+      tags: [Catalog]
+      summary: List leagues
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+        - $ref: "#/components/parameters/SportFilter"
+        - $ref: "#/components/parameters/SearchQuery"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Filtered leagues
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeagueListEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationProblem"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /leagues/{league_id}:
+    get:
+      operationId: getLeague
+      tags: [Catalog]
+      summary: Get a league and its current available context
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+        - $ref: "#/components/parameters/LeagueId"
+      responses:
+        "200":
+          description: League detail
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeagueDetailEnvelope"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /teams:
+    get:
+      operationId: getTeams
+      tags: [Catalog]
+      summary: List teams or sport-side competitors
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+        - $ref: "#/components/parameters/SportFilter"
+        - $ref: "#/components/parameters/SearchQuery"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Filtered teams
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamListEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationProblem"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /teams/{team_id}:
+    get:
+      operationId: getTeam
+      tags: [Catalog]
+      summary: Get a team profile
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+        - $ref: "#/components/parameters/TeamId"
+      responses:
+        "200":
+          description: Team detail
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamDetailEnvelope"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /players:
+    get:
+      operationId: getPlayers
+      tags: [Catalog]
+      summary: List players
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+        - $ref: "#/components/parameters/SportFilter"
+        - $ref: "#/components/parameters/SearchQuery"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Filtered players
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerListEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationProblem"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /players/{player_id}:
+    get:
+      operationId: getPlayer
+      tags: [Catalog]
+      summary: Get a player profile
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+        - $ref: "#/components/parameters/PlayerId"
+      responses:
+        "200":
+          description: Player detail
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlayerDetailEnvelope"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /matches:
+    get:
+      operationId: getMatches
+      tags: [Matches]
+      summary: List matches
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+        - $ref: "#/components/parameters/SportFilter"
+        - $ref: "#/components/parameters/LeagueFilter"
+        - $ref: "#/components/parameters/MatchDateFilter"
+        - $ref: "#/components/parameters/MatchStatusFilter"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Filtered matches
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchListEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationProblem"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /matches/{match_id}:
+    get:
+      operationId: getMatch
+      tags: [Matches]
+      summary: Get the frontend match detail aggregate
+      description: |
+        Returns match context plus currently available statistics, odds,
+        prediction and form. Missing sections are `null` or empty and are
+        explained through `unavailable_fields`; they are never fabricated.
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+        - $ref: "#/components/parameters/MatchId"
+      responses:
+        "200":
+          description: Match detail
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchDetailEnvelope"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /matches/{match_id}/stats:
+    get:
+      operationId: getMatchStatistics
+      tags: [Statistics]
+      summary: Get normalized statistics for a match
+      description: |
+        Canonical statistics subresource. The current frontend obtains the same
+        array embedded in `MatchDetail.stats`; both representations must be
+        produced from the same backend DTO.
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+        - $ref: "#/components/parameters/MatchId"
+      responses:
+        "200":
+          description: Match statistics
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchStatisticsEnvelope"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /matches/{match_id}/odds:
+    get:
+      operationId: getMatchOdds
+      tags: [Odds]
+      summary: Get the latest compatible odds snapshot
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+        - $ref: "#/components/parameters/MatchId"
+        - $ref: "#/components/parameters/MarketFilter"
+      responses:
+        "200":
+          description: Odds snapshot; data is null when unavailable
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OddsEnvelope"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /matches/{match_id}/prediction:
+    get:
+      operationId: getMatchPrediction
+      tags: [Predictions]
+      summary: Get the published calibrated prediction
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+        - $ref: "#/components/parameters/MatchId"
+        - $ref: "#/components/parameters/MarketFilter"
+      responses:
+        "200":
+          description: Prediction; data is null when no prediction is published
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PredictionEnvelope"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /picks:
+    get:
+      operationId: getPicks
+      tags: [Picks]
+      summary: List published model picks
+      description: Picks are model signals and never guaranteed outcomes.
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+        - $ref: "#/components/parameters/SportFilter"
+        - $ref: "#/components/parameters/LeagueFilter"
+        - $ref: "#/components/parameters/MatchDateFilter"
+        - $ref: "#/components/parameters/MatchStatusFilter"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Filtered picks
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PickListEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationProblem"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /value:
+    get:
+      operationId: getValueOpportunities
+      tags: [Value]
+      summary: List deterministic value evaluations
+      description: |
+        Every item is derived from a calibrated probability and a timestamped
+        odds snapshot. Ratios are raw decimal values: `0.072` means 7.2%.
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+        - $ref: "#/components/parameters/SportFilter"
+        - $ref: "#/components/parameters/LeagueFilter"
+        - $ref: "#/components/parameters/MatchDateFilter"
+        - $ref: "#/components/parameters/MatchStatusFilter"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Offset"
+      responses:
+        "200":
+          description: Filtered value evaluations
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValueListEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationProblem"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /performance:
+    get:
+      operationId: getPerformance
+      tags: [Performance]
+      summary: Get model performance and calibration
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      responses:
+        "200":
+          description: Current model performance report
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerformanceEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationProblem"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /ai/analyze:
+    post:
+      operationId: analyzeMatch
+      tags: [Analyst]
+      summary: Get a fact-grounded analyst session
+      description: |
+        The analyst may explain only facts present in the validated fact pack.
+        It cannot create probabilities, odds, statistics or availability data.
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalystRequest"
+      responses:
+        "200":
+          description: Analyst session
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalystEnvelope"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/ValidationProblem"
+        default:
+          $ref: "#/components/responses/Problem"
+
+components:
+  parameters:
+    XRequestId:
+      name: X-Request-ID
+      in: header
+      required: false
+      description: Caller-provided correlation identifier. The API generates one when absent.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+    SportFilter:
+      name: sport
+      in: query
+      required: false
+      schema:
+        $ref: "#/components/schemas/SportCode"
+    LeagueFilter:
+      name: league_id
+      in: query
+      required: false
+      schema:
+        $ref: "#/components/schemas/Identifier"
+    MatchDateFilter:
+      name: date
+      in: query
+      required: false
+      description: Calendar date interpreted in the competition timezone.
+      schema:
+        type: string
+        format: date
+    MatchStatusFilter:
+      name: status
+      in: query
+      required: false
+      schema:
+        $ref: "#/components/schemas/MatchStatus"
+    SearchQuery:
+      name: query
+      in: query
+      required: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 100
+    MarketFilter:
+      name: market
+      in: query
+      required: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of items. The frontend may omit it.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+    Offset:
+      name: offset
+      in: query
+      required: false
+      description: Zero-based offset. V1 list payloads retain `items` and `total`.
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    MatchId:
+      name: match_id
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/Identifier"
+    LeagueId:
+      name: league_id
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/Identifier"
+    TeamId:
+      name: team_id
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/Identifier"
+    PlayerId:
+      name: player_id
+      in: path
+      required: true
+      schema:
+        $ref: "#/components/schemas/Identifier"
+
+  headers:
+    XRequestId:
+      description: Correlation identifier, identical to the envelope or problem `request_id`.
+      schema:
+        type: string
+
+  responses:
+    Problem:
+      description: Request or server error
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/XRequestId"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    NotFound:
+      description: Resource not found
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/XRequestId"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    ValidationProblem:
+      description: Invalid request
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/XRequestId"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+
+  schemas:
+    Identifier:
+      type: string
+      minLength: 1
+      maxLength: 128
+
+    Timestamp:
+      type: string
+      format: date-time
+      description: RFC 3339 timestamp with timezone, normalized to UTC on persistence.
+
+    NullableTimestamp:
+      anyOf:
+        - $ref: "#/components/schemas/Timestamp"
+        - type: "null"
+
+    NullableProbability:
+      type: [number, "null"]
+      minimum: 0
+      maximum: 1
+      description: Raw ratio; 0.68 means 68%. Null means unavailable.
+
+    DataMode:
+      type: string
+      enum: [mock, live]
+      description: |
+        `mock` identifies explicitly fictional fixtures. `live` identifies data
+        served from real configured sources; it does not imply live-match timing.
+
+    SportCode:
+      type: string
+      enum: [football, basketball, tennis]
+
+    AvailabilityStatus:
+      type: string
+      enum: [available, unavailable, partial, stale]
+
+    ConfidenceLevel:
+      type: string
+      enum: [low, medium, high]
+      description: Model confidence category, never a guarantee.
+
+    MatchStatus:
+      type: string
+      enum: [scheduled, live, finished, postponed]
+
+    FreshnessLevel:
+      type: string
+      enum: [fresh, acceptable, stale]
+
+    ProblemDetails:
+      type: object
+      additionalProperties: false
+      required: [type, title, status, detail, request_id]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          default: about:blank
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+        instance:
+          type: [string, "null"]
+          format: uri-reference
+        request_id:
+          type: string
+          minLength: 1
+
+    DataQuality:
+      type: object
+      additionalProperties: false
+      required: [availability, source, observed_at, freshness, note]
+      properties:
+        availability:
+          $ref: "#/components/schemas/AvailabilityStatus"
+        source:
+          type: [string, "null"]
+          description: Provider, model, registry or fixture source identifier.
+        observed_at:
+          $ref: "#/components/schemas/NullableTimestamp"
+        freshness:
+          anyOf:
+            - $ref: "#/components/schemas/FreshnessLevel"
+            - type: "null"
+        note:
+          type: [string, "null"]
+
+    EnvelopeMetadata:
+      type: object
+      required: [data_mode, generated_at, request_id]
+      properties:
+        data_mode:
+          $ref: "#/components/schemas/DataMode"
+        generated_at:
+          $ref: "#/components/schemas/Timestamp"
+        request_id:
+          type: string
+          minLength: 1
+
+    IdentifiedEntity:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        name:
+          type: string
+          minLength: 1
+
+    Sport:
+      type: object
+      additionalProperties: false
+      required: [id, name, code]
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        name:
+          type: string
+          minLength: 1
+        code:
+          $ref: "#/components/schemas/SportCode"
+
+    League:
+      type: object
+      additionalProperties: false
+      required: [id, name, sport, country, season, tier]
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        name:
+          type: string
+          minLength: 1
+        sport:
+          $ref: "#/components/schemas/SportCode"
+        country:
+          type: string
+        season:
+          type: string
+        tier:
+          type: integer
+          minimum: 1
+
+    Team:
+      type: object
+      additionalProperties: false
+      required: [id, name, short_name, sport, league_id, abbreviation]
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        name:
+          type: string
+          minLength: 1
+        short_name:
+          type: string
+          minLength: 1
+        sport:
+          $ref: "#/components/schemas/SportCode"
+        league_id:
+          $ref: "#/components/schemas/Identifier"
+        abbreviation:
+          type: string
+          minLength: 1
+          maxLength: 12
+
+    Player:
+      type: object
+      additionalProperties: false
+      required: [id, name, sport, team_id, position, country]
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        name:
+          type: string
+          minLength: 1
+        sport:
+          $ref: "#/components/schemas/SportCode"
+        team_id:
+          anyOf:
+            - $ref: "#/components/schemas/Identifier"
+            - type: "null"
+        position:
+          type: [string, "null"]
+        country:
+          type: string
+
+    UnavailableField:
+      type: object
+      additionalProperties: false
+      required: [field, reason]
+      properties:
+        field:
+          type: string
+          minLength: 1
+        reason:
+          type: string
+          minLength: 1
+
+    Scoreline:
+      type: object
+      additionalProperties: false
+      required: [home, away, quality]
+      properties:
+        home:
+          type: [integer, "null"]
+          minimum: 0
+        away:
+          type: [integer, "null"]
+          minimum: 0
+        quality:
+          $ref: "#/components/schemas/DataQuality"
+
+    MatchEvent:
+      type: object
+      additionalProperties: false
+      required: [id, minute, type, label, team_id, quality]
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        minute:
+          type: [integer, "null"]
+          minimum: 0
+        type:
+          type: string
+          minLength: 1
+        label:
+          type: string
+          minLength: 1
+        team_id:
+          anyOf:
+            - $ref: "#/components/schemas/Identifier"
+            - type: "null"
+        quality:
+          $ref: "#/components/schemas/DataQuality"
+
+    MatchStatistic:
+      type: object
+      additionalProperties: false
+      required: [key, label, home_value, away_value, unit, quality]
+      properties:
+        key:
+          type: string
+          minLength: 1
+        label:
+          type: string
+          minLength: 1
+        home_value:
+          type: [number, "null"]
+        away_value:
+          type: [number, "null"]
+        unit:
+          type: [string, "null"]
+        quality:
+          $ref: "#/components/schemas/DataQuality"
+
+    TeamFormSide:
+      type: object
+      additionalProperties: false
+      required: [team_id, results, quality]
+      properties:
+        team_id:
+          $ref: "#/components/schemas/Identifier"
+        results:
+          type: array
+          items:
+            type: [string, "null"]
+            enum: [W, D, L, null]
+        quality:
+          $ref: "#/components/schemas/DataQuality"
+
+    ProbabilityOutcome:
+      type: object
+      additionalProperties: false
+      required:
+        - selection
+        - label
+        - model_probability
+        - calibrated_probability
+        - quality
+      properties:
+        selection:
+          type: string
+          minLength: 1
+        label:
+          type: string
+          minLength: 1
+        model_probability:
+          $ref: "#/components/schemas/NullableProbability"
+        calibrated_probability:
+          $ref: "#/components/schemas/NullableProbability"
+        quality:
+          $ref: "#/components/schemas/DataQuality"
+
+    PredictionPreview:
+      type: object
+      additionalProperties: false
+      required:
+        - model_version
+        - market
+        - confidence
+        - leading_selection
+        - leading_probability
+        - cutoff_at
+        - outcomes
+        - quality
+      properties:
+        model_version:
+          type: string
+          minLength: 1
+        market:
+          type: string
+          minLength: 1
+        confidence:
+          $ref: "#/components/schemas/ConfidenceLevel"
+        leading_selection:
+          type: string
+          minLength: 1
+        leading_probability:
+          $ref: "#/components/schemas/NullableProbability"
+        cutoff_at:
+          $ref: "#/components/schemas/Timestamp"
+        outcomes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProbabilityOutcome"
+        quality:
+          $ref: "#/components/schemas/DataQuality"
+
+    PredictionFactor:
+      type: object
+      additionalProperties: false
+      required: [id, label, direction, weight, detail, quality]
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        label:
+          type: string
+          minLength: 1
+        direction:
+          type: string
+          enum: [home, away, neutral]
+        weight:
+          type: string
+          enum: [low, medium, high]
+        detail:
+          type: string
+        quality:
+          $ref: "#/components/schemas/DataQuality"
+
+    PredictionDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - match_id
+        - market
+        - model_family
+        - model_version
+        - calibrator_version
+        - feature_set_version
+        - cutoff_at
+        - confidence
+        - outcomes
+        - factors
+        - quality
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        match_id:
+          $ref: "#/components/schemas/Identifier"
+        market:
+          type: string
+          minLength: 1
+        model_family:
+          type: string
+          minLength: 1
+        model_version:
+          type: string
+          minLength: 1
+        calibrator_version:
+          type: string
+          minLength: 1
+        feature_set_version:
+          type: string
+          minLength: 1
+        cutoff_at:
+          $ref: "#/components/schemas/Timestamp"
+        confidence:
+          $ref: "#/components/schemas/ConfidenceLevel"
+        outcomes:
+          type: array
+          minItems: 2
+          items:
+            $ref: "#/components/schemas/ProbabilityOutcome"
+        factors:
+          type: array
+          items:
+            $ref: "#/components/schemas/PredictionFactor"
+        quality:
+          $ref: "#/components/schemas/DataQuality"
+
+    OddsSelection:
+      type: object
+      additionalProperties: false
+      required:
+        - selection
+        - label
+        - decimal_odds
+        - implied_probability_raw
+        - no_vig_probability
+        - quality
+      properties:
+        selection:
+          type: string
+          minLength: 1
+        label:
+          type: string
+          minLength: 1
+        decimal_odds:
+          type: [number, "null"]
+          exclusiveMinimum: 1
+        implied_probability_raw:
+          $ref: "#/components/schemas/NullableProbability"
+        no_vig_probability:
+          $ref: "#/components/schemas/NullableProbability"
+        quality:
+          $ref: "#/components/schemas/DataQuality"
+
+    OddsSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - match_id
+        - market
+        - bookmaker
+        - provider
+        - observed_at
+        - overround
+        - selections
+        - quality
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        match_id:
+          $ref: "#/components/schemas/Identifier"
+        market:
+          type: string
+          minLength: 1
+        bookmaker:
+          type: string
+          minLength: 1
+        provider:
+          type: string
+          minLength: 1
+        observed_at:
+          $ref: "#/components/schemas/Timestamp"
+        overround:
+          type: [number, "null"]
+          minimum: 0
+        selections:
+          type: array
+          minItems: 2
+          items:
+            $ref: "#/components/schemas/OddsSelection"
+        quality:
+          $ref: "#/components/schemas/DataQuality"
+
+    ValuePreview:
+      type: object
+      additionalProperties: false
+      required: [selection, edge, expected_value, formula_version, quality]
+      properties:
+        selection:
+          type: string
+          minLength: 1
+        edge:
+          type: [number, "null"]
+          minimum: -1
+          maximum: 1
+          description: Probability-point difference as a raw ratio.
+        expected_value:
+          type: [number, "null"]
+          minimum: -1
+          description: "(calibrated_probability * decimal_odds) - 1."
+        formula_version:
+          type: string
+          minLength: 1
+        quality:
+          $ref: "#/components/schemas/DataQuality"
+
+    MatchSummary:
+      type: object
+      required:
+        - id
+        - sport
+        - league
+        - home
+        - away
+        - kickoff_at
+        - status
+        - venue
+        - score
+        - prediction_preview
+        - value_preview
+        - quality
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        sport:
+          $ref: "#/components/schemas/SportCode"
+        league:
+          $ref: "#/components/schemas/League"
+        home:
+          $ref: "#/components/schemas/Team"
+        away:
+          $ref: "#/components/schemas/Team"
+        kickoff_at:
+          $ref: "#/components/schemas/Timestamp"
+        status:
+          $ref: "#/components/schemas/MatchStatus"
+        venue:
+          type: [string, "null"]
+        score:
+          $ref: "#/components/schemas/Scoreline"
+        prediction_preview:
+          anyOf:
+            - $ref: "#/components/schemas/PredictionPreview"
+            - type: "null"
+        value_preview:
+          anyOf:
+            - $ref: "#/components/schemas/ValuePreview"
+            - type: "null"
+        quality:
+          $ref: "#/components/schemas/DataQuality"
+
+    MatchDetail:
+      allOf:
+        - $ref: "#/components/schemas/MatchSummary"
+        - type: object
+          required: [timeline, stats, odds, prediction, form, unavailable_fields]
+          properties:
+            timeline:
+              type: array
+              items:
+                $ref: "#/components/schemas/MatchEvent"
+            stats:
+              type: array
+              items:
+                $ref: "#/components/schemas/MatchStatistic"
+            odds:
+              anyOf:
+                - $ref: "#/components/schemas/OddsSnapshot"
+                - type: "null"
+            prediction:
+              anyOf:
+                - $ref: "#/components/schemas/PredictionDetail"
+                - type: "null"
+            form:
+              type: array
+              items:
+                $ref: "#/components/schemas/TeamFormSide"
+            unavailable_fields:
+              type: array
+              items:
+                $ref: "#/components/schemas/UnavailableField"
+
+    ValueOpportunity:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - match
+        - market
+        - selection
+        - selection_label
+        - calibrated_probability
+        - decimal_odds
+        - implied_probability_raw
+        - no_vig_probability
+        - overround
+        - edge_raw
+        - edge_no_vig
+        - expected_value
+        - formula_version
+        - odds_observed_at
+        - prediction_cutoff_at
+        - quality
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        match:
+          $ref: "#/components/schemas/MatchSummary"
+        market:
+          type: string
+          minLength: 1
+        selection:
+          type: string
+          minLength: 1
+        selection_label:
+          type: string
+          minLength: 1
+        calibrated_probability:
+          $ref: "#/components/schemas/NullableProbability"
+        decimal_odds:
+          type: [number, "null"]
+          exclusiveMinimum: 1
+        implied_probability_raw:
+          $ref: "#/components/schemas/NullableProbability"
+        no_vig_probability:
+          $ref: "#/components/schemas/NullableProbability"
+        overround:
+          type: [number, "null"]
+          minimum: 0
+        edge_raw:
+          type: [number, "null"]
+          minimum: -1
+          maximum: 1
+          description: Calibrated probability minus raw implied probability.
+        edge_no_vig:
+          type: [number, "null"]
+          minimum: -1
+          maximum: 1
+          description: Calibrated probability minus no-vig probability.
+        expected_value:
+          type: [number, "null"]
+          minimum: -1
+          description: "(calibrated_probability * decimal_odds) - 1."
+        formula_version:
+          type: string
+          minLength: 1
+        odds_observed_at:
+          $ref: "#/components/schemas/NullableTimestamp"
+        prediction_cutoff_at:
+          $ref: "#/components/schemas/NullableTimestamp"
+        quality:
+          $ref: "#/components/schemas/DataQuality"
+
+    Pick:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - match
+        - market
+        - selection
+        - selection_label
+        - calibrated_probability
+        - confidence
+        - rationale
+        - criteria
+        - model_version
+        - published_at
+        - quality
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        match:
+          $ref: "#/components/schemas/MatchSummary"
+        market:
+          type: string
+          minLength: 1
+        selection:
+          type: string
+          minLength: 1
+        selection_label:
+          type: string
+          minLength: 1
+        calibrated_probability:
+          $ref: "#/components/schemas/NullableProbability"
+        confidence:
+          $ref: "#/components/schemas/ConfidenceLevel"
+        rationale:
+          type: string
+        criteria:
+          type: string
+        model_version:
+          type: string
+          minLength: 1
+        published_at:
+          $ref: "#/components/schemas/Timestamp"
+        quality:
+          $ref: "#/components/schemas/DataQuality"
+
+    Insight:
+      type: object
+      additionalProperties: false
+      required: [id, title, body, kind, href, quality]
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        title:
+          type: string
+          minLength: 1
+        body:
+          type: string
+        kind:
+          type: string
+          enum: [model, data, value, caution]
+        href:
+          type: [string, "null"]
+        quality:
+          $ref: "#/components/schemas/DataQuality"
+
+    MetricPoint:
+      type: object
+      additionalProperties: false
+      required: [label, value, quality]
+      properties:
+        label:
+          type: string
+        value:
+          type: [number, "null"]
+        quality:
+          $ref: "#/components/schemas/DataQuality"
+
+    ModelHealthSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - model_version
+        - sport
+        - window_label
+        - accuracy
+        - log_loss
+        - brier_score
+        - ece
+        - theoretical_roi
+        - theoretical_max_drawdown
+        - prediction_count
+        - quality
+      properties:
+        model_version:
+          type: string
+          minLength: 1
+        sport:
+          $ref: "#/components/schemas/SportCode"
+        window_label:
+          type: string
+          minLength: 1
+        accuracy:
+          $ref: "#/components/schemas/NullableProbability"
+        log_loss:
+          type: [number, "null"]
+          minimum: 0
+        brier_score:
+          type: [number, "null"]
+          minimum: 0
+          maximum: 1
+        ece:
+          $ref: "#/components/schemas/NullableProbability"
+        theoretical_roi:
+          type: [number, "null"]
+          minimum: -1
+          description: Backtest-only return ratio; never a promised return.
+        theoretical_max_drawdown:
+          type: [number, "null"]
+          minimum: -1
+          maximum: 0
+          description: |
+            Worst peak-to-trough decline in the same backtest, represented as a
+            non-positive raw ratio. For example, -0.084 means -8.4%.
+        prediction_count:
+          type: integer
+          minimum: 0
+        quality:
+          $ref: "#/components/schemas/DataQuality"
+
+    DashboardSnapshot:
+      type: object
+      additionalProperties: false
+      required:
+        - headline
+        - sports
+        - matches_today
+        - picks
+        - value_opportunities
+        - insights
+        - model_health
+      properties:
+        headline:
+          type: string
+        sports:
+          type: array
+          items:
+            $ref: "#/components/schemas/Sport"
+        matches_today:
+          type: array
+          items:
+            $ref: "#/components/schemas/MatchSummary"
+        picks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Pick"
+        value_opportunities:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValueOpportunity"
+        insights:
+          type: array
+          items:
+            $ref: "#/components/schemas/Insight"
+        model_health:
+          $ref: "#/components/schemas/ModelHealthSummary"
+
+    PerformanceSeriesPoint:
+      type: object
+      additionalProperties: false
+      required: [period, log_loss, brier_score, accuracy, theoretical_roi]
+      properties:
+        period:
+          type: string
+        log_loss:
+          type: [number, "null"]
+          minimum: 0
+        brier_score:
+          type: [number, "null"]
+          minimum: 0
+          maximum: 1
+        accuracy:
+          $ref: "#/components/schemas/NullableProbability"
+        theoretical_roi:
+          type: [number, "null"]
+          minimum: -1
+
+    CalibrationBucket:
+      type: object
+      additionalProperties: false
+      required: [predicted, observed, count]
+      properties:
+        predicted:
+          type: number
+          minimum: 0
+          maximum: 1
+        observed:
+          $ref: "#/components/schemas/NullableProbability"
+        count:
+          type: integer
+          minimum: 0
+
+    PerformanceReport:
+      type: object
+      additionalProperties: false
+      required: [summary, series, calibration, notes]
+      properties:
+        summary:
+          $ref: "#/components/schemas/ModelHealthSummary"
+        series:
+          type: array
+          items:
+            $ref: "#/components/schemas/PerformanceSeriesPoint"
+        calibration:
+          type: array
+          items:
+            $ref: "#/components/schemas/CalibrationBucket"
+        notes:
+          type: array
+          items:
+            type: string
+
+    StandingRow:
+      type: object
+      additionalProperties: false
+      required: [rank, team, played, points, goal_diff, quality]
+      properties:
+        rank:
+          type: [integer, "null"]
+          minimum: 1
+        team:
+          $ref: "#/components/schemas/Team"
+        played:
+          type: [integer, "null"]
+          minimum: 0
+        points:
+          type: [integer, "null"]
+        goal_diff:
+          type: [integer, "null"]
+        quality:
+          $ref: "#/components/schemas/DataQuality"
+
+    LeagueDetail:
+      type: object
+      additionalProperties: false
+      required: [league, standing, recent_matches, unavailable_fields]
+      properties:
+        league:
+          $ref: "#/components/schemas/League"
+        standing:
+          type: array
+          items:
+            $ref: "#/components/schemas/StandingRow"
+        recent_matches:
+          type: array
+          items:
+            $ref: "#/components/schemas/MatchSummary"
+        unavailable_fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnavailableField"
+
+    NamedStat:
+      type: object
+      additionalProperties: false
+      required: [key, label, value, unit, quality]
+      properties:
+        key:
+          type: string
+          minLength: 1
+        label:
+          type: string
+          minLength: 1
+        value:
+          type: [number, "null"]
+        unit:
+          type: [string, "null"]
+        quality:
+          $ref: "#/components/schemas/DataQuality"
+
+    TeamDetail:
+      type: object
+      additionalProperties: false
+      required: [team, league, recent_matches, stats, unavailable_fields]
+      properties:
+        team:
+          $ref: "#/components/schemas/Team"
+        league:
+          $ref: "#/components/schemas/League"
+        recent_matches:
+          type: array
+          items:
+            $ref: "#/components/schemas/MatchSummary"
+        stats:
+          type: array
+          items:
+            $ref: "#/components/schemas/NamedStat"
+        unavailable_fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnavailableField"
+
+    PlayerDetail:
+      type: object
+      additionalProperties: false
+      required: [player, team, stats, recent_mentions, unavailable_fields]
+      properties:
+        player:
+          $ref: "#/components/schemas/Player"
+        team:
+          anyOf:
+            - $ref: "#/components/schemas/Team"
+            - type: "null"
+        stats:
+          type: array
+          items:
+            $ref: "#/components/schemas/NamedStat"
+        recent_mentions:
+          type: array
+          items:
+            type: string
+        unavailable_fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnavailableField"
+
+    Fact:
+      type: object
+      additionalProperties: false
+      required: [id, label, value, unit, source, observed_at, availability]
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        label:
+          type: string
+        value:
+          type: string
+          description: String representation retained for the fact-grounding boundary.
+        unit:
+          type: [string, "null"]
+        source:
+          type: string
+          minLength: 1
+        observed_at:
+          $ref: "#/components/schemas/Timestamp"
+        availability:
+          $ref: "#/components/schemas/AvailabilityStatus"
+
+    FactPack:
+      type: object
+      additionalProperties: false
+      required: [id, match_id, generated_at, facts]
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        match_id:
+          $ref: "#/components/schemas/Identifier"
+        generated_at:
+          $ref: "#/components/schemas/Timestamp"
+        facts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Fact"
+
+    AnalystMessage:
+      type: object
+      additionalProperties: false
+      required: [id, role, body, cited_fact_ids, created_at]
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        role:
+          type: string
+          enum: [user, analyst]
+        body:
+          type: string
+        cited_fact_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/Identifier"
+        created_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    AnalystSession:
+      type: object
+      additionalProperties: false
+      required:
+        - match_id
+        - fact_pack
+        - messages
+        - llm_model
+        - prompt_version
+        - disclaimer
+      properties:
+        match_id:
+          $ref: "#/components/schemas/Identifier"
+        fact_pack:
+          $ref: "#/components/schemas/FactPack"
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnalystMessage"
+        llm_model:
+          type: string
+          minLength: 1
+        prompt_version:
+          type: string
+          minLength: 1
+        disclaimer:
+          type: string
+          minLength: 1
+
+    AnalystRequest:
+      type: object
+      additionalProperties: false
+      required: [match_id, question]
+      properties:
+        match_id:
+          $ref: "#/components/schemas/Identifier"
+        question:
+          type: [string, "null"]
+          minLength: 1
+          maxLength: 2000
+
+    LeagueList:
+      type: object
+      additionalProperties: false
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/League"
+        total:
+          type: integer
+          minimum: 0
+
+    TeamList:
+      type: object
+      additionalProperties: false
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Team"
+        total:
+          type: integer
+          minimum: 0
+
+    PlayerList:
+      type: object
+      additionalProperties: false
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Player"
+        total:
+          type: integer
+          minimum: 0
+
+    MatchList:
+      type: object
+      additionalProperties: false
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MatchSummary"
+        total:
+          type: integer
+          minimum: 0
+
+    PickList:
+      type: object
+      additionalProperties: false
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Pick"
+        total:
+          type: integer
+          minimum: 0
+
+    ValueList:
+      type: object
+      additionalProperties: false
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValueOpportunity"
+        total:
+          type: integer
+          minimum: 0
+
+    DashboardEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: "#/components/schemas/DashboardSnapshot"
+
+    SportsEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/Sport"
+
+    LeagueListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: "#/components/schemas/LeagueList"
+
+    LeagueDetailEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: "#/components/schemas/LeagueDetail"
+
+    TeamListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: "#/components/schemas/TeamList"
+
+    TeamDetailEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: "#/components/schemas/TeamDetail"
+
+    PlayerListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: "#/components/schemas/PlayerList"
+
+    PlayerDetailEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: "#/components/schemas/PlayerDetail"
+
+    MatchListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: "#/components/schemas/MatchList"
+
+    MatchDetailEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: "#/components/schemas/MatchDetail"
+
+    MatchStatisticsEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              type: array
+              items:
+                $ref: "#/components/schemas/MatchStatistic"
+
+    OddsEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              anyOf:
+                - $ref: "#/components/schemas/OddsSnapshot"
+                - type: "null"
+
+    PredictionEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              anyOf:
+                - $ref: "#/components/schemas/PredictionDetail"
+                - type: "null"
+
+    PickListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: "#/components/schemas/PickList"
+
+    ValueListEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: "#/components/schemas/ValueList"
+
+    PerformanceEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: "#/components/schemas/PerformanceReport"
+
+    AnalystEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: "#/components/schemas/AnalystSession"

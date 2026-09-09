@@ -95,10 +95,24 @@ export function CalibrationChart({ buckets }: { buckets: CalibrationBucket[] }) 
   );
 }
 
-export function RoiNote({ value }: { value: number | null }) {
+/**
+ * Backtest outcome figures.
+ *
+ * ROI and drawdown are always shown together: a return quoted without its worst
+ * decline overstates how comfortable the strategy was to hold.
+ */
+export function RoiNote({
+  roi,
+  maxDrawdown,
+}: {
+  roi: number | null;
+  maxDrawdown: number | null;
+}) {
   return (
     <p className="text-sm text-muted">
-      ROI théorique {formatSignedPercent(value)}. Mesure de backtest, pas un rendement promis.
+      ROI théorique {formatSignedPercent(roi)} · drawdown maximal{" "}
+      {formatSignedPercent(maxDrawdown)}. Mesures de backtest à mises unitaires, pas un rendement
+      promis.
     </p>
   );
 }

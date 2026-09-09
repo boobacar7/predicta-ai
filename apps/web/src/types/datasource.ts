@@ -8,7 +8,6 @@ import type {
   MatchDetail,
   MatchFilters,
   MatchSummary,
-  MockScenario,
   PerformanceReport,
   Pick,
   Player,
@@ -24,23 +23,42 @@ export interface ListResult<T> {
   total: number;
 }
 
+/** How the active source resolved its reads, surfaced for diagnostics only. */
+export type DataSourceKind = "mock" | "http" | "hybrid";
+
+/**
+ * The single boundary every view reads through.
+ *
+ * Each method maps 1:1 onto an endpoint in docs/architecture.md §16, and takes
+ * only parameters that endpoint accepts. Mock-only concerns (scenario selection,
+ * fixture latency) are bound when the source is constructed, never passed per
+ * call, so `MockDataSource` and `HttpDataSource` stay interchangeable.
+ *
+ * Every method rejects with a `DataSourceError` from `@/lib/api/errors`.
+ */
 export interface DataSource {
-  readonly mode: "mock" | "http";
-  getDashboard(scenario?: MockScenario): Promise<Envelope<DashboardSnapshot>>;
+  readonly kind: DataSourceKind;
+
+  getDashboard(): Promise<Envelope<DashboardSnapshot>>;
   getSports(): Promise<Envelope<Sport[]>>;
+
   getLeagues(filters?: CatalogFilters): Promise<Envelope<ListResult<League>>>;
   getLeague(id: string): Promise<Envelope<LeagueDetail>>;
-  getMatches(filters?: MatchFilters, scenario?: MockScenario): Promise<Envelope<ListResult<MatchSummary>>>;
-  getMatch(id: string, scenario?: MockScenario): Promise<Envelope<MatchDetail>>;
-  getPicks(filters?: MatchFilters, scenario?: MockScenario): Promise<Envelope<ListResult<Pick>>>;
-  getValue(
-    filters?: MatchFilters,
-    scenario?: MockScenario,
-  ): Promise<Envelope<ListResult<ValueOpportunity>>>;
-  getPerformance(scenario?: MockScenario): Promise<Envelope<PerformanceReport>>;
+
+  getMatches(filters?: MatchFilters): Promise<Envelope<ListResult<MatchSummary>>>;
+  getMatch(id: string): Promise<Envelope<MatchDetail>>;
+
+  getPicks(filters?: MatchFilters): Promise<Envelope<ListResult<Pick>>>;
+  getValue(filters?: MatchFilters): Promise<Envelope<ListResult<ValueOpportunity>>>;
+  getPerformance(): Promise<Envelope<PerformanceReport>>;
+
   getTeams(filters?: CatalogFilters): Promise<Envelope<ListResult<Team>>>;
   getTeam(id: string): Promise<Envelope<TeamDetail>>;
   getPlayers(filters?: CatalogFilters): Promise<Envelope<ListResult<Player>>>;
   getPlayer(id: string): Promise<Envelope<PlayerDetail>>;
+
   getAnalystSession(matchId: string, question?: string): Promise<Envelope<AnalystSession>>;
 }
+
+/** Read method names, used to route each resource independently. */
+export type DataSourceMethod = Exclude<keyof DataSource, "kind">;

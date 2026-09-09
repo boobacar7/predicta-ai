@@ -40,6 +40,7 @@ export const performanceReport: PerformanceReport = {
     brier_score: 0.238,
     ece: 0.031,
     theoretical_roi: 0.027,
+    theoretical_max_drawdown: -0.084,
     prediction_count: 640,
     quality: quality({ source, note: "Métriques de backtest fictives, non issues d'un modèle entraîné." }),
   },
