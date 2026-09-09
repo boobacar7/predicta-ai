@@ -1,13 +1,16 @@
 {
   "name": "predicta-ai",
   "private": true,
-  "description": "PREDICTA AI monorepo. Phase 1 prototype lives in apps/web.",
+  "description": "PREDICTA AI monorepo. Phase 1 prototype lives in apps/web. Phase 2 API lives in apps/api.",
   "scripts": {
     "dev:web": "npm run dev --prefix apps/web",
+    "dev:api": "npm run dev --prefix apps/api",
     "build:web": "npm run build --prefix apps/web",
     "lint:web": "npm run lint --prefix apps/web",
     "typecheck:web": "npm run typecheck --prefix apps/web",
     "test:web": "npm run test --prefix apps/web",
-    "verify:web": "npm run typecheck:web && npm run lint:web && npm run test:web && npm run build:web"
+    "verify:web": "npm run typecheck:web && npm run lint:web && npm run test:web && npm run build:web",
+    "test:api": "npm run test --prefix apps/api",
+    "verify:api": "npm run verify --prefix apps/api"
   }
 }

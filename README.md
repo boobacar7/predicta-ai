@@ -2,7 +2,7 @@
 
 PREDICTA AI est une plateforme SaaS premium d'intelligence sportive. Elle transforme des données de football, basketball et tennis en statistiques, probabilités calibrées, signaux de valeur et explications traçables.
 
-> État du projet : fondation architecturale + prototype UI mock. Backend, ingestion, API réelle et modèles ML ne sont pas implémentés.
+> État du projet : fondation architecturale + prototype UI mock + API FastAPI v1 (fixtures mock). Ingestion provider et modèles ML ne sont pas implémentés.
 
 ## Principes non négociables
 
@@ -34,12 +34,13 @@ Les workers constituent des frontières extractibles, mais aucune architecture m
 - [Contrat API](docs/api-contract.md)
 - [Modèle de données](docs/data-model.md)
 - [Conventions de développement](docs/development-conventions.md)
-- [Roadmap](docs/development-roadmap.md)
 - [Contrat OpenAPI 3.1](contracts/openapi.yaml)
 - [Instructions obligatoires des agents](AGENTS.md)
 - [Design system UI](docs/ui-design-system.md)
 - [Handoff agent Frontend](docs/frontend-handoff.md)
+- [Handoff agent Backend](docs/backend-handoff.md)
 - [ADR 0001 — Fondation UI](docs/adr/0001-frontend-design-system.md)
+- [ADR 0003 — Fondation backend](docs/adr/0003-backend-foundation.md)
 
 ## Flux cible
 
@@ -79,3 +80,5 @@ npm run dev
 Depuis la racine : `npm run dev:web`.
 
 Le prototype affiche exclusivement des fixtures fictives (`data_mode: mock`). Aucun secret ne doit être commité; les variables sont documentées dans `apps/web/.env.example`.
+
+L'API FastAPI se lance depuis `apps/api` (voir [handoff backend](docs/backend-handoff.md)). En mode mock elle sert le même contrat OpenAPI, toujours avec `data_mode: mock`.
