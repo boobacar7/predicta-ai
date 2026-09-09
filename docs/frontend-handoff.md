@@ -1,6 +1,7 @@
-# Handoff agent Frontend
+# Handoff Frontend
 
-Le prototype UI est dans `apps/web`. L'agent Frontend peut brancher l'API sans redessiner les écrans.
+État de `apps/web` après la passe de l'agent Frontend. Les décisions structurantes
+sont dans [ADR 0002](adr/0002-frontend-data-access.md).
 
 ## Démarrage
 
@@ -11,54 +12,115 @@ npm install
 npm run dev
 ```
 
-Depuis la racine : `npm run dev:web`.
+Depuis la racine : `npm run dev:web`, et `npm run verify:web` pour enchaîner
+types, lint, tests et build.
 
-## Ce qui est déjà en place
+## Architecture
 
-- App Router, layout, navigation, design system.
-- Vues : Dashboard, Match Center, détail match, AI Picks, Value Finder, Statistiques, Performance, Ligues, Équipes, Joueurs, AI Analyst, Profil.
-- `DataSource` + `MockDataSource` + stub `HttpDataSource`.
-- Hooks TanStack Query et query keys centralisées.
-- Fixtures fictives, horloge injectée `2026-09-09T18:00:00.000Z`, `data_mode: mock`.
-- Bannière mock permanente.
+```text
+src/
+├── app/                    routes App Router, chaque page délègue à une feature
+├── components/
+│   ├── ui/                 primitives sans logique métier
+│   └── domain/             composants sportifs réutilisables
+├── features/<feature>/
+│   ├── <feature>-view.tsx  composition de la page
+│   ├── selectors.ts        sélection et tri purs, testés
+│   └── index.ts            point d'entrée public
+├── data/
+│   ├── mock/               fixtures fictives + scénarios + contexte scénario
+│   └── http/               client fetch + HttpDataSource
+├── lib/
+│   ├── api/                factory, contrat public, erreurs typées
+│   ├── query/              hooks TanStack Query, clés, client
+│   ├── filters/            filtres utilisateur transverses
+│   └── format/             formatage d'affichage
+├── types/                  types API et contrat DataSource
+└── test/                   helper de rendu avec providers
+```
 
-## Ce qu'il ne faut pas faire
+Règles appliquées :
 
-- Recalculer edge / EV / overround comme source de vérité.
-- Hardcoder des cotes ou stats dans un composant.
-- Présenter un mock comme une donnée live.
-- Inventer blessures, compos, classements réels ou performances de modèle.
-- Activer le mock silencieusement en production.
+- un composant ne fait pas d'appel réseau et ne contient pas de sélection métier;
+- aucune donnée réaliste n'est écrite dans du JSX;
+- les nombres circulent bruts et sont formatés à la frontière d'affichage;
+- une valeur absente devient « Indisponible », jamais `0`.
 
-## Remplacement mock → HTTP
+## Accès aux données
 
-1. Générer les types depuis `contracts/openapi.yaml` vers `src/types/generated/`.
-2. Remplacer `src/types/api.ts` par des réexports générés. Conserver snake_case.
-3. Implémenter `src/data/http/source.ts` avec le client généré.
-4. `getDataSource()` dans `src/lib/api/factory.ts` lit déjà `NEXT_PUBLIC_PREDICTA_DATA_SOURCE`.
-5. Basculer endpoint par endpoint si un mode hybride est ajouté ; chaque réponse doit exposer `data_mode`.
-6. Laisser les fixtures mock pour tests et Storybook futur.
+```text
+vue → hook (lib/query/hooks) → getDataSource(scenario) → MockDataSource | HttpDataSource
+```
 
-## Fichiers d'entrée
+Le mode est résolu **par ressource**, ce qui permet de brancher l'API endpoint par
+endpoint.
 
-| Sujet | Chemin |
+| Variable | Rôle |
 | --- | --- |
-| Factory datasource | `src/lib/api/factory.ts` |
-| Hooks | `src/lib/query/hooks.ts` |
-| Clés | `src/lib/query/keys.ts` |
-| Mock | `src/data/mock/` |
-| HTTP stub | `src/data/http/source.ts` |
-| Tokens | `src/app/globals.css` |
-| Navigation | `src/lib/navigation.ts` |
+| `NEXT_PUBLIC_PREDICTA_ENV` | Cible de déploiement. Seul `production` interdit les mocks. |
+| `NEXT_PUBLIC_PREDICTA_DATA_SOURCE` | Mode par défaut : `mock` ou `http`. |
+| `NEXT_PUBLIC_PREDICTA_HTTP_RESOURCES` | Ressources basculées sur l'API. |
+| `NEXT_PUBLIC_PREDICTA_MOCK_RESOURCES` | Ressources maintenues sur fixtures. |
+| `NEXT_PUBLIC_PREDICTA_API_BASE_URL` | Base `/api/v1`, requise dès qu'une ressource lit en HTTP. |
+| `NEXT_PUBLIC_PREDICTA_REQUEST_TIMEOUT_MS` | Budget d'abandon d'une lecture. |
 
-## Écarts connus à reconcilier avec OpenAPI
+Exemple de bascule d'un seul endpoint :
 
-- Types manuscrits dans `src/types/api.ts`.
-- Pas encore de pagination curseur.
-- `request_id` mock constant.
-- AI Analyst : session mock déterministe, pas d'appel LLM.
-- Profil : placeholder phase 10.
+```bash
+NEXT_PUBLIC_PREDICTA_HTTP_RESOURCES=performance
+NEXT_PUBLIC_PREDICTA_API_BASE_URL=http://localhost:8000/api/v1
+```
 
-## Tests existants
+La bannière passe alors en `hybrid` et l'indique explicitement.
 
-`npm run test --prefix apps/web` couvre le formatage des probabilités (une valeur absente ne devient jamais `0`).
+## États d'interface
+
+`QueryBoundary` traite loading, idle, error, empty, partial et stale pour toutes
+les vues. Une vue fournit son squelette, sa définition de « vide » et, si
+pertinent, un sélecteur de `DataQuality`.
+
+Le sélecteur « Scénario mock » de la barre supérieure expose `success`, `empty`,
+`partial`, `stale` et `error` sans backend. Il disparaît quand toutes les
+ressources lisent en HTTP.
+
+Le bouton « Réessayer » n'apparaît que pour une erreur réellement retentable
+(`network`, `server`, `mock_scenario`). Un 404 ou une enveloppe invalide n'en
+propose pas.
+
+## Responsive
+
+- Desktop `lg+` : sidebar persistante 256px.
+- Tablette : sidebar en overlay via le bouton hamburger.
+- Mobile : barre inférieure à 5 destinations, contenu dégagé par `pb-24`.
+
+Vérifié à 1440, 820 et 390px : aucun débordement horizontal.
+
+## Tests
+
+`npm run test --prefix apps/web` (Vitest + Testing Library, jsdom).
+
+Couverture actuelle : formatage et règle « jamais `0` », configuration et garde
+production, client HTTP (RFC 9457, validation d'enveloppe, timeout), erreurs
+typées, `MockDataSource` et ses scénarios, clés de cache, routage de la factory,
+`QueryBoundary`, `StatGrid`, `MatchCard`, et `PicksView` de bout en bout.
+
+Utiliser `renderWithProviders` de `src/test/render.tsx` pour tout composant qui
+dépend des providers de l'application.
+
+## Écarts connus à résorber
+
+- `src/types/api.ts` est **manuscrit**. Il doit être remplacé par des types
+  générés depuis `contracts/openapi.yaml`, qui n'existe pas encore. C'est l'écart
+  prioritaire.
+- Aucune route agrégée `GET /dashboard` n'est documentée dans AGENTS.md §16.
+  `HttpDataSource` la suppose ; à confirmer avec l'agent Architecte.
+- Pas de pagination curseur : `ListResult` expose `items` et `total`.
+- `theoretical_max_drawdown` a été ajouté à `ModelHealthSummary` côté frontend
+  pour satisfaire AGENTS.md §12. À refléter dans le contrat.
+- AI Analyst : session mock déterministe, aucun appel LLM.
+- Profil : placeholder, phase 10.
+
+## Non fait volontairement
+
+Backend, base de données, modèles ML, intégration provider et logique de
+prédiction réelle restent hors périmètre de cet agent.

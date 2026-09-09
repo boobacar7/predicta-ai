@@ -259,7 +259,10 @@ export interface ModelHealthSummary {
   log_loss: number | null;
   brier_score: number | null;
   ece: number | null;
+  /** Backtest ROI, expressed as a ratio. Theoretical, never a promised return. */
   theoretical_roi: number | null;
+  /** Worst peak-to-trough decline observed in the same backtest, as a ratio. */
+  theoretical_max_drawdown: number | null;
   prediction_count: number;
   quality: DataQuality;
 }

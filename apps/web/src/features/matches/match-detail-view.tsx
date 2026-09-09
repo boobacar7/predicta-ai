@@ -2,11 +2,11 @@
 
 import { AIConfidence } from "@/components/domain/ai-confidence";
 import { DataFreshness, Provenance } from "@/components/domain/data-freshness";
-import { EmptyState, ErrorState } from "@/components/domain/empty-state";
 import { MatchTimeline } from "@/components/domain/match-timeline";
 import { OddsDisplay } from "@/components/domain/odds-display";
 import { PageHeader } from "@/components/domain/page-header";
 import { ProbabilityBar } from "@/components/domain/probability-bar";
+import { QueryBoundary } from "@/components/domain/query-boundary";
 import { TeamComparison } from "@/components/domain/team-comparison";
 import { TeamLogo } from "@/components/domain/team-logo";
 import { Unavailable } from "@/components/domain/unavailable";
@@ -14,42 +14,58 @@ import { ValueBadge } from "@/components/domain/value-badge";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { CardSkeleton } from "@/components/ui/skeleton";
-import { useFilters } from "@/lib/filters/context";
-import { formatKickoff } from "@/lib/format/dates";
+import { formatAbsolute, formatKickoff } from "@/lib/format/dates";
 import { matchStatusLabels, sportLabels } from "@/lib/format/labels";
+import { formatPoints, formatScore } from "@/lib/format/numbers";
 import { useMatch } from "@/lib/query/hooks";
+import type { MatchDetail } from "@/types/api";
 import Link from "next/link";
 
 export function MatchDetailView({ matchId }: { matchId: string }) {
-  const { scenario } = useFilters();
-  const query = useMatch(matchId, scenario);
+  const query = useMatch(matchId);
 
-  if (query.isLoading) return <CardSkeleton rows={8} />;
-  if (query.isError || !query.data) {
-    return <ErrorState description={query.error?.message ?? "Réponse mock indisponible."} onRetry={() => void query.refetch()} />;
-  }
+  return (
+    <QueryBoundary
+      query={query}
+      skeleton={<CardSkeleton rows={8} />}
+      quality={(match) => match.quality}
+    >
+      {(match) => <MatchDetailContent match={match} />}
+    </QueryBoundary>
+  );
+}
 
-  const match = query.data.data;
+function MatchDetailContent({ match }: { match: MatchDetail }) {
+  const showScore = match.status === "finished" || match.status === "live";
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow={sportLabels[match.sport]}
+        eyebrow={`${sportLabels[match.sport]} · ${match.league.name}`}
         title={`${match.home.name} · ${match.away.name}`}
-        description={`${match.league.name} · ${formatKickoff(match.kickoff_at)} · ${match.venue ?? "Lieu indisponible"}`}
+        description={`${formatKickoff(match.kickoff_at)} · ${match.venue ?? "Lieu indisponible"}`}
         actions={<Badge tone="muted">{matchStatusLabels[match.status]}</Badge>}
       />
+
       <div className="flex flex-wrap items-center gap-3">
         <DataFreshness quality={match.quality} />
         <Provenance quality={match.quality} />
       </div>
-      <div className="flex items-center justify-center gap-6 rounded-2xl border border-border bg-surface p-6">
+
+      <div className="flex items-center justify-center gap-4 rounded-2xl border border-border bg-surface p-6 sm:gap-8">
         <TeamLogo name={match.home.name} abbreviation={match.home.abbreviation} size="lg" />
-        <p className="font-mono text-3xl tabular">
-          {match.score.home ?? "—"} – {match.score.away ?? "—"}
-        </p>
+        {showScore ? (
+          <p className="font-mono text-3xl tabular">
+            {formatScore(match.score.home)} – {formatScore(match.score.away)}
+          </p>
+        ) : (
+          <p className="text-xs uppercase tracking-[0.18em] text-faint">
+            {formatKickoff(match.kickoff_at)}
+          </p>
+        )}
         <TeamLogo name={match.away.name} abbreviation={match.away.abbreviation} size="lg" />
       </div>
+
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -61,20 +77,27 @@ export function MatchDetailView({ matchId }: { matchId: string }) {
                 <div className="flex flex-wrap gap-2">
                   <AIConfidence level={match.prediction.confidence} />
                   <Badge tone="ai">{match.prediction.model_version}</Badge>
-                  <ValueBadge preview={match.value_preview} />
+                  {match.value_preview ? <ValueBadge preview={match.value_preview} /> : null}
                 </div>
                 <ProbabilityBar outcomes={match.prediction.outcomes} />
                 <p className="text-xs text-faint">
-                  Cutoff {match.prediction.cutoff_at} · calibrateur {match.prediction.calibrator_version}
+                  Cutoff des données {formatAbsolute(match.prediction.cutoff_at)} · calibrateur{" "}
+                  {match.prediction.calibrator_version} · features{" "}
+                  {match.prediction.feature_set_version}
                 </p>
-                <ul className="space-y-2 text-sm text-muted">
-                  {match.prediction.factors.map((factor) => (
-                    <li key={factor.id}>
-                      <span className="text-foreground">{factor.label}.</span> {factor.detail}
-                      {factor.quality.availability === "unavailable" ? " (indisponible)" : ""}
-                    </li>
-                  ))}
-                </ul>
+                <div>
+                  <h3 className="text-sm font-medium">Facteurs explicatifs</h3>
+                  <ul className="mt-2 space-y-2 text-sm text-muted">
+                    {match.prediction.factors.map((factor) => (
+                      <li key={factor.id}>
+                        <span className="text-foreground">{factor.label}.</span> {factor.detail}
+                        {factor.quality.availability === "unavailable" ? (
+                          <span className="text-warning"> (donnée indisponible)</span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </>
             ) : (
               <Unavailable
@@ -84,20 +107,22 @@ export function MatchDetailView({ matchId }: { matchId: string }) {
             )}
           </CardBody>
         </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>Cotes observées</CardTitle>
           </CardHeader>
           <CardBody>
             <OddsDisplay odds={match.odds} />
-            {match.odds?.overround !== null && match.odds ? (
+            {match.odds && match.odds.overround !== null ? (
               <p className="mt-3 text-xs text-faint">
-                Overround estimé {(match.odds.overround * 100).toFixed(1)} pts. Formule Value Engine
-                0.1.
+                Overround estimé {formatPoints(match.odds.overround)}. Les probabilités no-vig sont
+                calculées par le Value Engine, pas par l&apos;interface.
               </p>
             ) : null}
           </CardBody>
         </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>Statistiques</CardTitle>
@@ -106,6 +131,7 @@ export function MatchDetailView({ matchId }: { matchId: string }) {
             <TeamComparison home={match.home} away={match.away} stats={match.stats} />
           </CardBody>
         </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>Chronologie</CardTitle>
@@ -115,14 +141,20 @@ export function MatchDetailView({ matchId }: { matchId: string }) {
           </CardBody>
         </Card>
       </div>
+
       {match.unavailable_fields.length > 0 ? (
-        <EmptyState
-          title="Données manquantes"
-          description={match.unavailable_fields.map((field) => field.reason).join(" ")}
-        />
+        <section className="space-y-2">
+          <h2 className="text-sm font-medium">Données non fournies</h2>
+          <div className="grid gap-2 md:grid-cols-2">
+            {match.unavailable_fields.map((field) => (
+              <Unavailable key={field.field} label={field.field} reason={field.reason} />
+            ))}
+          </div>
+        </section>
       ) : null}
-      <Link href="/analyst" className="text-sm text-ai-strong hover:underline">
-        Ouvrir dans l’AI Analyst
+
+      <Link href="/analyst" className="inline-block text-sm text-ai-strong hover:underline">
+        Ouvrir dans l&apos;AI Analyst
       </Link>
     </div>
   );

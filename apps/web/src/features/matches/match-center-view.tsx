@@ -1,67 +1,92 @@
 "use client";
 
 import { CalendarStrip } from "@/components/domain/calendar-strip";
-import { EmptyState, ErrorState } from "@/components/domain/empty-state";
-import { LeagueFilter } from "@/components/domain/filters";
+import { LeagueFilter, StatusFilter } from "@/components/domain/filters";
 import { MatchCard } from "@/components/domain/match-card";
 import { PageHeader } from "@/components/domain/page-header";
+import { QueryBoundary } from "@/components/domain/query-boundary";
+import { Input } from "@/components/ui/input";
 import { CardSkeleton } from "@/components/ui/skeleton";
-import { isoDaysFromNow } from "@/data/mock/clock";
+import { searchMatches, upcomingDays } from "@/features/matches/selectors";
 import { useFilters } from "@/lib/filters/context";
-import { useLeagues, useMatches } from "@/lib/query/hooks";
 import { pageMeta } from "@/lib/navigation";
-import { useMemo, useState } from "react";
+import { useLeagues, useMatches } from "@/lib/query/hooks";
+import type { MatchStatus } from "@/types/api";
+import { useDeferredValue, useState } from "react";
 
-const days = [0, 1, 2, 3, 4, 5, 6].map((offset) => isoDaysFromNow(offset).slice(0, 10));
+const meta = pageMeta["/matches"];
+const days = upcomingDays(7);
 
 export function MatchCenterView() {
-  const { sport, scenario } = useFilters();
-  const [date, setDate] = useState(days[0] ?? "2026-09-09");
+  const { sport } = useFilters();
+  const [date, setDate] = useState(days[0]);
   const [leagueId, setLeagueId] = useState("all");
-  const meta = pageMeta["/matches"];
+  const [status, setStatus] = useState<MatchStatus | "all">("all");
+  const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
+
   const leagues = useLeagues({ sport });
-  const matches = useMatches(
-    { sport, date, league_id: leagueId },
-    scenario,
-  );
-
-  const leagueOptions = useMemo(
-    () => leagues.data?.data.items ?? [],
-    [leagues.data],
-  );
-
-  if (matches.isLoading) {
-    return (
-      <div className="space-y-6">
-        <PageHeader eyebrow={meta.eyebrow} title={meta.title} description={meta.description} />
-        <CardSkeleton rows={4} />
-      </div>
-    );
-  }
-
-  if (matches.isError || !matches.data) {
-    return (
-      <ErrorState description={matches.error?.message ?? "Réponse mock indisponible."} onRetry={() => void matches.refetch()} />
-    );
-  }
+  const matches = useMatches({ sport, date, league_id: leagueId, status });
 
   return (
     <div className="space-y-6">
       <PageHeader eyebrow={meta.eyebrow} title={meta.title} description={meta.description} />
+
       <CalendarStrip days={days} value={date} onChange={setDate} />
-      <LeagueFilter leagues={leagueOptions} value={leagueId} onChange={setLeagueId} />
-      {matches.data.data.items.length === 0 ? (
-        <EmptyState
-          title="Aucun événement"
-          description="Aucun match mock ne correspond à cette date, ce sport ou cette compétition."
+
+      <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end">
+        <LeagueFilter
+          leagues={leagues.data?.data.items ?? []}
+          value={leagueId}
+          onChange={setLeagueId}
+          disabled={leagues.isPending}
         />
-      ) : (
-        <div className="grid gap-4 xl:grid-cols-2">
-          {matches.data.data.items.map((match) => (
-            <MatchCard key={match.id} match={match} />
-          ))}
+        <StatusFilter value={status} onChange={setStatus} />
+        <div className="md:ml-auto md:w-64">
+          <Input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Rechercher une équipe"
+            aria-label="Rechercher une équipe dans le calendrier"
+          />
         </div>
-      )}
+      </div>
+
+      <QueryBoundary
+        query={matches}
+        skeleton={
+          <div className="grid gap-4 xl:grid-cols-2">
+            <CardSkeleton rows={4} />
+            <CardSkeleton rows={4} />
+          </div>
+        }
+      >
+        {(result) => {
+          const items = searchMatches(result.items, deferredSearch);
+
+          if (items.length === 0) {
+            return (
+              <p
+                role="status"
+                className="rounded-2xl border border-dashed border-border-strong px-6 py-16 text-center text-sm text-muted"
+              >
+                {result.items.length === 0
+                  ? "Aucun événement ne correspond à cette date, ce sport, cette compétition ou ce statut."
+                  : `Aucune équipe ne correspond à « ${deferredSearch.trim()} » parmi les ${result.items.length} événements de cette sélection.`}
+              </p>
+            );
+          }
+
+          return (
+            <div className="grid gap-4 xl:grid-cols-2">
+              {items.map((match) => (
+                <MatchCard key={match.id} match={match} />
+              ))}
+            </div>
+          );
+        }}
+      </QueryBoundary>
     </div>
   );
 }
