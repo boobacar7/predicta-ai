@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+  --background: #07090d;
+  --surface: #0e1219;
+  --surface-elevated: #151b25;
+  --surface-hover: #1b2330;
+  --foreground: #f5f7fa;
+  --muted: #8992a3;
+  --muted-strong: #c3cad6;
+  --faint: #5c6573;
+  --border: rgb(245 247 250 / 0.07);
+  --border-strong: rgb(245 247 250 / 0.14);
+  --ai: #7c6cf6;
+  --ai-soft: rgb(124 108 246 / 0.14);
+  --ai-strong: #a99cff;
+  --value: #3ddc97;
+  --value-soft: rgb(61 220 151 / 0.12);
+  --warning: #f0a14a;
+  --warning-soft: rgb(240 161 74 / 0.14);
+  --risk: #e36b5b;
+  --risk-soft: rgb(227 107 91 / 0.12);
+  --home: #7c6cf6;
+  --draw: #6b7380;
+  --away: #4ea3d9;
+  --radius: 1rem;
+  --radius-sm: 0.625rem;
+  --radius-lg: 1.375rem;
+  --shadow-card: 0 1px 0 rgb(255 255 255 / 0.04), 0 18px 50px rgb(0 0 0 / 0.35);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-hover: var(--surface-hover);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-strong: var(--muted-strong);
+  --color-faint: var(--faint);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-ai: var(--ai);
+  --color-ai-soft: var(--ai-soft);
+  --color-ai-strong: var(--ai-strong);
+  --color-value: var(--value);
+  --color-value-soft: var(--value-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-risk: var(--risk);
+  --color-risk-soft: var(--risk-soft);
+  --color-home: var(--home);
+  --color-draw: var(--draw);
+  --color-away: var(--away);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --radius-xl: var(--radius);
+  --radius-lg: var(--radius-lg);
+  --shadow-card: var(--shadow-card);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html,
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+body {
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  min-height: 100%;
+  letter-spacing: -0.011em;
+}
+
+::selection {
+  background: var(--ai-soft);
+  color: var(--foreground);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ai);
+  outline-offset: 2px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
