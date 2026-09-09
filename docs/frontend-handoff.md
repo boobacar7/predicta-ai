@@ -107,16 +107,21 @@ typées, `MockDataSource` et ses scénarios, clés de cache, routage de la facto
 Utiliser `renderWithProviders` de `src/test/render.tsx` pour tout composant qui
 dépend des providers de l'application.
 
-## Écarts connus à résorber
+## Écarts contractuels
 
-- `src/types/api.ts` est **manuscrit**. Il doit être remplacé par des types
-  générés depuis `contracts/openapi.yaml`, qui n'existe pas encore. C'est l'écart
-  prioritaire.
-- Aucune route agrégée `GET /dashboard` n'est documentée dans AGENTS.md §16.
-  `HttpDataSource` la suppose ; à confirmer avec l'agent Architecte.
-- Pas de pagination curseur : `ListResult` expose `items` et `total`.
-- `theoretical_max_drawdown` a été ajouté à `ModelHealthSummary` côté frontend
-  pour satisfaire AGENTS.md §12. À refléter dans le contrat.
+Résolus par [`contracts/openapi.yaml`](../contracts/openapi.yaml) :
+
+- la route agrégée `GET /api/v1/dashboard` est canonique;
+- `ModelHealthSummary.theoretical_max_drawdown` est requis et exprimé comme un
+  ratio non positif;
+- les listes v1 conservent `items` et `total`, avec `limit`/`offset` optionnels;
+- les enveloppes, erreurs RFC 9457, filtres, enums, disponibilités et fraîcheurs
+  sont définis.
+
+Reste une tâche frontend volontairement séparée : remplacer
+`src/types/api.ts`, encore manuscrit, par les types générés depuis OpenAPI puis
+exécuter le typecheck et les tests. Les composants et la `DataSource` n'ont pas
+besoin d'être redessinés.
 - AI Analyst : session mock déterministe, aucun appel LLM.
 - Profil : placeholder, phase 10.
 
