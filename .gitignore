@@ -13,3 +13,13 @@ coverage
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+*.egg-info/
+dist/
+.worktrees/
+
