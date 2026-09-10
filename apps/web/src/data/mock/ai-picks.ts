@@ -24,11 +24,26 @@ import type { AiPick, AiPickExclusion, AiPicksMetadata } from "@/types/api";
 
 const MODEL_VERSION = "football-elo-v1-candidate";
 const ODDS_SOURCE = "predicta-mock-odds-v0.1";
-const CUTOFF_AT = isoHoursFromNow(6);
+/**
+ * The engine sets the point-in-time cutoff to the match kickoff, so a fixture
+ * whose `cutoff_at` drifted from `kickoff_at` would describe a state the
+ * engine cannot produce.
+ */
+const LINCOLN_KICKOFF = "2026-07-07T16:00:00Z";
+
+const KICKOFFS = {
+  lincoln: LINCOLN_KICKOFF,
+  silverpark: isoHoursFromNow(9),
+  castleford: isoHoursFromNow(30),
+  eastfield: isoHoursFromNow(32),
+} as const;
 
 type PickFacts = Pick<
   AiPick,
   | "match_id"
+  | "home_team"
+  | "away_team"
+  | "kickoff_at"
   | "league"
   | "selection"
   | "model_probability"
@@ -50,11 +65,11 @@ function pick(facts: PickFacts): AiPick {
     model_status: "candidate",
     value_engine_version: "value-engine-0.1",
     ai_picks_version: "ai-picks-0.1",
-    cutoff_at: CUTOFF_AT,
     generated_at: MOCK_NOW_ISO,
     data_mode: "mock",
     status: "eligible",
     ...facts,
+    cutoff_at: facts.kickoff_at,
   };
 }
 
@@ -68,20 +83,29 @@ function pick(facts: PickFacts): AiPick {
  */
 export const aiPicks: AiPick[] = [
   pick({
-    match_id: "mth_mock_northgate_harbor",
-    league: "Continental Premier",
+    // Copied from GET /football/ai-picks after c31a367. Identity fields are
+    // the contract the UI must render; derived ratios stay as the engine
+    // published them and are never recomputed here.
+    match_id: "mth_football-sportmonks-19719892",
+    home_team: "Lincoln Red Imps",
+    away_team: "Inter Club d'Escaldes",
+    kickoff_at: KICKOFFS.lincoln,
+    league: "Champions League",
     selection: "AWAY",
-    model_probability: 0.3126,
+    model_probability: 0.31261487997008847,
     odds: 5,
     implied_probability: 0.2,
-    no_vig_probability: 0.2105,
-    edge: 0.1126,
-    ev: 0.563,
-    opportunity_score: 0.6756,
+    no_vig_probability: 0.21052631578947367,
+    edge: 0.11261487997008847,
+    ev: 0.5630743998504424,
+    opportunity_score: 0.6756892798205308,
     rank: 1,
   }),
   pick({
     match_id: "mth_mock_silverpark_westbridge",
+    home_team: "Silverpark City",
+    away_team: "Westbridge Athletic",
+    kickoff_at: KICKOFFS.silverpark,
     league: "Continental Premier",
     selection: "HOME",
     model_probability: 0.5412,
@@ -94,7 +118,13 @@ export const aiPicks: AiPick[] = [
     rank: 2,
   }),
   pick({
+    // Identity unresolved on purpose: the point-in-time archive does not always
+    // yield a label, the contract allows null, and the UI must show a gap
+    // rather than a placeholder name.
     match_id: "mth_mock_castleford_riverton",
+    home_team: null,
+    away_team: null,
+    kickoff_at: KICKOFFS.castleford,
     league: "Northern Championship",
     selection: "AWAY",
     model_probability: 0.3894,
@@ -107,7 +137,12 @@ export const aiPicks: AiPick[] = [
     rank: 3,
   }),
   pick({
+    // Partial identity: the archive resolved the home label only. The card
+    // must keep the "vs" shape and mark the missing side, not invent a name.
     match_id: "mth_mock_northgate_harbor",
+    home_team: "Northgate FC",
+    away_team: null,
+    kickoff_at: isoHoursFromNow(6),
     league: "Continental Premier",
     selection: "DRAW",
     model_probability: 0.271,
@@ -129,8 +164,8 @@ export const aiPicks: AiPick[] = [
  */
 export const aiPickExclusions: AiPickExclusion[] = [
   {
-    match_id: "mth_mock_northgate_harbor",
-    league: "Continental Premier",
+    match_id: "mth_football-sportmonks-19719892",
+    league: "Champions League",
     market: "1X2",
     selection: "HOME",
     status: "excluded",
@@ -167,17 +202,18 @@ export const aiPickExclusions: AiPickExclusion[] = [
 ];
 
 /**
- * Kickoff of each candidate, kept out of the payload on purpose.
+ * Kickoff of every candidate the engine evaluated, including those that
+ * produced no eligible pick.
  *
- * The engine resolves kickoffs internally to honour `?date=`, but does not
- * publish them on `AiPick`. Mirroring that split here keeps the mock honest:
- * the date filter can work while the UI still has no kickoff to display.
+ * `AiPick` now carries its own `kickoff_at`, so this map only exists to honour
+ * `?date=` for candidates that appear solely in the exclusions.
  */
 export const mockCandidateKickoffs: Readonly<Record<string, string>> = {
+  "mth_football-sportmonks-19719892": KICKOFFS.lincoln,
   mth_mock_northgate_harbor: isoHoursFromNow(6),
-  mth_mock_silverpark_westbridge: isoHoursFromNow(9),
-  mth_mock_castleford_riverton: isoHoursFromNow(30),
-  mth_mock_eastfield_lakeside: isoHoursFromNow(32),
+  mth_mock_silverpark_westbridge: KICKOFFS.silverpark,
+  mth_mock_castleford_riverton: KICKOFFS.castleford,
+  mth_mock_eastfield_lakeside: KICKOFFS.eastfield,
 };
 
 export const aiPicksMetadata: AiPicksMetadata = {

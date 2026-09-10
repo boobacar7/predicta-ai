@@ -7,7 +7,7 @@ import type {
   DashboardSnapshot,
   League,
   LeagueDetail,
-  MatchDetail,
+  MatchDetailResponse,
   MatchFilters,
   MatchSummary,
   PerformanceReport,
@@ -62,7 +62,7 @@ export class HttpDataSource implements DataSource {
   }
 
   getMatch(id: string) {
-    return this.client.get<MatchDetail>(`/matches/${encodeURIComponent(id)}`);
+    return this.client.get<MatchDetailResponse>(`/matches/${encodeURIComponent(id)}`);
   }
 
   getPicks(filters: MatchFilters = {}) {

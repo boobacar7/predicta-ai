@@ -7,7 +7,7 @@ import type {
   Envelope,
   League,
   LeagueDetail,
-  MatchDetail,
+  MatchDetailResponse,
   MatchFilters,
   MatchSummary,
   PerformanceReport,
@@ -48,7 +48,12 @@ export interface DataSource {
   getLeague(id: string): Promise<Envelope<LeagueDetail>>;
 
   getMatches(filters?: MatchFilters): Promise<Envelope<ListResult<MatchSummary>>>;
-  getMatch(id: string): Promise<Envelope<MatchDetail>>;
+  /**
+   * Returns `MatchDetail` for a projected match, or `HistoricalMatchIdentity`
+   * for an id that only exists in the point-in-time archive. Callers must
+   * discriminate; the two shapes share no statistics.
+   */
+  getMatch(id: string): Promise<Envelope<MatchDetailResponse>>;
 
   getPicks(filters?: MatchFilters): Promise<Envelope<ListResult<Pick>>>;
 

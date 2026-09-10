@@ -37,8 +37,9 @@ export const availabilityLabels: Record<AvailabilityStatus, string> = {
 /**
  * The engine's 1X2 selections.
  *
- * Rendered without team names on purpose: `AiPick` carries no team identity, so
- * writing anything other than the side would be an invention.
+ * The side only. Team names live on `AiPick.home_team` / `away_team` and are
+ * rendered by the card, so composing them here would duplicate identity in a
+ * place that has no way to know whether the archive resolved it.
  */
 export const football1x2Labels: Record<Football1x2Selection, string> = {
   HOME: "Domicile",
@@ -49,7 +50,6 @@ export const football1x2Labels: Record<Football1x2Selection, string> = {
 export const modelStatusLabels: Record<FootballModelStatus, string> = {
   candidate: "Candidat",
   champion: "Champion",
-  production: "Production",
 };
 
 /** Why the engine rejected a selection. One entry per reason in the contract. */

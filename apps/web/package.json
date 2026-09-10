@@ -9,7 +9,9 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "generate:api-types": "openapi-typescript ../../contracts/openapi.yaml --output src/types/generated/api.ts",
+    "verify": "npm run generate:api-types && npm run typecheck && npm run lint && npm test && npm run build"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",
@@ -39,6 +41,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "jsdom": "^29.1.1",
+    "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vite-tsconfig-paths": "^6.1.1",

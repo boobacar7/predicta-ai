@@ -118,32 +118,47 @@ Résolus par [`contracts/openapi.yaml`](../contracts/openapi.yaml) :
 - les enveloppes, erreurs RFC 9457, filtres, enums, disponibilités et fraîcheurs
   sont définis.
 
-Reste une tâche frontend volontairement séparée : remplacer
-`src/types/api.ts`, encore manuscrit, par les types générés depuis OpenAPI puis
-exécuter le typecheck et les tests. Les composants et la `DataSource` n'ont pas
-besoin d'être redessinés.
+`AiPick`, `AiPickExclusion`, `AiPicksMetadata`, `AiPicksResult` et
+`HistoricalMatchIdentity` sont des alias de
+`src/types/generated/api.ts`, régénéré par `npm run generate:api-types`
+depuis `contracts/openapi.yaml`. Le reste de `api.ts` reste manuscrit
+tant que la migration OpenAPI n'est pas totale.
 
-### Ouvert : identité de match absente de `AiPick`
+### Identité de match — consommé depuis `c31a367`
 
-`GET /api/v1/football/ai-picks` expose `match_id` et `league`, mais ni les noms
-d'équipes ni le coup d'envoi. Le moteur les résout pourtant en interne
-(`MatchCandidate.kickoff_at` dans `apps/api/app/ai_picks/models.py`) et s'en sert
-pour honorer `?date=`.
+`GET /api/v1/football/ai-picks` publie `home_team`, `away_team` (nullables)
+et `kickoff_at` (requis). `/ai-picks` affiche `Home vs Away`, la ligue et
+le coup d'envoi. `Information indisponible` n'apparaît que lorsque le
+libellé est réellement `null`.
 
-Vérifié contre l'API réelle : `GET /api/v1/matches/{match_id}` répond `404` pour
-les identifiants produits par le moteur, qui viennent du parquet PIT. L'identité
-n'est donc résolvable par aucune route existante.
+`GET /api/v1/matches/{match_id}` peut renvoyer `MatchDetail` ou
+`HistoricalMatchIdentity`. `MatchDetailView` discrimine via
+`resource_scope === "structural_identity"` et n'invente ni score, ni
+chronologie, ni statistiques pour un id d'archive.
 
-Conséquence assumée côté frontend : `/ai-picks` affiche l'identifiant du match et
-signale explicitement l'identité et le kickoff comme indisponibles, plutôt que
-d'inventer un nom d'équipe. C'est conforme à AGENTS.md §6, mais la page reste
-moins lisible qu'elle ne devrait l'être.
+Pour lire l'API réelle plutôt que les fixtures :
 
-Décision attendue de l'Architecte et du Backend : soit ajouter `home`, `away` et
-`kickoff_at` au schéma `AiPick`, soit exposer une route de résolution acceptant
-les identifiants du parquet PIT. Le frontend n'a pas modifié le contrat.
+```
+NEXT_PUBLIC_PREDICTA_HTTP_RESOURCES=football_ai_picks,matches
+NEXT_PUBLIC_PREDICTA_API_BASE_URL=http://localhost:8000/api/v1
+```
+
+Le défaut reste `mock` pour le développement local sans parquet. Chaque
+réponse porte encore `data_mode` ; l'UI affiche « Mock data » uniquement
+lorsque l'enveloppe le dit.
+
+### Value Finder — filtres du contrat
+
+`GET /value` accepte `sport`, `league_id`, `date`, `status`, `limit`,
+`offset`. Ceux-là partent à l'API. Marché, seuils numériques et tri n'ont
+pas de paramètre équivalent : ils restent un affinage local, étiqueté
+comme tel. Inventer `min_edge` sur cette route serait un contrat fantôme.
+
+Limites restantes :
+
 - AI Analyst : session mock déterministe, aucun appel LLM.
 - Profil : placeholder, phase 10.
+- Univers AI Picks V0.1 : un match candidat côté backend.
 
 ## Non fait volontairement
 

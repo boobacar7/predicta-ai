@@ -7,6 +7,8 @@
  * Do not silently diverge from the documented endpoints.
  */
 
+import type { components } from "@/types/generated/api";
+
 export type DataMode = "mock" | "live";
 export type SportCode = "football" | "basketball" | "tennis";
 export type AvailabilityStatus = "available" | "unavailable" | "partial" | "stale";
@@ -363,96 +365,58 @@ export interface AnalystSession {
 }
 
 /* -------------------------------------------------------------------------
- * AI Picks Engine (ai-picks-0.1)
+ * AI Picks Engine (ai-picks-0.1) and historical match identity
  *
- * Mirrors `AiPick`, `AiPickExclusion`, `AiPicksMetadata` and `AiPicksResult`
- * in contracts/openapi.yaml, which declare `additionalProperties: false`.
- * Nothing here may be widened locally: a field the engine does not publish is
- * a gap to raise with the Backend agent, never one to fill in the UI.
+ * These types are aliases of the schemas generated from
+ * `contracts/openapi.yaml` by `npm run generate:api-types`. They are not
+ * transcribed by hand.
+ *
+ * The distinction matters: this surface previously drifted from the contract
+ * when the engine started publishing team identity, and a hand-written mirror
+ * gave no signal. Deriving from the generated file turns any future contract
+ * change into a typecheck failure instead of a silently stale UI.
  *
  * Ratios are raw decimals: `0.072` means 7.2 points.
  * ---------------------------------------------------------------------- */
 
-export type FootballModelStatus = "candidate" | "champion" | "production";
-export type Football1x2Selection = "HOME" | "DRAW" | "AWAY";
+type Schemas = components["schemas"];
 
-export type AiPickExclusionReason =
-  | "negative_ev"
-  | "negative_edge"
-  | "below_minimum_ev"
-  | "below_minimum_edge"
-  | "below_minimum_model_probability"
-  | "invalid_odds"
-  | "incomplete_market"
-  | "prediction_unavailable"
-  | "pit_unavailable"
-  | "invalid_prediction"
-  | "invalid_value"
-  | "stale_odds";
+export type FootballModelStatus = Schemas["FootballModelStatus"];
+export type Football1x2Selection = AiPick["selection"];
+export type AiPickExclusionReason = Schemas["AiPickExclusionReason"];
 
 /**
  * One ranked opportunity.
  *
- * The engine resolves team identity and kickoff internally but does not
- * publish them, so a pick can only be identified by `match_id` and `league`.
+ * `home_team` and `away_team` are nullable in the contract: the engine
+ * publishes the canonical label when the point-in-time archive resolves it,
+ * and `null` when it does not. `kickoff_at` is required and non-nullable.
  */
-export interface AiPick {
-  match_id: string;
-  sport: "football";
-  league: string;
-  market: "1X2";
-  selection: Football1x2Selection;
-  model_probability: number;
-  odds: number;
-  implied_probability: number;
-  no_vig_probability: number;
-  edge: number;
-  ev: number;
-  opportunity_score: number;
-  rank: number;
-  odds_source: string;
-  model_version: string;
-  model_status: FootballModelStatus;
-  value_engine_version: string;
-  ai_picks_version: "ai-picks-0.1";
-  cutoff_at: string;
-  generated_at: string;
-  data_mode: DataMode;
-  status: "eligible";
-}
+export type AiPick = Schemas["AiPick"];
 
 /** A rejected selection. The engine never drops a candidate silently. */
-export interface AiPickExclusion {
-  match_id: string;
-  league: string;
-  market: "1X2";
-  selection: Football1x2Selection | null;
-  status: "excluded";
-  reason: AiPickExclusionReason;
-  detail: string;
-}
+export type AiPickExclusion = Schemas["AiPickExclusion"];
 
-export interface AiPicksMetadata {
-  ai_picks_version: "ai-picks-0.1";
-  scoring_formula: "opportunity_score = EV + Edge";
-  ranking_order: string;
-  minimum_edge: number;
-  minimum_ev: number;
-  minimum_model_probability: number;
-  maximum_odds_age_seconds: number;
-  evaluated_matches: number;
-  eligible_opportunities: number;
-  excluded_opportunities: number;
-  candidate_model_allowed: boolean;
-}
+export type AiPicksMetadata = Schemas["AiPicksMetadata"];
+export type AiPicksResult = Schemas["AiPicksResult"];
 
-export interface AiPicksResult {
-  items: AiPick[];
-  exclusions: AiPickExclusion[];
-  total: number;
-  limit: number;
-  offset: number;
-  metadata: AiPicksMetadata;
+/**
+ * Structural identity of a match that exists in the point-in-time archive but
+ * has no projection in the frontend repository.
+ *
+ * `GET /matches/{match_id}` returns this instead of `MatchDetail` for those
+ * ids. It deliberately carries no score, status, timeline or statistics, so a
+ * consumer must never treat it as a partial `MatchDetail`.
+ */
+export type HistoricalMatchIdentity = Schemas["HistoricalMatchIdentity"];
+
+/** Discriminates the two shapes `GET /matches/{match_id}` can return. */
+export type MatchDetailResponse = MatchDetail | HistoricalMatchIdentity;
+
+export function isHistoricalMatchIdentity(
+  value: MatchDetailResponse,
+): value is HistoricalMatchIdentity {
+  return "resource_scope" in value && value.resource_scope === "structural_identity";
 }
 
 /**

@@ -12,6 +12,7 @@ import { matchStatusLabels } from "@/lib/format/labels";
 import { pageMeta } from "@/lib/navigation";
 import { useMatch, useMatches } from "@/lib/query/hooks";
 import type { MatchSummary } from "@/types/api";
+import { isHistoricalMatchIdentity } from "@/types/api";
 import Link from "next/link";
 
 const meta = pageMeta["/analytics"];
@@ -62,7 +63,17 @@ function DetailedComparison({ matchId }: { matchId: string }) {
 
   return (
     <QueryBoundary query={query} skeleton={<CardSkeleton rows={5} />}>
-      {(match) => (
+      {(match) =>
+        isHistoricalMatchIdentity(match) ? (
+          <Card>
+            <CardBody>
+              <Unavailable
+                label="Comparaison statistique"
+                reason="Cet identifiant ne renvoie qu'une identité structurelle archivée, sans statistiques."
+              />
+            </CardBody>
+          </Card>
+        ) : (
         <Card>
           <CardHeader>
             <CardTitle>
@@ -83,7 +94,8 @@ function DetailedComparison({ matchId }: { matchId: string }) {
             )}
           </CardBody>
         </Card>
-      )}
+        )
+      }
     </QueryBoundary>
   );
 }

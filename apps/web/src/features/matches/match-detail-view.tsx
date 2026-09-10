@@ -15,10 +15,12 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { CardSkeleton } from "@/components/ui/skeleton";
 import { formatAbsolute, formatKickoff } from "@/lib/format/dates";
+import { formatKickoffOrUnknown, formatMatchup } from "@/lib/format/identity";
 import { matchStatusLabels, sportLabels } from "@/lib/format/labels";
 import { formatPoints, formatScore } from "@/lib/format/numbers";
 import { useMatch } from "@/lib/query/hooks";
-import type { MatchDetail } from "@/types/api";
+import type { HistoricalMatchIdentity, MatchDetail } from "@/types/api";
+import { isHistoricalMatchIdentity } from "@/types/api";
 import Link from "next/link";
 
 export function MatchDetailView({ matchId }: { matchId: string }) {
@@ -28,9 +30,15 @@ export function MatchDetailView({ matchId }: { matchId: string }) {
     <QueryBoundary
       query={query}
       skeleton={<CardSkeleton rows={8} />}
-      quality={(match) => match.quality}
+      quality={(match) => (isHistoricalMatchIdentity(match) ? null : match.quality)}
     >
-      {(match) => <MatchDetailContent match={match} />}
+      {(match) =>
+        isHistoricalMatchIdentity(match) ? (
+          <HistoricalIdentityContent identity={match} />
+        ) : (
+          <MatchDetailContent match={match} />
+        )
+      }
     </QueryBoundary>
   );
 }
@@ -156,6 +164,70 @@ function MatchDetailContent({ match }: { match: MatchDetail }) {
       <Link href="/analyst" className="inline-block text-sm text-ai-strong hover:underline">
         Ouvrir dans l&apos;AI Analyst
       </Link>
+    </div>
+  );
+}
+
+/**
+ * `GET /matches/{match_id}` answers with `HistoricalMatchIdentity` for ids that
+ * exist in the point-in-time archive but have no projection in the frontend
+ * repository — the ids the AI Picks engine works on.
+ *
+ * The payload is structural by construction: no score, no status, no timeline,
+ * no statistics. Rendering it as a degraded `MatchDetail` would suggest those
+ * sections merely failed to load, so the page states the scope instead.
+ */
+function HistoricalIdentityContent({ identity }: { identity: HistoricalMatchIdentity }) {
+  const matchup = formatMatchup(identity.home_team, identity.away_team);
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow={`Football · ${identity.league}`}
+        title={matchup.text}
+        description={formatKickoffOrUnknown(identity.kickoff_at)}
+        actions={<Badge tone="muted">Identité archivée</Badge>}
+      />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Identité du match</CardTitle>
+        </CardHeader>
+        <CardBody className="space-y-3 text-sm">
+          <dl className="grid gap-3 sm:grid-cols-2">
+            <IdentityField label="Équipe à domicile" value={matchup.home} />
+            <IdentityField label="Équipe à l'extérieur" value={matchup.away} />
+            <IdentityField label="Compétition" value={identity.league} />
+            <IdentityField label="Coup d'envoi" value={formatKickoffOrUnknown(identity.kickoff_at)} />
+            <IdentityField label="Identifiant domicile" value={identity.home_team_id} mono />
+            <IdentityField label="Identifiant extérieur" value={identity.away_team_id} mono />
+          </dl>
+        </CardBody>
+      </Card>
+
+      <Unavailable
+        label="Statistiques, cotes, prédiction et chronologie"
+        reason="Ce match n'est disponible que sous forme d'identité structurelle archivée ; aucune de ces sections n'est publiée pour cet identifiant."
+      />
+    </div>
+  );
+}
+
+function IdentityField({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div>
+      <dt className="text-xs uppercase tracking-[0.14em] text-faint">{label}</dt>
+      <dd className={mono ? "mt-1 font-mono text-xs break-all text-muted" : "mt-1 text-foreground"}>
+        {value}
+      </dd>
     </div>
   );
 }

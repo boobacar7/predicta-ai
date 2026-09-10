@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { StatTile } from "@/components/ui/stat-tile";
 import { formatAbsolute } from "@/lib/format/dates";
+import { formatKickoffOrUnknown, formatMatchup } from "@/lib/format/identity";
+import Link from "next/link";
 import { football1x2Labels } from "@/lib/format/labels";
 import {
   formatDecimalOdds,
@@ -23,12 +25,14 @@ import type { AiPick } from "@/types/api";
  * `ev + edge` so that a divergence with the engine stays visible instead of
  * being hidden by the UI.
  *
- * Match identity is limited to `match_id` and `league` because the engine
- * publishes nothing else. Team names and kickoff are marked unavailable rather
- * than guessed.
+ * The engine publishes canonical team labels resolved from the point-in-time
+ * archive, and they are nullable. When both are present the card leads with
+ * the matchup; when the archive resolved none, it says so and falls back to
+ * `match_id`, which is the only identifier left.
  */
 export function AiPickCard({ pick, onOpenDetail }: { pick: AiPick; onOpenDetail?: () => void }) {
   const headingId = `pick-${pick.match_id}-${pick.selection}`;
+  const matchup = formatMatchup(pick.home_team, pick.away_team);
 
   return (
     <Card>
@@ -39,10 +43,19 @@ export function AiPickCard({ pick, onOpenDetail }: { pick: AiPick; onOpenDetail?
               <Badge tone="ai">Rang {pick.rank}</Badge>
               <p className="text-xs text-faint">{pick.league}</p>
             </div>
+
             <h3 id={headingId} className="mt-2 text-lg font-medium">
-              {pick.market} · {football1x2Labels[pick.selection]}
+              {matchup.home} <span className="text-faint">vs</span> {matchup.away}
             </h3>
-            <p className="mt-1 font-mono text-xs break-all text-faint">{pick.match_id}</p>
+
+            <p className="mt-1 text-sm text-muted">
+              {formatKickoffOrUnknown(pick.kickoff_at)} · {pick.market} ·{" "}
+              {football1x2Labels[pick.selection]}
+            </p>
+
+            {matchup.resolved ? null : (
+              <p className="mt-1 font-mono text-xs break-all text-faint">{pick.match_id}</p>
+            )}
           </div>
           <ModelStatusBadge version={pick.model_version} status={pick.model_status} />
         </div>
@@ -65,15 +78,23 @@ export function AiPickCard({ pick, onOpenDetail }: { pick: AiPick; onOpenDetail?
             Score {formatMetric(pick.opportunity_score)} · cutoff {formatAbsolute(pick.cutoff_at)} ·
             cotes <span className="font-mono">{pick.odds_source}</span>
           </p>
-          {onOpenDetail ? (
-            <button
-              type="button"
-              onClick={onOpenDetail}
-              className="text-sm text-ai-strong hover:underline"
+          <div className="flex flex-wrap items-center gap-4">
+            {onOpenDetail ? (
+              <button
+                type="button"
+                onClick={onOpenDetail}
+                className="text-sm text-ai-strong hover:underline"
+              >
+                Détail de l&apos;opportunité
+              </button>
+            ) : null}
+            <Link
+              href={`/matches/${pick.match_id}`}
+              className="text-sm text-muted hover:text-foreground hover:underline"
             >
-              Détail de l&apos;opportunité
-            </button>
-          ) : null}
+              Voir le match
+            </Link>
+          </div>
         </div>
       </CardBody>
     </Card>

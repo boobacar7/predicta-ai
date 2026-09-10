@@ -28,6 +28,7 @@ import {
 } from "@/features/value/selectors";
 import { useFilters } from "@/lib/filters/context";
 import { formatAbsolute } from "@/lib/format/dates";
+import { formatKickoffOrUnknown } from "@/lib/format/identity";
 import {
   formatCount,
   formatDecimalOdds,
@@ -36,7 +37,7 @@ import {
   formatSignedPercent,
 } from "@/lib/format/numbers";
 import { pageMeta } from "@/lib/navigation";
-import { useValueOpportunities } from "@/lib/query/hooks";
+import { useLeagues, useValueOpportunities } from "@/lib/query/hooks";
 import type { ValueOpportunity } from "@/types/api";
 import Link from "next/link";
 import { useState } from "react";
@@ -55,11 +56,19 @@ const sortOptions: Array<{ value: ValueSort; label: string }> = [
 /**
  * Value Finder, backed by `GET /value`.
  *
- * Sport, competition and date are server-side filters. Market and the numeric
- * thresholds are not parameters of that endpoint, so they are applied here as a
- * refinement over the loaded set, and paging follows the refinement. The view
- * states how many opportunities were loaded so the count is never mistaken for
- * a catalogue-wide total.
+ * The endpoint accepts `sport`, `league_id`, `date`, `status`, `limit` and
+ * `offset` and nothing else. Those are sent to the API, so the server decides
+ * which opportunities exist.
+ *
+ * Market, the four numeric thresholds and the sort order have no equivalent
+ * query parameter in the contract. They are applied here as a refinement over
+ * the loaded set, and paging follows the refinement so the page count always
+ * matches what is on screen. Refining server-side would require new parameters
+ * on `GET /value`; that is a backend change and is documented as a gap in
+ * docs/frontend-handoff.md rather than worked around by inventing an endpoint.
+ *
+ * The two groups are labelled in the UI so a reader can tell which criteria the
+ * API enforced from which the browser applied.
  *
  * No ratio is recomputed: every figure comes from the Value Engine.
  */
@@ -68,10 +77,16 @@ export function ValueFinderView() {
   const [sort, setSort] = useState<ValueSort>("edge");
   const [filters, setFilters] = useState<ValueFilters>(defaultValueFilters);
   const [date, setDate] = useState("");
+  const [league, setLeague] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [detail, setDetail] = useState<ValueOpportunity | null>(null);
 
-  const query = useValueOpportunities({ sport, date: date || undefined });
+  const query = useValueOpportunities({
+    sport,
+    league_id: league === "all" ? undefined : league,
+    date: date || undefined,
+  });
+  const leaguesQuery = useLeagues({ sport });
 
   const update = <K extends keyof ValueFilters>(key: K) => (value: ValueFilters[K]) => {
     setFilters((current) => ({ ...current, [key]: value }));
@@ -80,6 +95,7 @@ export function ValueFinderView() {
 
   const hasRefinement =
     date !== "" ||
+    league !== "all" ||
     filters.market !== "all" ||
     filters.minEdge !== null ||
     filters.minEv !== null ||
@@ -118,9 +134,47 @@ export function ValueFinderView() {
               <DataModeNotice dataMode={envelope.data_mode} />
 
               <section
-                aria-label="Filtres et tri des opportunités"
-                className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-surface px-4 py-3"
+                aria-label="Filtres envoyés à l'API"
+                className="space-y-2 rounded-2xl border border-border bg-surface px-4 py-3"
               >
+                <p className="text-xs uppercase tracking-[0.14em] text-faint">
+                  Filtres appliqués par l&apos;API
+                </p>
+                <div className="flex flex-wrap items-end gap-3">
+                  <SelectFilter
+                    label="Compétition"
+                    value={league}
+                    onChange={(value) => {
+                      setLeague(value);
+                      setPage(1);
+                    }}
+                  >
+                    <option value="all">Toutes</option>
+                    {(leaguesQuery.data?.data.items ?? []).map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </SelectFilter>
+
+                  <DateFilter
+                    value={date}
+                    onChange={(value) => {
+                      setDate(value);
+                      setPage(1);
+                    }}
+                  />
+                </div>
+              </section>
+
+              <section
+                aria-label="Affinage local des opportunités"
+                className="space-y-2 rounded-2xl border border-border bg-surface px-4 py-3"
+              >
+                <p className="text-xs uppercase tracking-[0.14em] text-faint">
+                  Affinage local · non supporté par <span className="font-mono">GET /value</span>
+                </p>
+                <div className="flex flex-wrap items-end gap-3">
                 <SelectFilter
                   label="Marché"
                   value={filters.market}
@@ -133,14 +187,6 @@ export function ValueFinderView() {
                     </option>
                   ))}
                 </SelectFilter>
-
-                <DateFilter
-                  value={date}
-                  onChange={(value) => {
-                    setDate(value);
-                    setPage(1);
-                  }}
-                />
 
                 <ThresholdFilter
                   label="Edge min"
@@ -187,12 +233,14 @@ export function ValueFinderView() {
                     onClick={() => {
                       setFilters(defaultValueFilters);
                       setDate("");
+                      setLeague("all");
                       setPage(1);
                     }}
                   >
                     Réinitialiser
                   </Button>
                 ) : null}
+                </div>
               </section>
 
               <p className="text-xs text-muted">
@@ -276,7 +324,8 @@ function OpportunityCard({
               {item.match.home.name} · {item.match.away.name}
             </h2>
             <p className="text-sm text-muted">
-              {item.market} · {item.selection_label}
+              {formatKickoffOrUnknown(item.match.kickoff_at)} · {item.market} ·{" "}
+              {item.selection_label}
             </p>
           </div>
           <ValueBadge

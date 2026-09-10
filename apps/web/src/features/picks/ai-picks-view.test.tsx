@@ -1,4 +1,5 @@
 import { AiPicksView } from "@/features/picks/ai-picks-view";
+import { formatKickoffOrUnknown } from "@/lib/format/identity";
 import { renderWithProviders } from "@/test/render";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -62,15 +63,73 @@ describe("AiPicksView", () => {
     expect(screen.getAllByText("football-elo-v1-candidate").length).toBeGreaterThan(1);
   });
 
-  /** The engine publishes no team identity; guessing one would be fabricated data. */
-  it("identifies a match by its id rather than inventing team names", async () => {
+  /**
+   * The engine publishes canonical team labels resolved from the point-in-time
+   * archive. Displaying `match_id` in their place would hide data the API sends.
+   */
+  it("leads with the canonical teams the engine published", async () => {
     await renderPage();
 
     const list = await screen.findByRole("list", { name: "Opportunités classées" });
 
-    // Two selections of the same match, each labelled by the same identifier.
-    expect(within(list).getAllByText("mth_mock_northgate_harbor")).toHaveLength(2);
-    expect(within(list).getAllByText("Continental Premier").length).toBeGreaterThan(0);
+    expect(
+      within(list).getByRole("heading", {
+        name: "Lincoln Red Imps vs Inter Club d'Escaldes",
+      }),
+    ).toBeInTheDocument();
+    expect(within(list).getByText("Champions League")).toBeInTheDocument();
+
+    // With identity resolved the raw identifier is no longer the label.
+    expect(within(list).queryByText("mth_football-sportmonks-19719892")).not.toBeInTheDocument();
+  });
+
+  /**
+   * `home_team` and `away_team` are nullable. A missing label is a gap in the
+   * archive, so it must read as a gap, never as a placeholder team name.
+   */
+  it("states that identity is unavailable when the archive resolved no label", async () => {
+    await renderPage();
+
+    const list = await screen.findByRole("list", { name: "Opportunités classées" });
+
+    expect(
+      within(list).getByRole("heading", {
+        name: "Information indisponible vs Information indisponible",
+      }),
+    ).toBeInTheDocument();
+    // The identifier is the only thing left to identify that pick by.
+    expect(within(list).getByText("mth_mock_castleford_riverton")).toBeInTheDocument();
+
+    const body = list.textContent ?? "";
+    expect(body).not.toContain("null");
+    expect(body).not.toContain("undefined");
+    expect(body).not.toContain("NaN");
+  });
+
+  it("keeps the resolved side when the archive published only one team", async () => {
+    await renderPage();
+
+    const list = await screen.findByRole("list", { name: "Opportunités classées" });
+
+    expect(
+      within(list).getByRole("heading", {
+        name: "Northgate FC vs Information indisponible",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the kickoff published on every pick", async () => {
+    await renderPage();
+
+    const list = await screen.findByRole("list", { name: "Opportunités classées" });
+    const items = within(list).getAllByRole("listitem");
+
+    expect(within(list).getByText(new RegExp(formatKickoffOrUnknown("2026-07-07T16:00:00Z")))).toBeInTheDocument();
+
+    for (const item of items) {
+      expect(item.textContent ?? "").not.toContain("Invalid Date");
+    }
+    expect(within(list).getAllByText(/·\s(Domicile|Nul|Extérieur)$/).length).toBe(items.length);
   });
 
   it("summarises the total from the engine and scopes averages to the page", async () => {
@@ -149,7 +208,7 @@ describe("AiPicksView", () => {
     expect(screen.getByRole("button", { name: "Réessayer" })).toBeInTheDocument();
   });
 
-  it("opens a detail panel split by Prediction, Odds and Value", async () => {
+  it("opens a detail panel split by Match, Prediction, Odds, Value and Metadata", async () => {
     const user = userEvent.setup();
     await renderPage();
 
@@ -157,12 +216,18 @@ describe("AiPicksView", () => {
     await user.click(screen.getAllByRole("button", { name: /Détail de l'opportunité/ })[0]);
 
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("Prediction")).toBeInTheDocument();
-    expect(within(dialog).getByText("Odds")).toBeInTheDocument();
-    expect(within(dialog).getByText("Value")).toBeInTheDocument();
+    for (const section of ["Match", "Prediction", "Odds", "Value", "Metadata"]) {
+      expect(within(dialog).getByText(section)).toBeInTheDocument();
+    }
+
+    expect(within(dialog).getByText("Lincoln Red Imps")).toBeInTheDocument();
+    expect(within(dialog).getByText("Inter Club d'Escaldes")).toBeInTheDocument();
+    expect(within(dialog).getAllByText("Champions League").length).toBeGreaterThan(0);
+
+    // The claim that the engine publishes no identity is obsolete.
     expect(
-      within(dialog).getByText(/ne publie ni nom d'équipe ni horaire/),
-    ).toBeInTheDocument();
+      within(dialog).queryByText(/ne publie ni nom d'équipe ni horaire/),
+    ).not.toBeInTheDocument();
   });
 
   it("never promises an outcome or a return", async () => {

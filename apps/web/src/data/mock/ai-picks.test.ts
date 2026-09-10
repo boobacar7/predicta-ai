@@ -65,6 +65,18 @@ describe("AI Picks fixtures", () => {
     }
   });
 
+  it("carries the identity-fixed fields published after the match-identity fix", () => {
+    const lincoln = aiPicks.find((pick) => pick.rank === 1);
+
+    expect(lincoln).toMatchObject({
+      match_id: "mth_football-sportmonks-19719892",
+      home_team: "Lincoln Red Imps",
+      away_team: "Inter Club d'Escaldes",
+      league: "Champions League",
+      kickoff_at: "2026-07-07T16:00:00Z",
+    });
+  });
+
   it("explains every exclusion with a reason and a detail", () => {
     expect(aiPickExclusions.length).toBeGreaterThan(0);
 

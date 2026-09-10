@@ -237,4 +237,41 @@ describe("football AI picks", () => {
   it("fails with a retryable error in the error scenario", async () => {
     await expect(source("error").getFootballAiPicks()).rejects.toBeInstanceOf(DataSourceError);
   });
+
+  it("publishes the identity-fixed fields the engine now returns", async () => {
+    const result = await source().getFootballAiPicks();
+    const lincoln = result.data.items.find((item) => item.rank === 1);
+
+    expect(lincoln?.home_team).toBe("Lincoln Red Imps");
+    expect(lincoln?.away_team).toBe("Inter Club d'Escaldes");
+    expect(lincoln?.league).toBe("Champions League");
+    expect(lincoln?.kickoff_at).toBe("2026-07-07T16:00:00Z");
+  });
+});
+
+describe("historical match identity", () => {
+  it("returns HistoricalMatchIdentity for an archive id, not a projected MatchDetail", async () => {
+    const result = await source().getMatch("mth_football-sportmonks-19719892");
+
+    expect(result.data).toMatchObject({
+      match_id: "mth_football-sportmonks-19719892",
+      home_team: "Lincoln Red Imps",
+      away_team: "Inter Club d'Escaldes",
+      league: "Champions League",
+      kickoff_at: "2026-07-07T16:00:00Z",
+      resource_scope: "structural_identity",
+    });
+    expect(result.data).not.toHaveProperty("timeline");
+    expect(result.data).not.toHaveProperty("score");
+  });
+});
+
+describe("value catalogue filters", () => {
+  it("honours league_id and date on GET /value, the parameters the contract actually has", async () => {
+    const tennis = await source().getValue({ league_id: "lg_grand_court" });
+    expect(tennis.data.items).toHaveLength(0);
+
+    const all = await source().getValue();
+    expect(all.data.items.length).toBeGreaterThan(0);
+  });
 });

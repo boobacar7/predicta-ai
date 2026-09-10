@@ -126,7 +126,20 @@ describe("ValueFinderView", () => {
     expect(screen.getAllByText(/Ancien/).length).toBeGreaterThan(0);
   });
 
-  it("opens a detail panel split by Prediction, Odds and Value", async () => {
+  it("sends competition and date to GET /value rather than inventing a second filter", async () => {
+    const user = userEvent.setup();
+    await renderPage();
+
+    await screen.findByRole("list");
+    expect(screen.getByText(/Filtres appliqués par l'API/)).toBeInTheDocument();
+    expect(screen.getByText(/Affinage local/)).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText("Compétition"), "Grand Court Tour");
+
+    expect(await screen.findByText("Aucun écart de value")).toBeInTheDocument();
+  });
+
+  it("opens a detail panel split by Match, Prediction, Odds, Value and Metadata", async () => {
     const user = userEvent.setup();
     await renderPage();
 
@@ -134,10 +147,11 @@ describe("ValueFinderView", () => {
     await user.click(screen.getAllByRole("button", { name: /Détail de l'opportunité/ })[0]);
 
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("Prediction")).toBeInTheDocument();
-    expect(within(dialog).getByText("Odds")).toBeInTheDocument();
-    expect(within(dialog).getByText("Value")).toBeInTheDocument();
+    for (const section of ["Match", "Prediction", "Odds", "Value", "Metadata"]) {
+      expect(within(dialog).getByText(section)).toBeInTheDocument();
+    }
     expect(within(dialog).getByText("Overround")).toBeInTheDocument();
+    expect(within(dialog).getByText("Coup d'envoi")).toBeInTheDocument();
   });
 
   it("documents the Value Engine formulas rather than reimplementing them", async () => {

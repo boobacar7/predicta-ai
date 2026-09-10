@@ -4,6 +4,7 @@ import {
   aiPicksMetadata,
   mockCandidateKickoffs,
 } from "@/data/mock/ai-picks";
+import { historicalMatchIdentities } from "@/data/mock/historical-identity";
 import { createAnalystSession } from "@/data/mock/analyst";
 import { leagues, players, sports, teams } from "@/data/mock/catalog";
 import { MOCK_NOW_ISO } from "@/data/mock/clock";
@@ -142,6 +143,11 @@ export class MockDataSource implements DataSource {
   async getMatch(id: string) {
     await this.begin();
 
+    const historical = historicalMatchIdentities.find((item) => item.match_id === id);
+    if (historical) {
+      return envelope(historical);
+    }
+
     const match = matches.find((item) => item.id === id);
     if (!match) throw notFound("Match");
 
@@ -215,9 +221,14 @@ export class MockDataSource implements DataSource {
   async getValue(filters: MatchFilters = {}) {
     await this.begin();
 
-    const items = applyValueScenario(valueOpportunities, this.scenario).filter((item) =>
-      matchesSport(item.match.sport, filters.sport),
-    );
+    const items = applyValueScenario(valueOpportunities, this.scenario).filter((item) => {
+      if (!matchesSport(item.match.sport, filters.sport)) return false;
+      if (filters.league_id && filters.league_id !== "all" && item.match.league.id !== filters.league_id) {
+        return false;
+      }
+      if (filters.date && !item.match.kickoff_at.startsWith(filters.date)) return false;
+      return true;
+    });
 
     return envelope(list(items));
   }
