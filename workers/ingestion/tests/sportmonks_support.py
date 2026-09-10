@@ -45,22 +45,30 @@ class ScriptedTransport:
             )
         parsed = urlparse(url)
         query = parse_qs(parsed.query)
-        if "leagues/" in parsed.path:
-            self._league_hits += 1
-            return HttpResponse(
-                status_code=200,
-                body=load_sportmonks("league_premier_league.json"),
-                headers={},
-                url=url,
-            )
+        path = parsed.path.rstrip("/")
+        if "/leagues/" in path:
+            filename = "league_mls.json" if path.endswith("/779") else "league_premier_league.json"
+            return HttpResponse(status_code=200, body=load_sportmonks(filename), headers={}, url=url)
+        if "/fixtures/seasons/" in path:
+            season_id = path.rsplit("/", 1)[-1]
+            filename = {
+                "18000": "mls_fixtures_2023.json",
+                "18001": "mls_fixtures_2024.json",
+                "18002": "mls_fixtures_2025.json",
+                "18003": "mls_fixtures_quarantine.json",
+            }.get(season_id, "empty_fixtures.json")
+            return HttpResponse(status_code=200, body=load_sportmonks(filename), headers={}, url=url)
+        filters = (query.get("filters") or [""])[0]
+        if "779" in filters:
+            return HttpResponse(status_code=200, body=load_sportmonks("mls_fixtures_2024.json"), headers={}, url=url)
         page = (query.get("page") or ["1"])[0]
         filename = "fixtures_page2.json" if page == "2" else "fixtures_page1.json"
         return HttpResponse(status_code=200, body=load_sportmonks(filename), headers={}, url=url)
 
 
 def assert_no_secret_in(value: object) -> None:
-        text = str(value)
-        assert TEST_SPORTMONKS_TOKEN not in text
-        lowered = text.lower()
-        if "api_token=" in lowered:
-            assert "api_token=[redacted]" in lowered
+    text = str(value)
+    assert TEST_SPORTMONKS_TOKEN not in text
+    lowered = text.lower()
+    if "api_token=" in lowered:
+        assert "api_token=[redacted]" in lowered

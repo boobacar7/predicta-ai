@@ -1,0 +1,61 @@
+{
+  "data": {
+    "id": 779,
+    "sport_id": 1,
+    "country_id": 3483,
+    "name": "Major League Soccer",
+    "active": true,
+    "short_code": "MLS",
+    "type": "league",
+    "sub_type": "domestic",
+    "country": {
+      "id": 3483,
+      "name": "USA",
+      "official_name": "United States of America",
+      "fifa_name": "USA",
+      "iso2": "US"
+    },
+    "season": {
+      "id": 18002,
+      "sport_id": 1,
+      "league_id": 779,
+      "name": "2025",
+      "finished": false,
+      "is_current": true,
+      "starting_at": "2025-02-22",
+      "ending_at": "2025-12-06"
+    },
+    "seasons": [
+      {
+        "id": 18000,
+        "sport_id": 1,
+        "league_id": 779,
+        "name": "2023",
+        "finished": true,
+        "is_current": false,
+        "starting_at": "2023-02-25",
+        "ending_at": "2023-12-09"
+      },
+      {
+        "id": 18001,
+        "sport_id": 1,
+        "league_id": 779,
+        "name": "2024",
+        "finished": true,
+        "is_current": false,
+        "starting_at": "2024-02-21",
+        "ending_at": "2024-12-07"
+      },
+      {
+        "id": 18002,
+        "sport_id": 1,
+        "league_id": 779,
+        "name": "2025",
+        "finished": false,
+        "is_current": true,
+        "starting_at": "2025-02-22",
+        "ending_at": "2025-12-06"
+      }
+    ]
+  }
+}

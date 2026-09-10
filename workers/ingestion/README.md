@@ -45,8 +45,37 @@ python -m predicta_ingestion ingest-football \
 `--dry-run` fetch / valide / normalise **sans** écrire PostgreSQL ni le store raw.
 Retirer `--dry-run` pour persister.
 
-Ligues V1 : `premier-league`, `la-liga`, `bundesliga`, `serie-a`, `ligue-1`,
-`champions-league`, ou `all`.
+Ligues V1 : `mls` (alias `MLS`), `premier-league`, `la-liga`, `bundesliga`, `serie-a`,
+`ligue-1`, `champions-league`, ou `all`.
+
+## Historique + dataset ML
+
+La MLS est la compétition historique de référence. Le pipeline **découvre** les
+saisons Sportmonks ; il n'en suppose aucune.
+
+```bash
+python -m predicta_ingestion ingest-history --league MLS --dry-run
+python -m predicta_ingestion ingest-history \
+  --league mls \
+  --season 2024 \
+  --date-from 2024-03-01 \
+  --date-to 2024-11-30
+python -m predicta_ingestion build-ml-dataset \
+  --league MLS \
+  --dry-run \
+  --write-dataset ./var/mls-1x2.json
+```
+
+Par défaut, la MLS ingère toutes les saisons découvertes. Les ligues européennes V1
+sont limitées aux 3 saisons les plus récentes sauf `--all-seasons` ou `--season`.
+
+Le rapport JSON liste saisons découvertes vs ingérées, volumes, quarantaine et
+`ingestion_run_id`. Les chiffres canned dans `fixtures/sportmonks` ne sont pas
+la couverture réelle du provider.
+
+`--dry-run` ne persiste ni PostgreSQL ni le raw store.
+
+Aucun modèle n'est entraîné ici. Voir [docs/ml-dataset.md](../../docs/ml-dataset.md).
 
 Données V1 : compétitions, équipes, fixtures (statut, coup d'envoi UTC,
 domicile/extérieur, score final si terminé). Pas de stats, joueurs, blessures,
@@ -72,4 +101,5 @@ bascule silencieuse vers les fixtures mock.
 
 Documentation : [data-strategy.md](../../docs/data-strategy.md),
 [data-pipeline.md](../../docs/data-pipeline.md),
-[data-providers.md](../../docs/data-providers.md).
+[data-providers.md](../../docs/data-providers.md),
+[ml-dataset.md](../../docs/ml-dataset.md).

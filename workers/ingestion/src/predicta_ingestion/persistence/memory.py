@@ -160,3 +160,36 @@ class MemoryCanonicalSink:
             accepted.append(item)
             result.inserted += 1
         return accepted
+
+
+class TeeCanonicalSink:
+    """Writes canonical rows to memory (PIT/dataset) and optionally PostgreSQL."""
+
+    def __init__(self, memory: MemoryCanonicalSink, sql: CanonicalSink | None = None) -> None:
+        self.memory = memory
+        self._sql = sql
+
+    def persist(self, batch: CanonicalBatch) -> PersistResult:
+        result = self.memory.persist(batch)
+        if self._sql is not None:
+            self._sql.persist(batch)
+        return result
+
+    def record_raw(self, stored: StoredRaw) -> None:
+        if self._sql is not None:
+            self._sql.record_raw(stored)
+
+    def persist_identity(self, bindings: object) -> None:
+        if self._sql is not None:
+            self._sql.persist_identity(bindings)
+
+    def record_quarantine(self, **kwargs: object) -> None:
+        recorder = getattr(self._sql, "record_quarantine", None)
+        if callable(recorder):
+            recorder(**kwargs)
+
+    def record_run(self, **kwargs: object) -> None:
+        recorder = getattr(self._sql, "record_run", None)
+        if callable(recorder):
+            recorder(**kwargs)
+

@@ -1,0 +1,27 @@
+{
+  "data": [
+    {
+      "id": 19423001,
+      "sport_id": 1,
+      "league_id": 779,
+      "season_id": 18000,
+      "state_id": 5,
+      "name": "LAFC vs LA Galaxy",
+      "starting_at": "2023-09-16 02:30:00",
+      "placeholder": false,
+      "participants": [
+        {"id": 4001, "name": "Los Angeles FC", "short_code": "LAFC", "short_name": "LAFC", "meta": {"location": "home"}},
+        {"id": 4002, "name": "LA Galaxy", "short_code": "LAG", "short_name": "Galaxy", "meta": {"location": "away"}}
+      ],
+      "scores": [
+        {"description": "CURRENT", "score": {"goals": 2, "participant": "home"}},
+        {"description": "CURRENT", "score": {"goals": 1, "participant": "away"}}
+      ],
+      "league": {"id": 779, "name": "Major League Soccer", "country": {"id": 3483, "name": "USA"}},
+      "season": {"id": 18000, "name": "2023"},
+      "venue": {"id": 9001, "name": "BMO Stadium"},
+      "state": {"id": 5, "state": "FT", "name": "Full Time", "short_name": "FT"}
+    }
+  ],
+  "pagination": {"count": 1, "per_page": 50, "current_page": 1, "next_page": null, "has_more": false}
+}

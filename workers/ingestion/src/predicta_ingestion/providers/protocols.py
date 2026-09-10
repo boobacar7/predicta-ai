@@ -17,6 +17,7 @@ class ProviderRequest:
         until: datetime | None = None,
         cursor: str | None = None,
         league: str | None = None,
+        season: str | None = None,
     ) -> None:
         self.resource = resource
         self.sport = sport
@@ -24,6 +25,7 @@ class ProviderRequest:
         self.until = until
         self.cursor = cursor
         self.league = league
+        self.season = season
 
 
 class ProviderHealth:

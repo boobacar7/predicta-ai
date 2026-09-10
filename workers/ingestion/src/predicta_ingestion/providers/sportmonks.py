@@ -19,6 +19,7 @@ DEFAULT_BASE_URL = "https://api.sportmonks.com/v3/football"
 MAX_FIXTURE_RANGE_DAYS = 100
 FIXTURE_INCLUDES = "participants;scores;league.country;season;venue;state"
 LEAGUE_INCLUDES = "country"
+SEASON_INCLUDES = "country;seasons"
 PER_PAGE = 50
 
 
@@ -61,12 +62,16 @@ class SportmonksFootballProvider:
 
     def fetch(self, request: ProviderRequest) -> list[RawEnvelope]:
         self._require_live()
-        if request.resource not in {ResourceType.FIXTURES, ResourceType.LEAGUES}:
-            raise ProviderUnavailable(self.name, "V1 Sportmonks adapter only fetches leagues and fixtures.")
+        allowed = {ResourceType.FIXTURES, ResourceType.LEAGUES, ResourceType.SEASONS}
+        if request.resource not in allowed:
+            raise ProviderUnavailable(self.name, "V1 Sportmonks adapter only fetches leagues, seasons and fixtures.")
         leagues = resolve_v1_leagues(request.league)
+        if request.resource is ResourceType.SEASONS:
+            return [self._fetch_league_seasons(league) for league in leagues]
         envelopes: list[RawEnvelope] = []
-        for league in leagues:
-            envelopes.append(self._fetch_league(league))
+        if request.season is None:
+            for league in leagues:
+                envelopes.append(self._fetch_league(league))
         if request.resource is ResourceType.FIXTURES:
             envelopes.extend(self._fetch_fixtures(request, leagues))
         return envelopes
@@ -87,8 +92,67 @@ class SportmonksFootballProvider:
             request_key=f"sportmonks:league:{league.sportmonks_id}",
         )
 
+    def _fetch_league_seasons(self, league: V1FootballLeague) -> RawEnvelope:
+        path = f"/leagues/{league.sportmonks_id}"
+        query = {"include": SEASON_INCLUDES}
+        return self._get_envelope(
+            path=path,
+            query=query,
+            resource=ResourceType.SEASONS,
+            request_key=f"sportmonks:seasons:{league.sportmonks_id}",
+        )
+
     def _fetch_fixtures(self, request: ProviderRequest, leagues: tuple[V1FootballLeague, ...]) -> list[RawEnvelope]:
+        if request.season:
+            return self._fetch_fixtures_by_season(request, leagues)
         start, end = _date_window(request, self._clock.now())
+        return self._paginate_between(leagues, start, end, season_id=None)
+
+    def _fetch_fixtures_by_season(
+        self,
+        request: ProviderRequest,
+        leagues: tuple[V1FootballLeague, ...],
+    ) -> list[RawEnvelope]:
+        season_id = str(request.season)
+        if request.since is not None or request.until is not None:
+            start, end = _date_window(request, self._clock.now())
+            return self._paginate_between(leagues, start, end, season_id=season_id)
+        envelopes: list[RawEnvelope] = []
+        for league in leagues:
+            envelopes.extend(self._paginate_season(league, season_id))
+        return envelopes
+
+    def _paginate_season(self, league: V1FootballLeague, season_id: str) -> list[RawEnvelope]:
+        envelopes: list[RawEnvelope] = []
+        page = 1
+        while True:
+            path = f"/fixtures/seasons/{season_id}"
+            query = {
+                "include": FIXTURE_INCLUDES,
+                "filters": f"fixtureLeagues:{league.sportmonks_id}",
+                "per_page": str(PER_PAGE),
+                "page": str(page),
+            }
+            envelope = self._get_envelope(
+                path=path,
+                query=query,
+                resource=ResourceType.FIXTURES,
+                request_key=f"sportmonks:fixtures:season:{season_id}:{league.sportmonks_id}:p{page}",
+            )
+            envelopes.append(envelope)
+            if not _has_more(self._parse_json(envelope.body)):
+                break
+            page += 1
+        return envelopes
+
+    def _paginate_between(
+        self,
+        leagues: tuple[V1FootballLeague, ...],
+        start: datetime,
+        end: datetime,
+        *,
+        season_id: str | None,
+    ) -> list[RawEnvelope]:
         league_ids = ",".join(str(item.sportmonks_id) for item in leagues)
         envelopes: list[RawEnvelope] = []
         for window_start, window_end in _split_range(start, end, MAX_FIXTURE_RANGE_DAYS):
@@ -97,23 +161,26 @@ class SportmonksFootballProvider:
             page = 1
             while True:
                 path = f"/fixtures/between/{start_s}/{end_s}"
+                filters = f"fixtureLeagues:{league_ids}"
+                if season_id:
+                    filters = f"{filters};fixtureSeasons:{season_id}"
                 query = {
                     "include": FIXTURE_INCLUDES,
-                    "filters": f"fixtureLeagues:{league_ids}",
+                    "filters": filters,
                     "per_page": str(PER_PAGE),
                     "page": str(page),
                 }
+                key = f"sportmonks:fixtures:{start_s}:{end_s}:{league_ids}"
+                if season_id:
+                    key = f"{key}:season:{season_id}"
                 envelope = self._get_envelope(
                     path=path,
                     query=query,
                     resource=ResourceType.FIXTURES,
-                    request_key=f"sportmonks:fixtures:{start_s}:{end_s}:{league_ids}:p{page}",
+                    request_key=f"{key}:p{page}",
                 )
                 envelopes.append(envelope)
-                payload = self._parse_json(envelope.body)
-                pagination = payload.get("pagination") if isinstance(payload, dict) else None
-                has_more = isinstance(pagination, dict) and bool(pagination.get("has_more"))
-                if not has_more:
+                if not _has_more(self._parse_json(envelope.body)):
                     break
                 page += 1
         return envelopes
@@ -162,6 +229,11 @@ def _date_window(request: ProviderRequest, now: datetime) -> tuple[datetime, dat
     if end < start:
         raise ValidationError("invalid_payload", "date-to must be on or after date-from.")
     return start, end
+
+
+def _has_more(payload: dict[str, Any]) -> bool:
+    pagination = payload.get("pagination")
+    return isinstance(pagination, dict) and bool(pagination.get("has_more"))
 
 
 def _split_range(start: datetime, end: datetime, max_days: int) -> list[tuple[datetime, datetime]]:

@@ -117,12 +117,29 @@ starting_at (UTC)          → Match.kickoff_at / event_at
 state_id                   → Match.status
 participants.meta.location → home/away teams
 scores[description=CURRENT] → home_score / away_score (finished/live only)
+season.name / season_id   → League.season
 ```
 
 Un match `scheduled` n'emporte pas de score, même si le JSON contient `0`.
 Un résultat `finished` a `available_at` strictement après le coup d'envoi
 (`kickoff + 3h`, ou `collected_at` s'il est plus tôt). Le PIT refuse ce
 résultat comme feature pre-match.
+
+Découverte d'historique :
+
+```text
+GET /leagues/{id}?include=country;seasons
+GET /fixtures/seasons/{seasonId}?include=participants;scores;league.country;season;venue;state
+```
+
+MLS (Sportmonks id 779) est ingérée pour toutes les saisons réellement retournées.
+Les ligues européennes V1 sont limitées par défaut aux 3 saisons les plus récentes.
+`--season`, `--date-from`, `--date-to` et `--all-seasons` restreignent le run.
+Une saison absente de la réponse provider n'est pas inventée.
+
+Une fixture invalide (placeholder, scores manquants, même équipe des deux côtés)
+va en quarantaine **individuellement** ; les voisines valides de la page sont
+normalisées.
 
 ## 7. Résolution d'identités
 
@@ -154,10 +171,15 @@ Les tables de faits volumineuses sont append-only. Un classement n'est pas écra
 
 Reproductibilité d'un dataset :
 
-1. figer `cutoff_at`;
-2. lire via `PointInTimeStore`;
-3. hasher les canonical ids + `available_at` max par type;
-4. enregistrer le hash à côté de la version de code.
+1. figer `cutoff_at` (kickoff du match cible) ;
+2. lire via `PointInTimeStore` ;
+3. construire `build_ml_dataset(competition, seasons, cutoff_policy)` ;
+4. hasher les canonical ids + `available_at` max par type ;
+5. enregistrer le hash à côté de `dataset_version` (`football-1x2-history-0.1`).
+
+Correction d'un payload Sportmonks : le raw d'origine reste immuable. Un payload
+corrigé (checksum différent) crée un nouvel enregistrement raw et un upsert
+canonique du match. `raw_payload_id` pointe vers le raw le plus récemment accepté.
 
 ## 10. Point-in-time (contrat ML)
 
@@ -179,7 +201,18 @@ data_mode filtré explicitement par l'appelant
 
 Une composition publiée après le coup d'envoi n'entre pas dans les features pre-match. Un résultat du match cible n'est jamais accessible pour ce match.
 
-Le DATA layer expose les observations ; il ne calcule pas Elo, xG agrégé ou form ratings. Ces features appartiennent au worker ML, qui doit utiliser exclusivement ce reader.
+Les features de forme football (`predicta_ingestion.ml.features`) n'utilisent que des
+matchs dont `event_at.date() < kickoff.date()` et `available_at < kickoff`. Un match
+du même jour calendaire est exclu des agrégats de forme.
+
+Le rating Elo pré-match (`predicta_ingestion.ml.elo`) est une reconstruction
+historique, pas un entraînement : on parcourt les matchs terminés dans l'ordre
+du coup d'envoi, on **enregistre** le rating courant, **puis** on met à jour. Le
+rating après le match N n'est jamais réinjecté dans le match N.
+
+Les classements ne sont pas encore ingérés depuis Sportmonks. Les features
+`home_standing_rank` / `away_standing_rank` restent `null` tant que des
+`StandingSnapshot` PIT-valides n'existent pas. Ils ne sont pas interpolés.
 
 ## 11. Cotes et Value Engine
 
@@ -220,13 +253,27 @@ Sans `PREDICTA_INGESTION_ENABLE_LIVE=true` et sans `SPORTMONKS_API_TOKEN`,
 la commande lève `LiveIngestionDisabled` ou `ProviderNotConfigured`.
 Aucun fallback mock.
 
+Historique + dataset PIT :
+
+```bash
+python -m predicta_ingestion ingest-history --league MLS --dry-run
+python -m predicta_ingestion ingest-history --league mls --season 2024 --date-from 2024-03-01 --date-to 2024-11-30
+python -m predicta_ingestion build-ml-dataset --league MLS --dry-run --write-dataset /tmp/mls-1x2.json
+```
+
+`--dry-run` ne écrit ni PostgreSQL ni le store raw. Le rapport d'ingestion liste
+les saisons **découvertes** (réponse provider) et celles **sélectionnées**.
+
+Détail ML : [ml-dataset.md](ml-dataset.md).
+
 ## 14. Handoff ML
 
 L'agent ML doit :
 
-- importer `predicta_ingestion.pit` plutôt que de joindre SQL librement;
-- versionner les définitions de features;
-- n'utiliser que `available_at < cutoff`;
-- traiter `availability=unavailable` comme donnée manquante;
+- importer `predicta_ingestion.pit` et `predicta_ingestion.ml` plutôt que de joindre SQL librement;
+- versionner les définitions de features (`football-1x2-history-0.1`);
+- n'utiliser que `available_at < cutoff` et `event_at < cutoff`;
+- traiter `availability=unavailable` et les ranks nuls comme donnée manquante;
 - ignorer toute ligne `data_mode=mock` dans un entraînement présenté comme réel;
-- ne pas lire `predictions` pour entraîner le même marché sans protocole dédié (fuite).
+- ne pas lire `predictions` pour entraîner le même marché sans protocole dédié (fuite);
+- ne pas réentraîner Elo / Poisson / Gradient Boosting dans le worker DATA.

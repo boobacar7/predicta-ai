@@ -136,9 +136,10 @@ def test_settings_reads_unprefixed_sportmonks_token(monkeypatch: pytest.MonkeyPa
     assert settings.sportmonks_key == TEST_SPORTMONKS_TOKEN
 
 
-def test_v1_league_catalog_contains_six_competitions() -> None:
+def test_v1_league_catalog_contains_mls_and_european_v1() -> None:
     slugs = {item.slug for item in V1_FOOTBALL_LEAGUES}
     assert slugs == {
+        "mls",
         "premier-league",
         "la-liga",
         "bundesliga",
@@ -146,6 +147,24 @@ def test_v1_league_catalog_contains_six_competitions() -> None:
         "ligue-1",
         "champions-league",
     }
+
+
+def test_fetch_fixtures_by_season_paginates_season_endpoint(clock: Clock) -> None:
+    transport = ScriptedTransport()
+    provider = _provider(clock, transport)
+    envelopes = provider.fetch(
+        ProviderRequest(
+            resource=ResourceType.FIXTURES,
+            sport=SportCode.FOOTBALL,
+            league="mls",
+            season="18001",
+        )
+    )
+    assert envelopes
+    assert all(item.resource is ResourceType.FIXTURES for item in envelopes)
+    urls = [url for url, _headers in transport.calls]
+    assert any("/fixtures/seasons/18001" in url for url in urls)
+    assert all("api_token" not in url for url in urls)
 
 
 def test_date_range_is_split_under_sportmonks_limit() -> None:

@@ -77,6 +77,8 @@ Trois instants sont distingués et persistés :
 
 `observed_at` exposé à l'API correspond à `available_at` lorsque les deux existent. Un backfill de résultats 2019 ingéré en 2026 doit porter `available_at` historique (fin de match + latence documentée), pas la date d'ingestion.
 
+Pour un résultat terminé Sportmonks, `available_at` est `min(collected_at, kickoff + 3h)`, jamais antérieur au coup d'envoi. C'est une **hypothèse documentée**, pas un timestamp d'observation fourni par le provider. Si Sportmonks ne permet pas de savoir quand le résultat est devenu public, le dataset ne prétend pas un PIT parfait sur ce champ.
+
 ## 6. Point-in-time et anti-fuite
 
 Pour prédire un match dont le coup d'envoi est `T` :
@@ -114,16 +116,24 @@ Les choix V1 sont dans [ADR 0005](adr/0005-data-providers-v1.md) et
 
 - Football live / stats : Sportmonks **Growth**
 - Cotes : The Odds API
-- Ligues : Premier League, La Liga, Bundesliga, Serie A, Ligue 1, Champions League
+- Ligues : MLS (priorité historique), Premier League, La Liga, Bundesliga, Serie A, Ligue 1, Champions League
 - football-data.co.uk : recherche / backtest seulement, pas le produit, tant que la licence commerciale n'est pas explicite
 - Basketball, tennis, event-level : reportés
 - Raw : filesystem en développement, S3 plus tard
 
 Aucun adapter live n'effectue d'appel réseau tant que `PREDICTA_INGESTION_ENABLE_LIVE` n'est pas activé **et** que les secrets ne sont injectés que par l'environnement.
 
-L'adapter **Sportmonks Football** (ligues V1 + fixtures) est implémenté. Il refuse
+L'adapter **Sportmonks Football** (MLS + ligues V1 + fixtures + découverte de saisons) est implémenté. Il refuse
 de tourner si le live n'est pas activé ou si `SPORTMONKS_API_TOKEN` est vide.
 Il ne retombe jamais sur les fixtures mock. The Odds API reste non branché.
+
+L'historique n'est **pas** une profondeur garantie. Le pipeline découvre les saisons
+que Sportmonks retourne réellement, les documente dans le rapport d'ingestion, et
+n'invente aucune saison manquante. La MLS est la compétition historique de référence ;
+les ligues européennes V1 sont limitées par défaut aux 3 saisons les plus récentes
+sauf `--season` / `--all-seasons`.
+
+Le dataset ML se construit via `PointInTimeStore` ; voir [ml-dataset.md](ml-dataset.md).
 
 Guide de lancement : [workers/ingestion/README.md](../workers/ingestion/README.md).
 
@@ -132,9 +142,10 @@ Guide de lancement : [workers/ingestion/README.md](../workers/ingestion/README.m
 1. Abstractions, schémas, PIT, mocks et tests.
 2. Validation humaine des fournisseurs V1 (**faite**, ADR 0005).
 3. Branchement contrôlé de l'adapter Sportmonks Growth (secrets hors Git).
-4. Backfill football historique produit via Sportmonks sur les ligues V1.
-5. Ingestion récurrente pre-match.
-6. The Odds API, puis basketball, puis tennis, sur les mêmes contrats.
+4. Backfill football historique produit via Sportmonks (MLS d'abord, puis ligues européennes V1).
+5. Construction d'un dataset ML 1X2 point-in-time (`predicta_ingestion.ml`). Aucun entraînement de modèle dans DATA.
+6. Ingestion récurrente pre-match.
+7. The Odds API, puis basketball, puis tennis, sur les mêmes contrats.
 
 ## 12. Hors périmètre
 

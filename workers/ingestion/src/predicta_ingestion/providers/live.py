@@ -55,7 +55,7 @@ class ApiTennisProvider(DisabledLiveAdapter):
 
 
 RESOURCE_CONTRACT: dict[str, tuple[ResourceType, ...]] = {
-    "sportmonks": (ResourceType.LEAGUES, ResourceType.FIXTURES),
+    "sportmonks": (ResourceType.LEAGUES, ResourceType.SEASONS, ResourceType.FIXTURES),
     "api_football": (
         ResourceType.FIXTURES,
         ResourceType.STANDINGS,

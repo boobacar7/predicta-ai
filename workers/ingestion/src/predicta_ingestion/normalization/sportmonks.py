@@ -3,13 +3,14 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from predicta_ingestion.canonical.enums import MatchStatus, SportCode
+from predicta_ingestion.canonical.enums import DataMode, MatchStatus, SportCode
 from predicta_ingestion.canonical.models import CanonicalBatch, League, Match, Provenance, Sport, Team
 from predicta_ingestion.clock import Clock, parse_rfc3339
 from predicta_ingestion.errors import ValidationError
 from predicta_ingestion.ids import slugify, stable_entity_id
 from predicta_ingestion.providers.leagues import V1_LEAGUE_BY_SPORTMONKS_ID
 from predicta_ingestion.quality.freshness import classify_freshness
+from predicta_ingestion.quality.quarantine import QuarantineItem
 from predicta_ingestion.raw.store import StoredRaw
 
 # Finished results become PIT-visible only after kickoff plus this lag.
@@ -67,8 +68,10 @@ def parse_sportmonks_datetime(value: object) -> datetime:
 class SportmonksFootballNormalizer:
     def __init__(self, clock: Clock) -> None:
         self._clock = clock
+        self.quarantined: list[QuarantineItem] = []
 
     def normalize(self, stored: StoredRaw, payload: dict[str, Any]) -> CanonicalBatch:
+        self.quarantined = []
         sport = Sport(
             id=stable_entity_id("sport", SportCode.FOOTBALL.value),
             code=SportCode.FOOTBALL,
@@ -84,9 +87,41 @@ class SportmonksFootballNormalizer:
             raise ValidationError("invalid_payload", "Sportmonks payload data must be an object or a list.")
         for item in data:
             if not isinstance(item, dict):
-                raise ValidationError("invalid_payload", "Expected a fixture object.")
-            self._add_fixture(batch, stored, sport, item)
+                self.quarantined.append(
+                    self._quarantine(stored, "invalid_payload", "Expected a fixture object.", provider_entity_id=None)
+                )
+                continue
+            try:
+                self._add_fixture(batch, stored, sport, item)
+            except ValidationError as exc:
+                self.quarantined.append(
+                    self._quarantine(
+                        stored,
+                        exc.reason_code,
+                        exc.detail,
+                        provider_entity_id=str(item.get("id")) if item.get("id") is not None else None,
+                    )
+                )
         return batch
+
+    def _quarantine(
+        self,
+        stored: StoredRaw,
+        reason_code: str,
+        detail: str,
+        *,
+        provider_entity_id: str | None,
+    ) -> QuarantineItem:
+        return QuarantineItem(
+            reason_code=reason_code,
+            detail=detail,
+            provider=stored.envelope.provider,
+            entity_type="match",
+            data_mode=stored.envelope.data_mode if isinstance(stored.envelope.data_mode, DataMode) else DataMode.LIVE,
+            provider_entity_id=provider_entity_id,
+            raw_payload_id=stored.id,
+            created_at=self._clock.now(),
+        )
 
     def _provenance(
         self,
@@ -163,7 +198,15 @@ class SportmonksFootballNormalizer:
         home, away = self._participants(raw)
         home_team = self._team(stored, sport, league, home)
         away_team = self._team(stored, sport, league, away)
+        if home_team.id == away_team.id:
+            raise ValidationError("same_team", "Home team and away team must be different.")
+        if league.season == "unknown":
+            raise ValidationError("missing_season", "Fixture season is missing.")
         home_score, away_score = _final_scores(raw, status)
+        if home_score is not None and home_score < 0:
+            raise ValidationError("inconsistent_score", "Home score cannot be negative.")
+        if away_score is not None and away_score < 0:
+            raise ValidationError("inconsistent_score", "Away score cannot be negative.")
         venue_raw: dict[str, Any] = raw["venue"] if isinstance(raw.get("venue"), dict) else {}
         venue = str(venue_raw.get("name") or "") or None
         available_at = _match_available_at(status=status, kickoff=kickoff, collected_at=stored.envelope.collected_at)
