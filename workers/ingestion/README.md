@@ -66,8 +66,7 @@ python -m predicta_ingestion ingest-history \
   --date-to 2024-11-30
 python -m predicta_ingestion build-ml-dataset \
   --league MLS \
-  --dry-run \
-  --write-dataset ./var/mls-1x2.json
+  --write-dataset ./var/football-1x2-history.json
 ```
 
 Par défaut, la MLS ingère toutes les saisons découvertes. Les ligues européennes V1

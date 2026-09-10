@@ -102,4 +102,4 @@ Pas de payload provider ni de clé dans les logs.
 
 ## 9. Tests de qualité exigés
 
-Le package ingestion couvre : parsing, validation, normalisation, mapping provider → canonique, timestamps UTC, déduplication, fraîcheur, point-in-time, ingestion bout-en-bout mock, erreurs provider, découverte de saisons, historique MLS, dataset 1X2, Elo pré-match, anti-leakage. Les fixtures de test ne sont jamais étiquetées `live`. Aucun test n'appelle le réseau.
+Le package ingestion couvre : parsing, validation, normalisation (fixtures **et** saisons Sportmonks séparément), mapping provider → canonique, timestamps UTC, déduplication, fraîcheur, point-in-time, ingestion bout-en-bout mock, erreurs provider, découverte de saisons, historique MLS, dataset 1X2, Elo pré-match, rolling 5/10, anti-leakage. Les fixtures de test ne sont jamais étiquetées `live`. Aucun test n'appelle le réseau.

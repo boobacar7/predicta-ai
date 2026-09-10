@@ -17,6 +17,9 @@ from predicta_ingestion.history import HistoryIngestReport, ingest_history, memo
 from predicta_ingestion.identity.resolver import IdentityResolver
 from predicta_ingestion.ids import stable_entity_id
 from predicta_ingestion.ml.dataset import MlDataset, build_ml_dataset
+from predicta_ingestion.ml.export import write_dataset_artifacts
+from predicta_ingestion.ml.quality import build_quality_report
+from predicta_ingestion.persistence.load import load_memory_sink
 from predicta_ingestion.persistence.memory import MemoryCanonicalSink, TeeCanonicalSink
 from predicta_ingestion.persistence.sql import SqlCanonicalSink
 from predicta_ingestion.pipeline import IngestionPipeline, IngestionReport
@@ -51,12 +54,19 @@ def main(argv: list[str] | None = None) -> int:
     history.add_argument("--write-dataset", dest="write_dataset", help="Write the PIT 1X2 dataset JSON after ingest.")
     dataset = sub.add_parser(
         "build-ml-dataset",
-        help="Ingest history (if needed) and emit a point-in-time 1X2 dataset.",
+        help="Build a point-in-time 1X2 dataset from ingested PostgreSQL rows. Does not train a model.",
     )
-    _add_common_ingest_args(dataset, default_league="mls")
-    dataset.add_argument("--season", help="Sportmonks season id or season name as returned by the provider.")
-    dataset.add_argument("--all-seasons", action="store_true")
-    dataset.add_argument("--write-dataset", dest="write_dataset", help="Output path for the dataset JSON.")
+    dataset.add_argument("--league", default="mls", help=f"League slug, alias (MLS), or 'all'. {_LEAGUE_HELP}")
+    dataset.add_argument(
+        "--season",
+        help="Limit labeled rows to this season name (Elo/form still use earlier PIT facts).",
+    )
+    dataset.add_argument(
+        "--write-dataset",
+        dest="write_dataset",
+        default="./var/football-1x2-history.json",
+        help="Output JSON path. Parquet and quality sidecar files use the same stem.",
+    )
     args = parser.parse_args(argv)
     if args.command is None:
         parser.print_help()
@@ -100,7 +110,7 @@ def _dispatch(args: argparse.Namespace, settings: Settings) -> dict[str, object]
             dry_run=args.dry_run,
         )
         return _report_payload(report)
-    if args.command in {"ingest-history", "build-ml-dataset"}:
+    if args.command == "ingest-history":
         history, dataset = run_history(
             settings=settings,
             league=args.league,
@@ -109,21 +119,24 @@ def _dispatch(args: argparse.Namespace, settings: Settings) -> dict[str, object]
             date_to=args.date_to,
             all_seasons=bool(getattr(args, "all_seasons", False)),
             dry_run=args.dry_run,
-            build_dataset=args.command == "build-ml-dataset" or bool(getattr(args, "write_dataset", None)),
+            build_dataset=bool(getattr(args, "write_dataset", None)),
         )
         payload: dict[str, object] = history.to_dict()
         if dataset is not None:
-            payload["dataset"] = {
-                "dataset_version": dataset.dataset_version,
-                "cutoff_policy": dataset.cutoff_policy,
-                "observation_count": len(dataset.observations),
-                "standings_available": dataset.standings_available,
-                "seasons": dataset.seasons,
-            }
+            payload["dataset"] = _dataset_summary(dataset)
             output = getattr(args, "write_dataset", None)
             if output:
-                Path(output).write_text(json.dumps(dataset.to_dict(), indent=2, sort_keys=True), encoding="utf-8")
-                payload["dataset_path"] = output
+                payload["dataset_paths"] = write_dataset_artifacts(dataset, output)
+        return payload
+    if args.command == "build-ml-dataset":
+        dataset = build_dataset_from_sql(
+            settings=settings,
+            league=args.league,
+            season=getattr(args, "season", None),
+        )
+        payload = _dataset_summary(dataset)
+        payload["dataset_paths"] = write_dataset_artifacts(dataset, args.write_dataset)
+        payload["quality"] = build_quality_report(dataset)
         return payload
     raise RuntimeError(f"Unknown command '{args.command}'.")
 
@@ -190,6 +203,43 @@ def run_history(
             seasons=None if all_seasons or not season else [item.season for item in history.seasons],
         )
     return history, dataset
+
+
+def build_dataset_from_sql(
+    *,
+    settings: Settings,
+    league: str = "mls",
+    season: str | None = None,
+) -> MlDataset:
+    engine = create_engine(settings.database_url, pool_pre_ping=True, future=True)
+    sink = load_memory_sink(engine)
+    if not sink.matches:
+        raise RuntimeError("No ingested matches in PostgreSQL. Run ingest-history before building the dataset.")
+    seasons = None if not season else [season]
+    return build_ml_dataset(
+        PointInTimeStore(sink),
+        competition=None if league in {None, "", "all"} else league,
+        seasons=seasons,
+    )
+
+
+def _dataset_summary(dataset: MlDataset) -> dict[str, object]:
+    reasons: dict[str, int] = {}
+    for item in dataset.rejections:
+        reasons[item.reason] = reasons.get(item.reason, 0) + 1
+    return {
+        "dataset_version": dataset.dataset_version,
+        "code_version": dataset.code_version,
+        "cutoff_policy": dataset.cutoff_policy,
+        "observation_count": dataset.observation_count,
+        "rejected_count": dataset.rejected_count,
+        "rejection_reasons": reasons,
+        "feature_count": len(dataset.feature_schema),
+        "standings_available": dataset.standings_available,
+        "seasons": dataset.seasons,
+        "period_start": dataset.period_start.isoformat() if dataset.period_start else None,
+        "period_end": dataset.period_end.isoformat() if dataset.period_end else None,
+    }
 
 
 def _sportmonks_provider(settings: Settings, clock: Clock) -> SportmonksFootballProvider:

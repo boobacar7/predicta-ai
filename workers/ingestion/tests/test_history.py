@@ -180,6 +180,29 @@ def test_per_fixture_quarantine_keeps_valid_neighbours(clock) -> None:
     assert batch.matches[0].status is MatchStatus.FINISHED
 
 
+def test_seasons_payload_is_not_normalized_as_fixtures(clock) -> None:
+    normalizer = SportmonksFootballNormalizer(clock)
+    envelope = RawEnvelope(
+        provider="sportmonks",
+        resource=ResourceType.SEASONS,
+        request_key="sportmonks:seasons:779",
+        collected_at=clock.now(),
+        data_mode=DataMode.LIVE,
+        sport=SportCode.FOOTBALL,
+        body=load_sportmonks("seasons_mls.json"),
+        content_type="application/json",
+        headers={},
+    )
+    stored = StoredRaw(raw_id="raw_seasons", envelope=envelope, storage_uri="mem", duplicate=False)
+    payload = json.loads(envelope.body.decode("utf-8"))
+    batch = normalizer.normalize(stored, payload)
+    assert batch.matches == []
+    assert {item.season for item in batch.leagues} == {"2023", "2024", "2025"}
+    assert all(item.name == "Major League Soccer" for item in batch.leagues)
+    assert all(item.reason_code != "unknown_status" for item in normalizer.quarantined)
+    assert "unknown_status" not in {item.reason_code for item in normalizer.quarantined}
+
+
 def test_count_fixtures_does_not_treat_league_payload_as_matches() -> None:
     envelope = RawEnvelope(
         provider="sportmonks",

@@ -11,35 +11,32 @@ Sportmonks
   → ingest-history (saisons découvertes, pas inventées)
   → raw immuable
   → validation / normalisation / quarantaine
-  → PostgreSQL canonique + MemoryCanonicalSink
+  → PostgreSQL canonique
+  → load_memory_sink (lecture SQL, pas de re-fetch)
   → PointInTimeStore
   → build_ml_dataset(competition, seasons, cutoff_policy)
+  → JSON + Parquet + rapport qualité
 ```
 
 Commandes :
 
 ```bash
-python -m predicta_ingestion ingest-history --league MLS --dry-run
-python -m predicta_ingestion build-ml-dataset --league MLS --season 2024 --dry-run --write-dataset ./var/mls-1x2.json
+python -m predicta_ingestion ingest-history --league MLS
+python -m predicta_ingestion build-ml-dataset \
+  --league MLS \
+  --write-dataset ./var/football-1x2-history.json
 ```
 
-`--dry-run` ne persiste ni PostgreSQL ni le filesystem raw.
+`build-ml-dataset` lit PostgreSQL. Il n'appelle pas Sportmonks et n'entraîne rien.
+`--dry-run` sur `ingest-history` ne persiste ni PostgreSQL ni le filesystem raw.
 
 ## 2. MLS
 
 La MLS (Sportmonks league id `779`, slug `mls`, alias `MLS`) est la compétition
 historique de référence.
 
-Le pipeline :
-
-1. appelle `GET /seasons?filters=seasonLeagues:779` ;
-2. parse uniquement les saisons **présentes dans la réponse** ;
-3. ingère chaque saison sélectionnée via `GET /fixtures?filters=fixtureLeagues:779;fixtureSeasons:{id}` ;
-4. rapporte `fetched / normalized / inserted / duplicate / quarantined`.
-
-Les fichiers `workers/ingestion/fixtures/sportmonks/league_mls.json` sont des
-**doubles de test**. Ils ne documentent pas la couverture réelle du plan Growth.
-Les saisons réellement disponibles sont celles du rapport d'un run live.
+Les saisons réellement disponibles sont celles du rapport d'un run live, pas
+les fixtures de test.
 
 ## 3. Cutoff et anti-leakage
 
@@ -47,48 +44,49 @@ Pour un match au coup d'envoi `T` :
 
 | Champ | Rôle |
 | --- | --- |
-| `event_at` | fait sportif (ici le kickoff) |
+| `event_at` | fait sportif (kickoff) |
 | `available_at` | moment où le fait est utilisable |
 | `collected_at` | audit d'ingestion, jamais un cutoff d'entraînement |
 
 Règle : une feature pour `T` n'utilise que des faits avec `available_at < T`
 et `event_at < T`. Le match cible est exclu.
 
-Forme récente (points, buts, domicile/extérieur) : uniquement des matchs dont
-la **date UTC** est strictement antérieure à `T.date()`. Un match du 20/09/2024
-n'entre pas dans les features du match PSG–Marseille du 20/09/2024.
+Forme récente (fenêtres 5 et 10) : matchs PIT-valides uniquement. Un match dont
+le résultat n'est pas encore `available_at < T` n'entre pas, même s'il a déjà
+kickoff.
 
-Elo pré-match : parcours chronologique par `kickoff_at`. Le rating **avant** N
-est celui obtenu après tous les matchs **précédant** N. Jamais un Elo calculé
-sur toute la saison puis réinjecté.
+Elo pré-match : snapshot au kickoff, mise à jour **uniquement** à `available_at`.
+Paramètres : `initial=1500`, `K=20`, avantage domicile `+80`, échelle 400.
 
-Classement : uniquement `standings_as_of(league_id, T)`. Tant que Sportmonks
-standings n'est pas ingéré, les ranks sont `null` (`standings_available=false`).
+H2H : confrontations antérieures entre les deux clubs. `h2h_available=1` si
+au moins 2 matchs PIT-valides.
+
+Classement : uniquement `standings_as_of`. Tant que Sportmonks standings n'est
+pas ingéré, `home_standing_rank` / `away_standing_rank` restent `null`.
 
 `available_at` des résultats terminés est une hypothèse (`kickoff + 3h`, bornée
-par `collected_at`). Ce n'est pas un timestamp d'observation Sportmonks. Le
-dataset ne prétend donc pas un PIT parfait sur l'instant exact de publication
-du score.
+par `collected_at`). Ce n'est pas un timestamp d'observation Sportmonks.
 
 ## 4. Observation
 
-Chaque ligne séparée **target** vs **features** :
+Chaque ligne sépare **target** vs **features** :
 
-- `match_id`, `event_at`, `home_team_id`, `away_team_id`
-- `target` ∈ {`HOME`, `DRAW`, `AWAY`}
-- `features` : forme, buts, goal-diff, matches joués, Elo pré-match, ranks (souvent null)
+- `match_id`, `event_at`, `home_team_id`, `away_team_id`, `competition`, `season`
+- `home_win` / `draw` / `away_win` ∈ {0, 1} (one-hot) et `target` ∈ {HOME, DRAW, AWAY}
+- `features` : forme 5/10, buts prior/5/10, Elo, diff Elo, H2H, flags `*_available`
 - `provider`, `raw_payload_id`, `data_mode`, `dataset_version`, `cutoff_policy`
 
-Les matchs non terminés ou sans scores n'entrent pas dans le dataset étiqueté.
-Aucun score n'est inventé pour compléter une saison.
+Les matchs non terminés ou sans scores sont **rejetés** (raison dans le rapport),
+pas étiquetés. Aucun score n'est inventé.
 
-## 5. Reproduire à une date T
+Version : `football-1x2-history-0.2`.
 
-1. Ingester l'historique (ou relire le sink mémoire d'un run).
-2. `PointInTimeStore.features_for_match(match_id, T)` refuse `T > kickoff`.
-3. `build_ml_dataset(..., cutoff_policy="pre_kickoff")` applique les mêmes bornes
-   à toutes les observations.
-4. Enregistrer `dataset_version=football-1x2-history-0.1` et le rapport d'ingestion.
+## 5. Artefacts
 
-Les tests `test_ml_dataset.py` démontrent qu'un résultat postérieur ou du même
-jour calendaire n'entre pas dans les features de forme.
+`build-ml-dataset` écrit, à côté du JSON :
+
+- `{stem}.parquet` : table aplatie reproductible
+- `{stem}.quality.json` : doublons, nulls, ordre temporel, flags de disponibilité,
+  compteurs de rejet, paramètres Elo, `code_version`
+
+Les tests `test_ml_dataset.py` couvrent anti-leakage, Elo différé, rolling 5/10 et H2H.

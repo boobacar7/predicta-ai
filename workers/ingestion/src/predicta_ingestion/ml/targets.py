@@ -23,6 +23,14 @@ def result_1x2(match: Match) -> Football1X2Target:
     return Football1X2Target.DRAW
 
 
+def one_hot_1x2(target: Football1X2Target) -> tuple[int, int, int]:
+    if target is Football1X2Target.HOME:
+        return 1, 0, 0
+    if target is Football1X2Target.DRAW:
+        return 0, 1, 0
+    return 0, 0, 1
+
+
 def finished_labeled(matches: Sequence[Match]) -> list[Match]:
     labeled: list[Match] = []
     for match in matches:

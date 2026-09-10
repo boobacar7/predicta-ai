@@ -181,7 +181,7 @@ Reproductibilité d'un dataset :
 2. lire via `PointInTimeStore` ;
 3. construire `build_ml_dataset(competition, seasons, cutoff_policy)` ;
 4. hasher les canonical ids + `available_at` max par type ;
-5. enregistrer le hash à côté de `dataset_version` (`football-1x2-history-0.1`).
+5. enregistrer le hash à côté de `dataset_version` (`football-1x2-history-0.2`).
 
 Correction d'un payload Sportmonks : le raw d'origine reste immuable. Un payload
 corrigé (checksum différent) crée un nouvel enregistrement raw et un upsert
@@ -208,13 +208,13 @@ data_mode filtré explicitement par l'appelant
 Une composition publiée après le coup d'envoi n'entre pas dans les features pre-match. Un résultat du match cible n'est jamais accessible pour ce match.
 
 Les features de forme football (`predicta_ingestion.ml.features`) n'utilisent que des
-matchs dont `event_at.date() < kickoff.date()` et `available_at < kickoff`. Un match
-du même jour calendaire est exclu des agrégats de forme.
+matchs dont `event_at < kickoff` et `available_at < kickoff`. Fenêtres rolling 5 et
+10, plus les totaux prior. Un résultat pas encore disponible est exclu.
 
 Le rating Elo pré-match (`predicta_ingestion.ml.elo`) est une reconstruction
-historique, pas un entraînement : on parcourt les matchs terminés dans l'ordre
-du coup d'envoi, on **enregistre** le rating courant, **puis** on met à jour. Le
-rating après le match N n'est jamais réinjecté dans le match N.
+historique, pas un entraînement : snapshot au `event_at`, mise à jour uniquement
+quand `available_at` est atteint. Paramètres : initial 1500, K=20, avantage
+domicile +80. Le rating après le match N n'est jamais réinjecté dans le match N.
 
 Les classements ne sont pas encore ingérés depuis Sportmonks. Les features
 `home_standing_rank` / `away_standing_rank` restent `null` tant que des
@@ -264,7 +264,7 @@ Historique + dataset PIT :
 ```bash
 python -m predicta_ingestion ingest-history --league MLS --dry-run
 python -m predicta_ingestion ingest-history --league mls --season 2024 --date-from 2024-03-01 --date-to 2024-11-30
-python -m predicta_ingestion build-ml-dataset --league MLS --dry-run --write-dataset /tmp/mls-1x2.json
+python -m predicta_ingestion build-ml-dataset --league MLS --write-dataset ./var/football-1x2-history.json
 ```
 
 `--dry-run` ne écrit ni PostgreSQL ni le store raw. Le rapport d'ingestion liste
@@ -277,7 +277,7 @@ Détail ML : [ml-dataset.md](ml-dataset.md).
 L'agent ML doit :
 
 - importer `predicta_ingestion.pit` et `predicta_ingestion.ml` plutôt que de joindre SQL librement;
-- versionner les définitions de features (`football-1x2-history-0.1`);
+- versionner les définitions de features (`football-1x2-history-0.2`);
 - n'utiliser que `available_at < cutoff` et `event_at < cutoff`;
 - traiter `availability=unavailable` et les ranks nuls comme donnée manquante;
 - ignorer toute ligne `data_mode=mock` dans un entraînement présenté comme réel;

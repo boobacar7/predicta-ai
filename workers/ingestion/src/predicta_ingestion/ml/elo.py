@@ -11,6 +11,14 @@ INITIAL_ELO = 1500.0
 ELO_K = 20.0
 HOME_ADVANTAGE = 80.0
 
+ELO_PARAMETERS: dict[str, float | str] = {
+    "initial": INITIAL_ELO,
+    "k": ELO_K,
+    "home_advantage": HOME_ADVANTAGE,
+    "scale": 400.0,
+    "update": "after_available_at",
+}
+
 
 def expected_score(rating: float, opponent: float) -> float:
     return 1.0 / (1.0 + 10 ** ((opponent - rating) / 400.0))
@@ -23,10 +31,11 @@ def reconstruct_pre_match_elo(
     k: float = ELO_K,
     home_advantage: float = HOME_ADVANTAGE,
 ) -> dict[str, tuple[float, float]]:
-    """Walk finished matches in kickoff order and record ratings *before* each result.
+    """Walk finished matches and record ratings *before* each kickoff.
 
-    Ratings after match N are never written back onto match N. That would leak the
-    outcome into a pre-match feature.
+    Snapshot at `event_at` (kickoff). Apply the result only at `available_at`.
+    A later match whose kickoff is before the previous result is available does
+    not inherit that result. Ratings after match N are never written onto N.
     """
     ordered = [
         item
@@ -37,17 +46,25 @@ def reconstruct_pre_match_elo(
         and item.home_team_id
         and item.away_team_id
     ]
-    ordered.sort(key=lambda item: (ensure_utc(item.kickoff_at), item.id))
+    events: list[tuple[object, int, str, str, Match]] = []
+    for match in ordered:
+        kickoff = ensure_utc(match.kickoff_at)
+        available = ensure_utc(match.provenance.available_at)
+        events.append((kickoff, 0, match.id, "snapshot", match))
+        events.append((available, 1, match.id, "update", match))
+    events.sort(key=lambda item: (item[0], item[1], item[2]))
     ratings: dict[str, float] = defaultdict(lambda: initial)
     pre_match: dict[str, tuple[float, float]] = {}
-    for match in ordered:
+    for _when, _order, _match_id, kind, match in events:
         home_id = match.home_team_id or ""
         away_id = match.away_team_id or ""
+        if kind == "snapshot":
+            pre_match[match.id] = (ratings[home_id], ratings[away_id])
+            continue
         home_goals = match.home_score
         away_goals = match.away_score
         if home_goals is None or away_goals is None:
             continue
-        pre_match[match.id] = (ratings[home_id], ratings[away_id])
         home_expected = expected_score(ratings[home_id] + home_advantage, ratings[away_id])
         away_expected = 1.0 - home_expected
         if home_goals > away_goals:
