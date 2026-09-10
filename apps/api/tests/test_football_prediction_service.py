@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -14,6 +16,7 @@ from app.predictions.types import (
     CANDIDATE_MODEL_VERSION,
     CANDIDATE_STATUS,
     CUTOFF_POLICY_PRE_KICKOFF,
+    ELO_FEATURES,
     PitEloFeatures,
 )
 
@@ -137,3 +140,32 @@ def test_candidate_artefact_and_reproducible_simplex() -> None:
     assert "expected_value" not in dumped
     assert "edge" not in dumped
     assert "odds" not in dumped
+
+
+def test_pit_snapshot_cannot_carry_post_match_labels() -> None:
+    forbidden = {"target", "home_win", "draw", "away_win", "y", "score", "standing"}
+    assert forbidden.isdisjoint(PitEloFeatures.__dataclass_fields__)
+    assert set(ELO_FEATURES).issubset(PitEloFeatures.__dataclass_fields__)
+
+
+def test_parquet_store_exposes_only_pre_kickoff_elo() -> None:
+    _require_live_assets()
+    features = ParquetPitFeatureStore(DATASET).get_pit_features(LIVE_MATCH_ID, LIVE_KICKOFF)
+    assert features.data_mode == "live"
+    assert features.cutoff_policy == CUTOFF_POLICY_PRE_KICKOFF
+    assert features.dataset_version == "football-1x2-history-0.3"
+    assert features.feature_schema_version == "football-1x2-features-0.3"
+    assert not hasattr(features, "target")
+    assert not hasattr(features, "home_win")
+
+
+def test_candidate_card_matches_runtime_dataset_hash() -> None:
+    _require_live_assets()
+    card_path = ARTEFACT_DIR / CANDIDATE_MODEL_VERSION / "registry.json"
+    card = json.loads(card_path.read_text(encoding="utf-8"))
+    digest = hashlib.sha256(DATASET.read_bytes()).hexdigest()
+    assert card["status"] == "candidate"
+    assert card["model_version"] == CANDIDATE_MODEL_VERSION
+    assert card["dataset_version"] == "football-1x2-history-0.3"
+    assert card["feature_schema_version"] == "football-1x2-features-0.3"
+    assert digest == card["dataset_sha256"]
