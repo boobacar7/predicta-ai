@@ -24,10 +24,12 @@ TEST_SPORTMONKS_TOKEN = "sm_test_secret_do_not_log"
 
 @pytest.fixture(autouse=True)
 def isolate_live_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PREDICTA_INGESTION_SKIP_DOTENV", "1")
     monkeypatch.delenv("SPORTMONKS_API_TOKEN", raising=False)
     monkeypatch.delenv("PREDICTA_INGESTION_SPORTMONKS_KEY", raising=False)
     monkeypatch.delenv("PREDICTA_INGESTION_ENABLE_LIVE", raising=False)
     monkeypatch.delenv("PREDICTA_INGESTION_DATA_MODE", raising=False)
+    monkeypatch.delenv("PREDICTA_INGESTION_ENV_FILE", raising=False)
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

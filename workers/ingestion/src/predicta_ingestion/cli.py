@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -10,7 +11,7 @@ from sqlalchemy import create_engine
 
 from predicta_ingestion.canonical.enums import ResourceType, SportCode
 from predicta_ingestion.clock import Clock, parse_rfc3339
-from predicta_ingestion.config import Settings, get_settings
+from predicta_ingestion.config import Settings, get_settings, load_local_env
 from predicta_ingestion.errors import ValidationError
 from predicta_ingestion.history import HistoryIngestReport, ingest_history, memory_sink
 from predicta_ingestion.identity.resolver import IdentityResolver
@@ -60,6 +61,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command is None:
         parser.print_help()
         return 2
+    load_local_env()
     try:
         settings = get_settings()
         payload = _dispatch(args, settings)
@@ -71,7 +73,7 @@ def main(argv: list[str] | None = None) -> int:
         TypeError,
         ValidationError,
     ) as exc:
-        print(redact_text(str(exc)), file=sys.stderr)
+        print(_redact_cli(str(exc)), file=sys.stderr)
         return 1
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
@@ -261,6 +263,13 @@ def _parse_date(value: str, *, end_of_day: bool) -> datetime:
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=UTC)
     return parsed
+
+
+def _redact_cli(message: str) -> str:
+    secret = (
+        os.environ.get("SPORTMONKS_API_TOKEN") or os.environ.get("PREDICTA_INGESTION_SPORTMONKS_KEY") or ""
+    ).strip()
+    return redact_text(message, secret or None)
 
 
 def _report_payload(report: IngestionReport) -> dict[str, object]:

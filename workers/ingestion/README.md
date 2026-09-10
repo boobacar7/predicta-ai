@@ -3,6 +3,10 @@
 Fondation DATA : adapters, raw immuable, validation, normalisation, résolution
 d'identités et lectures point-in-time.
 
+Le CLI charge `workers/ingestion/.env` tout seul (via python-dotenv), même si
+la commande est lancée depuis la racine du monorepo. Les variables déjà
+présentes dans le process restent prioritaires. Le token n'est jamais affiché.
+
 Le mode par défaut est `mock`. L'ingestion Sportmonks réelle est opt-in.
 
 ## Démarrage (mock / tests)
