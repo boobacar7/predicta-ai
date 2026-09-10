@@ -13,6 +13,8 @@
     "test:api": "npm run test --prefix apps/api",
     "verify:api": "npm run verify --prefix apps/api",
     "test:ingestion": "npm run test --prefix workers/ingestion",
-    "verify:ingestion": "npm run verify --prefix workers/ingestion"
+    "verify:ingestion": "npm run verify --prefix workers/ingestion",
+    "test:ml": "npm run test --prefix workers/ml",
+    "verify:ml": "npm run verify --prefix workers/ml"
   }
 }

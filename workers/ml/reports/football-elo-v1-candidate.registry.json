@@ -1,0 +1,266 @@
+{
+  "calibration_method": "sigmoid",
+  "code_version": "0.1.0+e8b76d7",
+  "created_at": "2026-09-10T17:43:36.436814Z",
+  "dataset_sha256": "0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5",
+  "dataset_version": "football-1x2-history-0.3",
+  "ensemble_used": false,
+  "feature_schema_version": "football-1x2-features-0.3",
+  "features": [
+    "home_elo_pre",
+    "away_elo_pre",
+    "elo_diff"
+  ],
+  "hyperparameters": {
+    "draw_base": 0.2774078149235929,
+    "draw_decay": 1.109649124607505,
+    "home_advantage": 80.0,
+    "initial": 1500.0,
+    "k": 20.0,
+    "scale": 400.0,
+    "source_elo_parameters": "dataset football-1x2-history-0.3 (k=20, initial=1500)",
+    "status": "candidate"
+  },
+  "market": "1X2",
+  "metrics": {
+    "calibration_select": {
+      "raw": {
+        "accuracy": 0.49429657794676807,
+        "brier_score": 0.6374661153132535,
+        "ece": 0.049203267045467146,
+        "log_loss": 1.0589249579047058,
+        "n": 263
+      },
+      "sigmoid": {
+        "accuracy": 0.49049429657794674,
+        "brier_score": 0.6323382036438427,
+        "ece": 0.03785683148971857,
+        "log_loss": 1.0508105214618524,
+        "n": 263
+      }
+    },
+    "sensitivity_candidate": {
+      "home_advantage": 80,
+      "k": 20,
+      "mean_accuracy": 0.505557017692654,
+      "mean_brier_score": 0.6080294923930744,
+      "mean_ece": 0.02911605101743237,
+      "mean_log_loss": 1.0178873455826467,
+      "rank_by_log_loss": 9
+    },
+    "stability": {
+      "collapse_vs_frequency": [],
+      "fold_log_loss_spread": 0.025675348096328765
+    },
+    "test_chosen": {
+      "accuracy": 0.48320413436692505,
+      "brier_score": 0.6158857490851429,
+      "ece": 0.06286755379601495,
+      "log_loss": 1.0280194466282804,
+      "n": 387
+    },
+    "test_raw": {
+      "accuracy": 0.4883720930232558,
+      "brier_score": 0.6123538772743731,
+      "ece": 0.0459337789213341,
+      "log_loss": 1.0237621449504593,
+      "n": 387
+    },
+    "test_sigmoid": {
+      "accuracy": 0.48320413436692505,
+      "brier_score": 0.6158857490851429,
+      "ece": 0.06286755379601495,
+      "log_loss": 1.0280194466282804,
+      "n": 387
+    },
+    "walk_forward": {
+      "folds": [
+        {
+          "accuracy": 0.4842911877394636,
+          "brier_score": 0.6141974404337762,
+          "draw_argmax_rate": 0.0,
+          "ece": 0.02958983864269419,
+          "fold": "fold_1",
+          "frequency_log_loss": 1.074525771444011,
+          "hyperparameters": {
+            "draw_base": 0.27899544327873294,
+            "draw_decay": 1.8069400417286543,
+            "home_advantage": 80.0,
+            "k": 20.0,
+            "scale": 400.0,
+            "source_elo_parameters": "dataset football-1x2-history-0.3 (k=20, initial=1500)"
+          },
+          "log_loss": 1.0274084475472263,
+          "n": 1305,
+          "train": {
+            "end_exclusive": "2025-01-01T00:00:00+00:00",
+            "name": "fold_1_train",
+            "rows": 1538,
+            "start": "2024-02-22T00:00:00+00:00"
+          },
+          "validation": {
+            "end_exclusive": "2025-07-01T00:00:00+00:00",
+            "name": "fold_1_validation",
+            "rows": 1305,
+            "start": "2025-01-01T00:00:00+00:00"
+          }
+        },
+        {
+          "accuracy": 0.5299760191846523,
+          "brier_score": 0.5969263028830329,
+          "draw_argmax_rate": 0.0,
+          "ece": 0.04052995114573061,
+          "fold": "fold_2",
+          "frequency_log_loss": 1.0600832770955737,
+          "hyperparameters": {
+            "draw_base": 0.2728896327526553,
+            "draw_decay": 1.0424316995534486,
+            "home_advantage": 80.0,
+            "k": 20.0,
+            "scale": 400.0,
+            "source_elo_parameters": "dataset football-1x2-history-0.3 (k=20, initial=1500)"
+          },
+          "log_loss": 1.0017330994508975,
+          "n": 1251,
+          "train": {
+            "end_exclusive": "2025-07-01T00:00:00+00:00",
+            "name": "fold_2_train",
+            "rows": 2843,
+            "start": "2024-02-22T00:00:00+00:00"
+          },
+          "validation": {
+            "end_exclusive": "2026-01-01T00:00:00+00:00",
+            "name": "fold_2_validation",
+            "rows": 1251,
+            "start": "2025-07-01T00:00:00+00:00"
+          }
+        },
+        {
+          "accuracy": 0.5024038461538461,
+          "brier_score": 0.6129647338624137,
+          "draw_argmax_rate": 0.0,
+          "ece": 0.01722836326387231,
+          "fold": "fold_3",
+          "frequency_log_loss": 1.0709628849141661,
+          "hyperparameters": {
+            "draw_base": 0.2774078149235929,
+            "draw_decay": 1.109649124607505,
+            "home_advantage": 80.0,
+            "k": 20.0,
+            "scale": 400.0,
+            "source_elo_parameters": "dataset football-1x2-history-0.3 (k=20, initial=1500)"
+          },
+          "log_loss": 1.0245204897498164,
+          "n": 1248,
+          "train": {
+            "end_exclusive": "2026-01-01T00:00:00+00:00",
+            "name": "fold_3_train",
+            "rows": 4094,
+            "start": "2024-02-22T00:00:00+00:00"
+          },
+          "validation": {
+            "end_exclusive": "2026-07-01T00:00:00+00:00",
+            "name": "fold_3_validation",
+            "rows": 1248,
+            "start": "2026-01-01T00:00:00+00:00"
+          }
+        }
+      ],
+      "mean_accuracy": 0.505557017692654,
+      "mean_brier_score": 0.6080294923930744,
+      "mean_ece": 0.02911605101743237,
+      "mean_log_loss": 1.0178873455826467,
+      "pooled_validation": {
+        "accuracy": 0.5052576235541535,
+        "brier_score": 0.608113157868834,
+        "ece": 0.011101028951968161,
+        "log_loss": 1.0180172719952614,
+        "n": 3804
+      }
+    }
+  },
+  "model_version": "football-elo-v1-candidate",
+  "notes": [
+    "status=candidate; not production; not champion.",
+    "No backend publish, no live predictions, no odds, no value/EV.",
+    "K/HA grid was a robustness probe and did not retune the candidate.",
+    "P(Draw) is always produced; argmax Draw can still be zero."
+  ],
+  "random_seed": 42,
+  "selected_model": "elo",
+  "sport": "football",
+  "status": "candidate",
+  "test_period": {
+    "end_exclusive": "2026-09-10T02:30:01+00:00",
+    "name": "final_test",
+    "rows": 387,
+    "start": "2026-07-01T00:00:00+00:00"
+  },
+  "training_period": {
+    "end_exclusive": "2026-01-01T00:00:00+00:00",
+    "name": "final_train",
+    "rows": 4094,
+    "start": "2024-02-22T00:00:00+00:00"
+  },
+  "validation_period": {
+    "calibration_fit": {
+      "end_exclusive": "2026-05-01T00:00:00+00:00",
+      "name": "calibration_fit",
+      "rows": 985,
+      "start": "2026-01-01T00:00:00+00:00"
+    },
+    "calibration_select": {
+      "end_exclusive": "2026-07-01T00:00:00+00:00",
+      "name": "calibration_select",
+      "rows": 263,
+      "start": "2026-05-01T00:00:00+00:00"
+    },
+    "walk_forward_folds": [
+      {
+        "name": "fold_1",
+        "train": {
+          "end_exclusive": "2025-01-01T00:00:00+00:00",
+          "name": "fold_1_train",
+          "rows": 1538,
+          "start": "2024-02-22T00:00:00+00:00"
+        },
+        "validation": {
+          "end_exclusive": "2025-07-01T00:00:00+00:00",
+          "name": "fold_1_validation",
+          "rows": 1305,
+          "start": "2025-01-01T00:00:00+00:00"
+        }
+      },
+      {
+        "name": "fold_2",
+        "train": {
+          "end_exclusive": "2025-07-01T00:00:00+00:00",
+          "name": "fold_2_train",
+          "rows": 2843,
+          "start": "2024-02-22T00:00:00+00:00"
+        },
+        "validation": {
+          "end_exclusive": "2026-01-01T00:00:00+00:00",
+          "name": "fold_2_validation",
+          "rows": 1251,
+          "start": "2025-07-01T00:00:00+00:00"
+        }
+      },
+      {
+        "name": "fold_3",
+        "train": {
+          "end_exclusive": "2026-01-01T00:00:00+00:00",
+          "name": "fold_3_train",
+          "rows": 4094,
+          "start": "2024-02-22T00:00:00+00:00"
+        },
+        "validation": {
+          "end_exclusive": "2026-07-01T00:00:00+00:00",
+          "name": "fold_3_validation",
+          "rows": 1248,
+          "start": "2026-01-01T00:00:00+00:00"
+        }
+      }
+    ]
+  }
+}

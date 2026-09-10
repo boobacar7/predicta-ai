@@ -1,0 +1,475 @@
+{
+  "calibration": {
+    "calibration_select": {
+      "raw": {
+        "accuracy": 0.49429657794676807,
+        "brier_score": 0.6374661153132535,
+        "ece": 0.049203267045467146,
+        "log_loss": 1.0589249579047058,
+        "n": 263
+      },
+      "sigmoid": {
+        "accuracy": 0.49049429657794674,
+        "brier_score": 0.6323382036438427,
+        "ece": 0.03785683148971857,
+        "log_loss": 1.0508105214618524,
+        "n": 263
+      }
+    },
+    "chosen_on_calibration_select": "sigmoid",
+    "sigmoid_improves_test_log_loss": false
+  },
+  "calibration_method": "sigmoid",
+  "code_version": "0.1.0+e8b76d7",
+  "dataset_sha256": "0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5",
+  "dataset_version": "football-1x2-history-0.3",
+  "draw": {
+    "argmax_draw_count": {
+      "test_raw": 0,
+      "walk_forward_validation": 0
+    },
+    "p_draw_never_removed": true,
+    "why_never_argmax": {
+      "approx_p_draw_at_elo_diff_zero": 0.2774078149235929,
+      "approx_p_home_at_elo_diff_zero": 0.4430478746252597,
+      "argmax_threshold": "Draw wins argmax only if P(Draw) > P(Home) and P(Draw) > P(Away).",
+      "elo_diff_zero_expected_home_score": 0.6131368201531431,
+      "fitted_draw_base": 0.2774078149235929,
+      "fitted_draw_decay": 1.109649124607505,
+      "mechanism": "P(Draw) is always emitted. Argmax never selects Draw because at elo_diff=0 home advantage +80 already makes P(Home) > P(Draw), and P(Draw) shrinks as |elo_diff| grows.",
+      "p_draw_preserved": true
+    }
+  },
+  "feature_schema_version": "football-1x2-features-0.3",
+  "final_test_period": {
+    "end_exclusive": "2026-09-10T02:30:01+00:00",
+    "name": "final_test",
+    "rows": 387,
+    "start": "2026-07-01T00:00:00+00:00"
+  },
+  "metrics": {
+    "test_chosen": {
+      "accuracy": 0.48320413436692505,
+      "brier_score": 0.6158857490851429,
+      "ece": 0.06286755379601495,
+      "log_loss": 1.0280194466282804,
+      "n": 387
+    },
+    "test_raw": {
+      "accuracy": 0.4883720930232558,
+      "brier_score": 0.6123538772743731,
+      "ece": 0.0459337789213341,
+      "log_loss": 1.0237621449504593,
+      "n": 387
+    },
+    "test_sigmoid": {
+      "accuracy": 0.48320413436692505,
+      "brier_score": 0.6158857490851429,
+      "ece": 0.06286755379601495,
+      "log_loss": 1.0280194466282804,
+      "n": 387
+    },
+    "walk_forward_folds": [
+      {
+        "accuracy": 0.4842911877394636,
+        "brier_score": 0.6141974404337762,
+        "ece": 0.02958983864269419,
+        "fold": "fold_1",
+        "frequency_log_loss": 1.074525771444011,
+        "log_loss": 1.0274084475472263,
+        "n": 1305
+      },
+      {
+        "accuracy": 0.5299760191846523,
+        "brier_score": 0.5969263028830329,
+        "ece": 0.04052995114573061,
+        "fold": "fold_2",
+        "frequency_log_loss": 1.0600832770955737,
+        "log_loss": 1.0017330994508975,
+        "n": 1251
+      },
+      {
+        "accuracy": 0.5024038461538461,
+        "brier_score": 0.6129647338624137,
+        "ece": 0.01722836326387231,
+        "fold": "fold_3",
+        "frequency_log_loss": 1.0709628849141661,
+        "log_loss": 1.0245204897498164,
+        "n": 1248
+      }
+    ],
+    "walk_forward_mean": {
+      "accuracy": 0.505557017692654,
+      "brier_score": 0.6080294923930744,
+      "ece": 0.02911605101743237,
+      "log_loss": 1.0178873455826467
+    }
+  },
+  "model_version": "football-elo-v1-candidate",
+  "parameters": {
+    "draw_base": 0.2774078149235929,
+    "draw_decay": 1.109649124607505,
+    "home_advantage": 80.0,
+    "initial": 1500.0,
+    "k": 20.0,
+    "scale": 400.0,
+    "source_elo_parameters": "dataset football-1x2-history-0.3 (k=20, initial=1500)",
+    "status": "candidate"
+  },
+  "promoted_to_production": false,
+  "random_seed": 42,
+  "reconstruction_mae": 0.0,
+  "segments": {
+    "test_raw": {
+      "by_competition": {
+        "bundesliga": {
+          "accuracy": 0.4444444444444444,
+          "brier_score": 0.5532304799054382,
+          "ece": 0.24195736157118913,
+          "log_loss": 0.9402816875824143,
+          "n": 18
+        },
+        "champions-league": {
+          "accuracy": 0.5588235294117647,
+          "brier_score": 0.5962696367230195,
+          "ece": 0.09922371571552888,
+          "log_loss": 0.998905043945823,
+          "n": 102
+        },
+        "la-liga": {
+          "accuracy": 0.4878048780487805,
+          "brier_score": 0.5743671562752852,
+          "ece": 0.10751122775933063,
+          "log_loss": 0.96617290808484,
+          "n": 41
+        },
+        "ligue-1": {
+          "accuracy": 0.4074074074074074,
+          "brier_score": 0.6779096086243088,
+          "ece": 0.1313132198530189,
+          "log_loss": 1.1205206487043944,
+          "n": 27
+        },
+        "mls": {
+          "accuracy": 0.43884892086330934,
+          "brier_score": 0.6568620712725244,
+          "ece": 0.05296365630413246,
+          "log_loss": 1.0891555991054247,
+          "n": 139
+        },
+        "premier-league": {
+          "accuracy": 0.43333333333333335,
+          "brier_score": 0.5956111555267711,
+          "ece": 0.1439572529909746,
+          "log_loss": 0.9984311847356652,
+          "n": 30
+        },
+        "serie-a": {
+          "accuracy": 0.6333333333333333,
+          "brier_score": 0.5059507836103144,
+          "ece": 0.20212218070909554,
+          "log_loss": 0.8723284890883068,
+          "n": 30
+        }
+      },
+      "by_season": {
+        "2026": {
+          "accuracy": 0.43884892086330934,
+          "brier_score": 0.6568620712725244,
+          "ece": 0.05296365630413246,
+          "log_loss": 1.0891555991054247,
+          "n": 139
+        },
+        "2026/2027": {
+          "accuracy": 0.5161290322580645,
+          "brier_score": 0.587407752412506,
+          "ece": 0.05939316493949615,
+          "log_loss": 0.9871101686297324,
+          "n": 248
+        }
+      },
+      "frequency_by_competition": {
+        "bundesliga": {
+          "accuracy": 0.5555555555555556,
+          "brier_score": 0.6055919485957223,
+          "ece": 0.11149107094392885,
+          "log_loss": 1.008659278062591,
+          "n": 18
+        },
+        "champions-league": {
+          "accuracy": 0.5392156862745098,
+          "brier_score": 0.6143613576783589,
+          "ece": 0.09515120166288288,
+          "log_loss": 1.022530132872998,
+          "n": 102
+        },
+        "la-liga": {
+          "accuracy": 0.4878048780487805,
+          "brier_score": 0.6387556901012371,
+          "ece": 0.043740393437153746,
+          "log_loss": 1.0603826727108665,
+          "n": 41
+        },
+        "ligue-1": {
+          "accuracy": 0.25925925925925924,
+          "brier_score": 0.7011066132359368,
+          "ece": 0.18480522535236749,
+          "log_loss": 1.145183716608219,
+          "n": 27
+        },
+        "mls": {
+          "accuracy": 0.43884892086330934,
+          "brier_score": 0.6576269205204786,
+          "ece": 0.005215563748317553,
+          "log_loss": 1.088535281470922,
+          "n": 139
+        },
+        "premier-league": {
+          "accuracy": 0.4,
+          "brier_score": 0.6712490077066164,
+          "ece": 0.04406448461162665,
+          "log_loss": 1.1084253011998444,
+          "n": 30
+        },
+        "serie-a": {
+          "accuracy": 0.4,
+          "brier_score": 0.6397883335493132,
+          "ece": 0.04406448461162665,
+          "log_loss": 1.051452628274281,
+          "n": 30
+        }
+      }
+    },
+    "walk_forward_validation": {
+      "by_competition": {
+        "bundesliga": {
+          "accuracy": 0.4863731656184486,
+          "brier_score": 0.6161279996486884,
+          "ece": 0.026604844252540318,
+          "log_loss": 1.0324935965828697,
+          "n": 477
+        },
+        "champions-league": {
+          "accuracy": 0.5331491712707183,
+          "brier_score": 0.5853271278341733,
+          "ece": 0.04622176553015879,
+          "log_loss": 0.9809218022662042,
+          "n": 362
+        },
+        "la-liga": {
+          "accuracy": 0.5198618307426598,
+          "brier_score": 0.587166139123528,
+          "ece": 0.03557571631044628,
+          "log_loss": 0.9881658012116189,
+          "n": 579
+        },
+        "ligue-1": {
+          "accuracy": 0.5274261603375527,
+          "brier_score": 0.5930701516267279,
+          "ece": 0.02642276619836377,
+          "log_loss": 0.9938391647696002,
+          "n": 474
+        },
+        "mls": {
+          "accuracy": 0.48284960422163586,
+          "brier_score": 0.6308846362928312,
+          "ece": 0.017035899816724223,
+          "log_loss": 1.0504877107463344,
+          "n": 758
+        },
+        "premier-league": {
+          "accuracy": 0.5,
+          "brier_score": 0.6165166931584324,
+          "ece": 0.021426865414620886,
+          "log_loss": 1.031707942168029,
+          "n": 572
+        },
+        "serie-a": {
+          "accuracy": 0.5051546391752577,
+          "brier_score": 0.6108907683925571,
+          "ece": 0.03426538110210754,
+          "log_loss": 1.022869714796267,
+          "n": 582
+        }
+      },
+      "by_season": {
+        "2024/2025": {
+          "accuracy": 0.4980276134122288,
+          "brier_score": 0.6033722321709352,
+          "ece": 0.03770097074520193,
+          "log_loss": 1.0118206043600717,
+          "n": 1014
+        },
+        "2025": {
+          "accuracy": 0.4703703703703704,
+          "brier_score": 0.635558530670841,
+          "ece": 0.023433761887484264,
+          "log_loss": 1.0582874246485414,
+          "n": 540
+        },
+        "2025/2026": {
+          "accuracy": 0.5172244094488189,
+          "brier_score": 0.601984475788263,
+          "ece": 0.016135734519376815,
+          "log_loss": 1.0089970103854036,
+          "n": 2032
+        },
+        "2026": {
+          "accuracy": 0.5137614678899083,
+          "brier_score": 0.6193070997601461,
+          "ece": 0.051956938029790116,
+          "log_loss": 1.0311673185115098,
+          "n": 218
+        }
+      },
+      "frequency_by_competition": {
+        "bundesliga": {
+          "accuracy": 0.40041928721174,
+          "brier_score": 0.6594812524924081,
+          "ece": 0.04257995462497827,
+          "log_loss": 1.0868872676687058,
+          "n": 477
+        },
+        "champions-league": {
+          "accuracy": 0.5082872928176796,
+          "brier_score": 0.619917555796917,
+          "ece": 0.06785886499523819,
+          "log_loss": 1.0285770649866115,
+          "n": 362
+        },
+        "la-liga": {
+          "accuracy": 0.4697754749568221,
+          "brier_score": 0.6400561646655558,
+          "ece": 0.026921986338308335,
+          "log_loss": 1.06033876233111,
+          "n": 579
+        },
+        "ligue-1": {
+          "accuracy": 0.4641350210970464,
+          "brier_score": 0.637913383620111,
+          "ece": 0.021306421957070887,
+          "log_loss": 1.0557025733672591,
+          "n": 474
+        },
+        "mls": {
+          "accuracy": 0.45382585751978893,
+          "brier_score": 0.6431751564206166,
+          "ece": 0.011103037360915058,
+          "log_loss": 1.0641425717094248,
+          "n": 758
+        },
+        "premier-league": {
+          "accuracy": 0.42132867132867136,
+          "brier_score": 0.653894903328652,
+          "ece": 0.02126267140543381,
+          "log_loss": 1.0794232490743982,
+          "n": 572
+        },
+        "serie-a": {
+          "accuracy": 0.39347079037800686,
+          "brier_score": 0.6628431023310705,
+          "ece": 0.04947371133853945,
+          "log_loss": 1.092444220891163,
+          "n": 582
+        }
+      }
+    }
+  },
+  "selected_model": "elo",
+  "sensitivity": {
+    "best_grid_cell_not_promoted": {
+      "home_advantage": 60,
+      "k": 30,
+      "mean_log_loss": 1.0123197137430793,
+      "reason": "Grid minimum is reported for robustness only; it does not replace the candidate."
+    },
+    "candidate": {
+      "home_advantage": 80,
+      "k": 20,
+      "mean_accuracy": 0.505557017692654,
+      "mean_brier_score": 0.6080294923930744,
+      "mean_ece": 0.02911605101743237,
+      "mean_log_loss": 1.0178873455826467,
+      "rank_by_log_loss": 9
+    },
+    "log_loss_max": 1.0394695693438891,
+    "log_loss_min": 1.0123197137430793,
+    "log_loss_range": 0.027149855600809847
+  },
+  "stability": {
+    "collapse_rule": "Flag if Elo log-loss exceeds the frequency baseline by more than 0.02 on walk-forward validation.",
+    "collapse_vs_frequency": [],
+    "fold_log_loss_max": 1.0274084475472263,
+    "fold_log_loss_min": 1.0017330994508975,
+    "fold_log_loss_spread": 0.025675348096328765,
+    "worst_fold": "fold_1"
+  },
+  "status": "candidate",
+  "training_period": {
+    "end_exclusive": "2026-01-01T00:00:00+00:00",
+    "name": "final_train",
+    "rows": 4094,
+    "start": "2024-02-22T00:00:00+00:00"
+  },
+  "validation_period": {
+    "calibration_fit": {
+      "end_exclusive": "2026-05-01T00:00:00+00:00",
+      "name": "calibration_fit",
+      "rows": 985,
+      "start": "2026-01-01T00:00:00+00:00"
+    },
+    "calibration_select": {
+      "end_exclusive": "2026-07-01T00:00:00+00:00",
+      "name": "calibration_select",
+      "rows": 263,
+      "start": "2026-05-01T00:00:00+00:00"
+    },
+    "walk_forward_folds": [
+      {
+        "name": "fold_1",
+        "train": {
+          "end_exclusive": "2025-01-01T00:00:00+00:00",
+          "name": "fold_1_train",
+          "rows": 1538,
+          "start": "2024-02-22T00:00:00+00:00"
+        },
+        "validation": {
+          "end_exclusive": "2025-07-01T00:00:00+00:00",
+          "name": "fold_1_validation",
+          "rows": 1305,
+          "start": "2025-01-01T00:00:00+00:00"
+        }
+      },
+      {
+        "name": "fold_2",
+        "train": {
+          "end_exclusive": "2025-07-01T00:00:00+00:00",
+          "name": "fold_2_train",
+          "rows": 2843,
+          "start": "2024-02-22T00:00:00+00:00"
+        },
+        "validation": {
+          "end_exclusive": "2026-01-01T00:00:00+00:00",
+          "name": "fold_2_validation",
+          "rows": 1251,
+          "start": "2025-07-01T00:00:00+00:00"
+        }
+      },
+      {
+        "name": "fold_3",
+        "train": {
+          "end_exclusive": "2026-01-01T00:00:00+00:00",
+          "name": "fold_3_train",
+          "rows": 4094,
+          "start": "2024-02-22T00:00:00+00:00"
+        },
+        "validation": {
+          "end_exclusive": "2026-07-01T00:00:00+00:00",
+          "name": "fold_3_validation",
+          "rows": 1248,
+          "start": "2026-01-01T00:00:00+00:00"
+        }
+      }
+    ]
+  }
+}
