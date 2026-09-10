@@ -1,3 +1,9 @@
+import {
+  aiPickExclusions,
+  aiPicks,
+  aiPicksMetadata,
+  mockCandidateKickoffs,
+} from "@/data/mock/ai-picks";
 import { createAnalystSession } from "@/data/mock/analyst";
 import { leagues, players, sports, teams } from "@/data/mock/catalog";
 import { MOCK_NOW_ISO } from "@/data/mock/clock";
@@ -12,6 +18,8 @@ import {
 import { picks, valueOpportunities } from "@/data/mock/signals";
 import { DataSourceError } from "@/lib/api/errors";
 import type {
+  AiPick,
+  AiPicksFilters,
   CatalogFilters,
   Envelope,
   LeagueDetail,
@@ -148,6 +156,60 @@ export class MockDataSource implements DataSource {
     );
 
     return envelope(list(items));
+  }
+
+  /**
+   * Mirrors the engine's own semantics, verified against a live response:
+   * `date` matches the candidate kickoff, `league` matches its name
+   * case-insensitively, thresholds move selections into `exclusions` rather
+   * than dropping them, ranks are global, and `total` counts every eligible
+   * opportunity before pagination.
+   */
+  async getFootballAiPicks(filters: AiPicksFilters = {}) {
+    await this.begin();
+
+    const limit = filters.limit ?? 20;
+    const offset = filters.offset ?? 0;
+    const minimumEdge = filters.min_edge ?? aiPicksMetadata.minimum_edge;
+    const minimumEv = filters.min_ev ?? aiPicksMetadata.minimum_ev;
+
+    const inScope = (matchId: string, league: string) => {
+      if (filters.league && league.toLowerCase() !== filters.league.toLowerCase()) return false;
+      if (filters.date && !mockCandidateKickoffs[matchId]?.startsWith(filters.date)) return false;
+      return true;
+    };
+
+    const candidates = isEmptyScenario(this.scenario)
+      ? []
+      : aiPicks.filter((item) => inScope(item.match_id, item.league));
+
+    const thresholdExclusions = candidates
+      .filter((item) => item.ev < minimumEv || item.edge < minimumEdge)
+      .map((item) => belowThreshold(item, minimumEv));
+
+    const eligible = candidates
+      .filter((item) => item.ev >= minimumEv && item.edge >= minimumEdge)
+      .map((item, index) => ({ ...item, rank: index + 1 }));
+
+    const exclusions = [
+      ...aiPickExclusions.filter((item) => inScope(item.match_id, item.league)),
+      ...thresholdExclusions,
+    ];
+
+    return envelope({
+      items: eligible.slice(offset, offset + limit),
+      exclusions,
+      total: eligible.length,
+      limit,
+      offset,
+      metadata: {
+        ...aiPicksMetadata,
+        minimum_edge: minimumEdge,
+        minimum_ev: minimumEv,
+        eligible_opportunities: eligible.length,
+        excluded_opportunities: exclusions.length,
+      },
+    });
   }
 
   async getValue(filters: MatchFilters = {}) {
@@ -292,6 +354,26 @@ export class MockDataSource implements DataSource {
       throw new DataSourceError({ kind: "mock_scenario" });
     }
   }
+}
+
+/**
+ * Reproduces the engine's exclusion precedence: expected value is judged before
+ * edge, so a selection failing both is reported on the EV rule.
+ */
+function belowThreshold(pick: AiPick, minimumEv: number) {
+  const onEv = pick.ev < minimumEv;
+
+  return {
+    match_id: pick.match_id,
+    league: pick.league,
+    market: pick.market,
+    selection: pick.selection,
+    status: "excluded",
+    reason: onEv ? "below_minimum_ev" : "below_minimum_edge",
+    detail: onEv
+      ? "Expected value is below the requested minimum."
+      : "Edge is below the requested minimum.",
+  } as const;
 }
 
 function notFound(entity: string): DataSourceError {

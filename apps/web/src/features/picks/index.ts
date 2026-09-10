@@ -1,1 +1,1 @@
-export { PicksView } from "@/features/picks/picks-view";
+export { AiPicksView } from "@/features/picks/ai-picks-view";

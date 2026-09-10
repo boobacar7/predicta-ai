@@ -3,9 +3,9 @@
 import { useMockScenario } from "@/data/mock/scenario-context";
 import { getDataSource } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
-import type { CatalogFilters, MatchFilters } from "@/types/api";
+import type { AiPicksFilters, CatalogFilters, MatchFilters } from "@/types/api";
 import type { DataSource } from "@/types/datasource";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 /**
@@ -83,6 +83,22 @@ export function usePicks(filters?: MatchFilters) {
   return useQuery({
     queryKey: queryKeys.picks.list(scenario, filters),
     queryFn: () => source.getPicks(filters),
+  });
+}
+
+/**
+ * `GET /football/ai-picks`.
+ *
+ * `placeholderData: keepPreviousData` keeps the current page on screen while the
+ * next one loads, so paging or nudging a threshold does not blank the list.
+ */
+export function useFootballAiPicks(filters?: AiPicksFilters) {
+  const { source, scenario } = useSource();
+
+  return useQuery({
+    queryKey: queryKeys.footballAiPicks.list(scenario, filters),
+    queryFn: () => source.getFootballAiPicks(filters),
+    placeholderData: keepPreviousData,
   });
 }
 

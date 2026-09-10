@@ -1,5 +1,7 @@
 import { HttpClient, type HttpClientOptions } from "@/data/http/client";
 import type {
+  AiPicksFilters,
+  AiPicksResult,
   AnalystSession,
   CatalogFilters,
   DashboardSnapshot,
@@ -67,6 +69,10 @@ export class HttpDataSource implements DataSource {
     return this.client.get<ListResult<Pick>>("/picks", matchParams(filters));
   }
 
+  getFootballAiPicks(filters: AiPicksFilters = {}) {
+    return this.client.get<AiPicksResult>("/football/ai-picks", aiPicksParams(filters));
+  }
+
   getValue(filters: MatchFilters = {}) {
     return this.client.get<ListResult<ValueOpportunity>>("/value", matchParams(filters));
   }
@@ -109,5 +115,20 @@ function matchParams(filters: MatchFilters) {
     league_id: filters.league_id,
     date: filters.date,
     status: filters.status,
+  };
+}
+
+/**
+ * Parameter names are the engine's own, not the generic match filter names:
+ * the route takes `league` (a name) rather than `league_id`, and has no `sport`.
+ */
+function aiPicksParams(filters: AiPicksFilters) {
+  return {
+    date: filters.date,
+    league: filters.league,
+    limit: filters.limit,
+    offset: filters.offset,
+    min_edge: filters.min_edge,
+    min_ev: filters.min_ev,
   };
 }

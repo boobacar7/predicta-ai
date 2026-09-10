@@ -91,7 +91,7 @@ export function DashboardView() {
 
               <div className="grid gap-8 lg:grid-cols-2">
                 <section className="space-y-4">
-                  <SectionHeading title="AI Picks" href="/picks" linkLabel="Tous les picks" />
+                  <SectionHeading title="AI Picks" href="/ai-picks" linkLabel="Tous les picks" />
                   {view.picks.length === 0 ? (
                     <EmptyState
                       title="Aucun pick publié"
@@ -105,7 +105,7 @@ export function DashboardView() {
                 </section>
 
                 <section className="space-y-4">
-                  <SectionHeading title="Value Finder" href="/value" linkLabel="Tous les écarts" />
+                  <SectionHeading title="Value Finder" href="/value-finder" linkLabel="Tous les écarts" />
                   {view.valueOpportunities.length === 0 ? (
                     <EmptyState
                       title="Aucun écart publié"

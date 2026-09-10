@@ -1,4 +1,6 @@
 import type {
+  AiPicksFilters,
+  AiPicksResult,
   AnalystSession,
   CatalogFilters,
   DashboardSnapshot,
@@ -49,6 +51,16 @@ export interface DataSource {
   getMatch(id: string): Promise<Envelope<MatchDetail>>;
 
   getPicks(filters?: MatchFilters): Promise<Envelope<ListResult<Pick>>>;
+
+  /**
+   * `GET /football/ai-picks`.
+   *
+   * Returns its own result shape rather than a `ListResult`: the engine also
+   * publishes structured exclusions and the thresholds it applied, and both are
+   * needed to explain an empty page honestly.
+   */
+  getFootballAiPicks(filters?: AiPicksFilters): Promise<Envelope<AiPicksResult>>;
+
   getValue(filters?: MatchFilters): Promise<Envelope<ListResult<ValueOpportunity>>>;
   getPerformance(): Promise<Envelope<PerformanceReport>>;
 

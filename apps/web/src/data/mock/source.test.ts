@@ -162,3 +162,79 @@ describe("data integrity", () => {
     expect(previews.every((preview) => preview.model_version && preview.cutoff_at)).toBe(true);
   });
 });
+
+/**
+ * The mock must reproduce the engine's own semantics, verified against a live
+ * response, or the UI would be built against behaviour the API does not have.
+ */
+describe("football AI picks", () => {
+  it("ranks globally and paginates without renumbering the page", async () => {
+    const all = await source().getFootballAiPicks();
+    const second = await source().getFootballAiPicks({ limit: 2, offset: 2 });
+
+    expect(all.data.items[0].rank).toBe(1);
+    expect(second.data.items).toHaveLength(2);
+    // `total` counts every eligible opportunity, not the page.
+    expect(second.data.total).toBe(all.data.total);
+    expect(second.data.offset).toBe(2);
+  });
+
+  it("filters by league name, ignoring case", async () => {
+    const result = await source().getFootballAiPicks({ league: "northern championship" });
+
+    expect(result.data.items.length).toBeGreaterThan(0);
+    expect(result.data.items.every((pick) => pick.league === "Northern Championship")).toBe(true);
+  });
+
+  it("returns an empty result for a date with no candidate", async () => {
+    const result = await source().getFootballAiPicks({ date: "1999-01-01" });
+
+    expect(result.data.items).toHaveLength(0);
+    expect(result.data.total).toBe(0);
+  });
+
+  /**
+   * A threshold must not merely hide rows. The engine re-evaluates eligibility
+   * and reports what it rejected, which is what lets the UI explain an empty page.
+   */
+  it("moves selections below a threshold into exclusions rather than dropping them", async () => {
+    const baseline = await source().getFootballAiPicks();
+    const filtered = await source().getFootballAiPicks({ min_edge: 0.05 });
+
+    expect(filtered.data.items.length).toBeLessThan(baseline.data.items.length);
+    expect(filtered.data.exclusions.length).toBeGreaterThan(baseline.data.exclusions.length);
+    expect(filtered.data.exclusions.some((item) => item.reason === "below_minimum_edge")).toBe(true);
+  });
+
+  it("echoes the thresholds it applied", async () => {
+    const result = await source().getFootballAiPicks({ min_edge: 0.02, min_ev: 0.03 });
+
+    expect(result.data.metadata.minimum_edge).toBe(0.02);
+    expect(result.data.metadata.minimum_ev).toBe(0.03);
+  });
+
+  it("reports the EV rule first when a selection fails both thresholds", async () => {
+    const result = await source().getFootballAiPicks({ min_edge: 0.9, min_ev: 0.9 });
+
+    expect(result.data.items).toHaveLength(0);
+    expect(result.data.exclusions.every((item) => item.reason !== "below_minimum_edge")).toBe(true);
+  });
+
+  it("keeps every pick on the candidate model, never claiming a promoted one", async () => {
+    const result = await source().getFootballAiPicks();
+
+    expect(result.data_mode).toBe("mock");
+    expect(result.data.items.every((pick) => pick.model_status === "candidate")).toBe(true);
+  });
+
+  it("returns no opportunity in the empty scenario", async () => {
+    const result = await source("empty").getFootballAiPicks();
+
+    expect(result.data.items).toHaveLength(0);
+    expect(result.data.total).toBe(0);
+  });
+
+  it("fails with a retryable error in the error scenario", async () => {
+    await expect(source("error").getFootballAiPicks()).rejects.toBeInstanceOf(DataSourceError);
+  });
+});

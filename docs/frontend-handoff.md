@@ -122,6 +122,26 @@ Reste une tâche frontend volontairement séparée : remplacer
 `src/types/api.ts`, encore manuscrit, par les types générés depuis OpenAPI puis
 exécuter le typecheck et les tests. Les composants et la `DataSource` n'ont pas
 besoin d'être redessinés.
+
+### Ouvert : identité de match absente de `AiPick`
+
+`GET /api/v1/football/ai-picks` expose `match_id` et `league`, mais ni les noms
+d'équipes ni le coup d'envoi. Le moteur les résout pourtant en interne
+(`MatchCandidate.kickoff_at` dans `apps/api/app/ai_picks/models.py`) et s'en sert
+pour honorer `?date=`.
+
+Vérifié contre l'API réelle : `GET /api/v1/matches/{match_id}` répond `404` pour
+les identifiants produits par le moteur, qui viennent du parquet PIT. L'identité
+n'est donc résolvable par aucune route existante.
+
+Conséquence assumée côté frontend : `/ai-picks` affiche l'identifiant du match et
+signale explicitement l'identité et le kickoff comme indisponibles, plutôt que
+d'inventer un nom d'équipe. C'est conforme à AGENTS.md §6, mais la page reste
+moins lisible qu'elle ne devrait l'être.
+
+Décision attendue de l'Architecte et du Backend : soit ajouter `home`, `away` et
+`kickoff_at` au schéma `AiPick`, soit exposer une route de résolution acceptant
+les identifiants du parquet PIT. Le frontend n'a pas modifié le contrat.
 - AI Analyst : session mock déterministe, aucun appel LLM.
 - Profil : placeholder, phase 10.
 

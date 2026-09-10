@@ -1,18 +1,35 @@
 "use client";
 
 import { DataFreshness } from "@/components/domain/data-freshness";
+import { DataModeNotice } from "@/components/domain/data-mode-notice";
+import {
+  DateFilter,
+  NumberFilter,
+  SelectFilter,
+  ThresholdFilter,
+} from "@/components/domain/filters";
 import { PageHeader } from "@/components/domain/page-header";
 import { QueryBoundary } from "@/components/domain/query-boundary";
 import { ValueBadge } from "@/components/domain/value-badge";
+import { ValueDetailDialog } from "@/components/domain/value-detail";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { DialogContent, DialogRoot, DialogTrigger } from "@/components/ui/dialog";
 import { CardSkeleton } from "@/components/ui/skeleton";
 import { StatTile } from "@/components/ui/stat-tile";
-import { sortValueOpportunities, type ValueSort } from "@/features/value/selectors";
+import {
+  availableMarkets,
+  defaultValueFilters,
+  filterValueOpportunities,
+  paginateValueOpportunities,
+  sortValueOpportunities,
+  type ValueFilters,
+  type ValueSort,
+} from "@/features/value/selectors";
 import { useFilters } from "@/lib/filters/context";
 import { formatAbsolute } from "@/lib/format/dates";
 import {
+  formatCount,
   formatDecimalOdds,
   formatPoints,
   formatProbability,
@@ -24,18 +41,50 @@ import type { ValueOpportunity } from "@/types/api";
 import Link from "next/link";
 import { useState } from "react";
 
-const meta = pageMeta["/value"];
+const meta = pageMeta["/value-finder"];
+const PAGE_SIZE = 8;
 
 const sortOptions: Array<{ value: ValueSort; label: string }> = [
   { value: "edge", label: "Edge no-vig" },
   { value: "expected_value", label: "EV" },
+  { value: "probability", label: "Probabilité modèle" },
+  { value: "odds", label: "Cote" },
   { value: "kickoff", label: "Coup d'envoi" },
 ];
 
+/**
+ * Value Finder, backed by `GET /value`.
+ *
+ * Sport, competition and date are server-side filters. Market and the numeric
+ * thresholds are not parameters of that endpoint, so they are applied here as a
+ * refinement over the loaded set, and paging follows the refinement. The view
+ * states how many opportunities were loaded so the count is never mistaken for
+ * a catalogue-wide total.
+ *
+ * No ratio is recomputed: every figure comes from the Value Engine.
+ */
 export function ValueFinderView() {
   const { sport } = useFilters();
   const [sort, setSort] = useState<ValueSort>("edge");
-  const query = useValueOpportunities({ sport });
+  const [filters, setFilters] = useState<ValueFilters>(defaultValueFilters);
+  const [date, setDate] = useState("");
+  const [page, setPage] = useState(1);
+  const [detail, setDetail] = useState<ValueOpportunity | null>(null);
+
+  const query = useValueOpportunities({ sport, date: date || undefined });
+
+  const update = <K extends keyof ValueFilters>(key: K) => (value: ValueFilters[K]) => {
+    setFilters((current) => ({ ...current, [key]: value }));
+    setPage(1);
+  };
+
+  const hasRefinement =
+    date !== "" ||
+    filters.market !== "all" ||
+    filters.minEdge !== null ||
+    filters.minEv !== null ||
+    filters.minProbability !== null ||
+    filters.minOdds !== null;
 
   return (
     <div className="space-y-6">
@@ -45,21 +94,6 @@ export function ValueFinderView() {
         description={meta.description}
         actions={<FormulaDialog />}
       />
-
-      <label className="flex w-fit flex-col gap-1 text-xs text-muted">
-        Trier par
-        <select
-          value={sort}
-          onChange={(event) => setSort(event.target.value as ValueSort)}
-          className="h-9 rounded-xl border border-border bg-surface-elevated px-3 text-sm text-foreground"
-        >
-          {sortOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
 
       <QueryBoundary
         query={query}
@@ -71,19 +105,167 @@ export function ValueFinderView() {
             "Aucune cote exploitable n'est associée à une probabilité calibrée pour ce filtre. C'est un résultat, pas une erreur.",
         }}
       >
-        {(result) => (
-          <div className="grid gap-4">
-            {sortValueOpportunities(result.items, sort).map((item) => (
-              <OpportunityCard key={item.id} item={item} />
-            ))}
-          </div>
-        )}
+        {(result, envelope) => {
+          const markets = availableMarkets(result.items);
+          const refined = sortValueOpportunities(
+            filterValueOpportunities(result.items, filters),
+            sort,
+          );
+          const paged = paginateValueOpportunities(refined, page, PAGE_SIZE);
+
+          return (
+            <div className="space-y-5">
+              <DataModeNotice dataMode={envelope.data_mode} />
+
+              <section
+                aria-label="Filtres et tri des opportunités"
+                className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-surface px-4 py-3"
+              >
+                <SelectFilter
+                  label="Marché"
+                  value={filters.market}
+                  onChange={update("market")}
+                >
+                  <option value="all">Tous</option>
+                  {markets.map((market) => (
+                    <option key={market} value={market}>
+                      {market}
+                    </option>
+                  ))}
+                </SelectFilter>
+
+                <DateFilter
+                  value={date}
+                  onChange={(value) => {
+                    setDate(value);
+                    setPage(1);
+                  }}
+                />
+
+                <ThresholdFilter
+                  label="Edge min"
+                  value={filters.minEdge}
+                  onChange={update("minEdge")}
+                />
+                <ThresholdFilter
+                  label="EV min"
+                  value={filters.minEv}
+                  onChange={update("minEv")}
+                  suffix="%"
+                  step={1}
+                />
+                <ThresholdFilter
+                  label="Proba min"
+                  value={filters.minProbability}
+                  onChange={update("minProbability")}
+                  suffix="%"
+                  step={5}
+                />
+                <NumberFilter
+                  label="Cote min"
+                  value={filters.minOdds}
+                  onChange={update("minOdds")}
+                  min={1}
+                />
+
+                <SelectFilter
+                  label="Trier par"
+                  value={sort}
+                  onChange={(value) => setSort(value as ValueSort)}
+                >
+                  {sortOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </SelectFilter>
+
+                {hasRefinement ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setFilters(defaultValueFilters);
+                      setDate("");
+                      setPage(1);
+                    }}
+                  >
+                    Réinitialiser
+                  </Button>
+                ) : null}
+              </section>
+
+              <p className="text-xs text-muted">
+                {formatCount(paged.total)} opportunité(s) retenue(s) sur{" "}
+                {formatCount(result.items.length)} chargée(s).
+              </p>
+
+              {paged.items.length === 0 ? (
+                <div
+                  role="status"
+                  className="rounded-2xl border border-dashed border-border-strong px-6 py-16 text-center"
+                >
+                  <h2 className="text-lg font-medium">Aucune opportunité pour ces critères</h2>
+                  <p className="mx-auto mt-2 max-w-lg text-sm text-muted">
+                    Les seuils écartent toutes les opportunités chargées. Une valeur non mesurée ne
+                    franchit jamais un seuil : elle est exclue plutôt que comptée comme nulle.
+                  </p>
+                </div>
+              ) : (
+                <ul className="grid list-none gap-4">
+                  {paged.items.map((item) => (
+                    <li key={item.id}>
+                      <OpportunityCard item={item} onOpenDetail={() => setDetail(item)} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {paged.pageCount > 1 ? (
+                <nav
+                  aria-label="Pagination des opportunités"
+                  className="flex flex-wrap items-center justify-between gap-3"
+                >
+                  <p className="text-xs text-muted">
+                    Page {formatCount(paged.page)} sur {formatCount(paged.pageCount)}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={!paged.hasPrevious}
+                      onClick={() => setPage((current) => current - 1)}
+                    >
+                      Précédent
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={!paged.hasNext}
+                      onClick={() => setPage((current) => current + 1)}
+                    >
+                      Suivant
+                    </Button>
+                  </div>
+                </nav>
+              ) : null}
+            </div>
+          );
+        }}
       </QueryBoundary>
+
+      <ValueDetailDialog opportunity={detail} onClose={() => setDetail(null)} />
     </div>
   );
 }
 
-function OpportunityCard({ item }: { item: ValueOpportunity }) {
+function OpportunityCard({
+  item,
+  onOpenDetail,
+}: {
+  item: ValueOpportunity;
+  onOpenDetail: () => void;
+}) {
   return (
     <Card>
       <CardBody className="space-y-4">
@@ -125,16 +307,27 @@ function OpportunityCard({ item }: { item: ValueOpportunity }) {
           <DataFreshness quality={item.quality} />
           <p className="text-xs text-faint">
             Overround {formatPoints(item.overround)} · formule {item.formula_version}
-            {item.odds_observed_at ? ` · cote observée le ${formatAbsolute(item.odds_observed_at)}` : ""}
+            {item.odds_observed_at
+              ? ` · cote observée le ${formatAbsolute(item.odds_observed_at)}`
+              : ""}
           </p>
         </div>
 
-        <Link
-          href={`/matches/${item.match.id}`}
-          className="inline-block text-sm text-ai-strong hover:underline"
-        >
-          Voir le match
-        </Link>
+        <div className="flex flex-wrap items-center gap-4">
+          <button
+            type="button"
+            onClick={onOpenDetail}
+            className="text-sm text-ai-strong hover:underline"
+          >
+            Détail de l&apos;opportunité
+          </button>
+          <Link
+            href={`/matches/${item.match.id}`}
+            className="text-sm text-muted hover:text-foreground hover:underline"
+          >
+            Voir le match
+          </Link>
+        </div>
       </CardBody>
     </Card>
   );

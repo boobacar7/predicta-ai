@@ -59,3 +59,29 @@ describe("per-resource routing", () => {
     expect(result.data.items).toHaveLength(0);
   });
 });
+
+describe("AI Picks routing", () => {
+  /**
+   * `GET /picks` and `GET /football/ai-picks` are separate resources in the
+   * contract, so the engine can be pointed at the live API on its own.
+   */
+  it("routes the engine independently from the generic picks resource", async () => {
+    const source = createDataSource({ resourceModes: modes({ football_ai_picks: "http" }) });
+
+    // No API runs in tests: reaching a transport error proves the call left the fixtures.
+    const engine = await source.getFootballAiPicks().catch((error: unknown) => error);
+    const picks = await source.getPicks();
+
+    expect(engine).toBeInstanceOf(Error);
+    expect(picks.data_mode).toBe("mock");
+    expect(resolveKind(modes({ football_ai_picks: "http" }))).toBe("hybrid");
+  });
+
+  it("serves the engine from fixtures by default", async () => {
+    const source = createDataSource({ resourceModes: modes() });
+    const result = await source.getFootballAiPicks();
+
+    expect(result.data_mode).toBe("mock");
+    expect(result.data.metadata.ai_picks_version).toBe("ai-picks-0.1");
+  });
+});

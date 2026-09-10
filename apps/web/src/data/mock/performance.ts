@@ -17,7 +17,7 @@ export const insights: Insight[] = [
     title: "Cotes Silverpark anciennes",
     body: "Le snapshot Atlas pour Silverpark–Westbridge a plus de 8 h. L'edge affiché est marqué stale.",
     kind: "caution",
-    href: "/value",
+    href: "/value-finder",
     quality: quality({ source, availability: "stale", freshness: "stale" }),
   },
   {

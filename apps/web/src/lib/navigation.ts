@@ -29,13 +29,13 @@ export const navSections: NavSection[] = [
         icon: "calendar",
       },
       {
-        href: "/picks",
+        href: "/ai-picks",
         label: "AI Picks",
-        description: "Signaux versionnés, jamais des garanties",
+        description: "Opportunités classées par le moteur, jamais des garanties",
         icon: "spark",
       },
       {
-        href: "/value",
+        href: "/value-finder",
         label: "Value Finder",
         description: "Écarts entre modèle et cotes observées",
         icon: "diamond",
@@ -110,12 +110,12 @@ export const pageMeta: Record<string, { title: string; eyebrow: string; descript
     eyebrow: "Calendrier",
     description: "Parcourez les événements par sport, date et compétition.",
   },
-  "/picks": {
+  "/ai-picks": {
     title: "AI Picks",
     eyebrow: "Signaux",
-    description: "Picks issus de prédictions versionnées. Ce ne sont pas des conseils de mise.",
+    description: "Opportunités statistiques identifiées par le modèle. Ce ne sont pas des conseils de mise.",
   },
-  "/value": {
+  "/value-finder": {
     title: "Value Finder",
     eyebrow: "Value Engine",
     description: "Comparaison transparente entre probabilités calibrées et cotes observées.",
