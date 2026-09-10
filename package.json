@@ -11,6 +11,8 @@
     "test:web": "npm run test --prefix apps/web",
     "verify:web": "npm run typecheck:web && npm run lint:web && npm run test:web && npm run build:web",
     "test:api": "npm run test --prefix apps/api",
-    "verify:api": "npm run verify --prefix apps/api"
+    "verify:api": "npm run verify --prefix apps/api",
+    "test:ingestion": "npm run test --prefix workers/ingestion",
+    "verify:ingestion": "npm run verify --prefix workers/ingestion"
   }
 }

@@ -1,0 +1,10 @@
+{
+  "name": "predicta-ingestion",
+  "private": true,
+  "scripts": {
+    "test": "python -m pytest",
+    "lint": "python -m ruff check src tests",
+    "typecheck": "python -m mypy",
+    "verify": "python -m ruff check src tests && python -m mypy && python -m pytest"
+  }
+}

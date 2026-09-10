@@ -57,3 +57,4 @@ Tous les chemins OpenAPI `/api/v1/*` listés dans `docs/api-contract.md`, plus
 - ingestion provider, scraping, ML, LLM réel, auth, paiement
 - cache Redis actif (URL optionnelle seulement)
 - mapping SQL complet des fixtures vers les tables
+- connexion d'un fournisseur sportif payant (fondation DATA : adapters mock + schéma, voir `docs/data-strategy.md`)

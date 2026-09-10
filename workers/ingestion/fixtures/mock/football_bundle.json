@@ -1,0 +1,83 @@
+{
+  "data_mode": "mock",
+  "note": "Fixture fictive. Ne pas interpréter comme un calendrier ou des statistiques réelles.",
+  "provider": "mock.api_football",
+  "response": [
+    {
+      "fixture": {
+        "id": 91001,
+        "date": "2026-09-08T18:00:00Z",
+        "status": { "short": "FT" },
+        "venue": { "name": "Mock Helix Park" }
+      },
+      "league": {
+        "id": 39,
+        "name": "Mock Premier League",
+        "country": "Mockland",
+        "season": 2026
+      },
+      "teams": {
+        "home": { "id": 40, "name": "Helix FC", "code": "HLX" },
+        "away": { "id": 50, "name": "Meridian Athletic", "code": "MER" }
+      },
+      "goals": { "home": 2, "away": 1 },
+      "events": [
+        {
+          "time": { "elapsed": 23 },
+          "team": { "id": 40 },
+          "player": { "id": 701, "name": "A. Vega" },
+          "type": "Goal",
+          "detail": "Normal Goal"
+        }
+      ],
+      "statistics": [
+        {
+          "team": { "id": 40 },
+          "statistics": [{ "type": "Shots on Goal", "value": 7 }]
+        },
+        {
+          "team": { "id": 50 },
+          "statistics": [{ "type": "Shots on Goal", "value": null }]
+        }
+      ],
+      "lineups": [
+        {
+          "team": { "id": 40 },
+          "formation": "4-3-3",
+          "startXI": [{ "player": { "id": 701, "name": "A. Vega", "number": 9, "pos": "F" } }],
+          "substitutes": [{ "player": { "id": 702, "name": "B. Nadir", "number": 18, "pos": "M" } }]
+        }
+      ]
+    }
+  ],
+  "standings": [
+    {
+      "league_id": 39,
+      "season": 2026,
+      "as_of": "2026-09-08T20:00:00Z",
+      "table": [
+        {
+          "rank": 1,
+          "team": { "id": 40, "name": "Helix FC" },
+          "points": 12,
+          "played": 4,
+          "win": 4,
+          "draw": 0,
+          "lose": 0,
+          "goals_for": 9,
+          "goals_against": 2
+        }
+      ]
+    }
+  ],
+  "injuries": [
+    {
+      "id": "inj-50-801",
+      "player": { "id": 801, "name": "C. Orlo" },
+      "team": { "id": 50 },
+      "type": "Knee",
+      "status": "injured",
+      "observed_at": "2026-09-07T12:00:00Z"
+    }
+  ]
+}

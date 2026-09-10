@@ -52,6 +52,10 @@ predicta-ai/
 │   ├── product-spec.md
 │   ├── api-contract.md
 │   ├── data-model.md
+│   ├── data-strategy.md
+│   ├── data-providers.md
+│   ├── data-pipeline.md
+│   ├── data-quality.md
 │   ├── development-conventions.md
 │   ├── development-roadmap.md
 │   └── adr/
@@ -78,11 +82,9 @@ predicta-ai/
 │       ├── alembic/
 │       └── tests/
 ├── workers/
-│   ├── ingestion/
-│   │   ├── src/providers/
-│   │   ├── src/raw/
-│   │   ├── src/normalization/
-│   │   ├── src/quality/
+│   ├── ingestion/                  # package predicta_ingestion (phase 3)
+│   │   ├── src/predicta_ingestion/
+│   │   ├── fixtures/mock/          # data_mode=mock uniquement
 │   │   └── tests/
 │   └── ml/
 │       ├── src/features/
@@ -233,7 +235,9 @@ L'API publique démarre sous `/api/v1`. Les breaking changes créent une nouvell
 - Quarantaine des enregistrements invalides; aucune correction silencieuse.
 - Métriques de complétude, fraîcheur, duplicats et anomalies.
 
-Un stockage objet compatible S3 est recommandé à partir de l'intégration provider pour le raw et les artefacts ML. Il reste provider-neutral dans la fondation.
+Un stockage objet compatible S3 est recommandé à partir de l'intégration provider pour le raw et les artefacts ML. Il reste provider-neutral dans la fondation. La phase 3 utilise un filesystem immuable local derrière le même protocole `RawStore`.
+
+Détail opérationnel : [data-strategy.md](data-strategy.md), [data-pipeline.md](data-pipeline.md), [data-quality.md](data-quality.md). Comparatif fournisseurs : [data-providers.md](data-providers.md). ADR : [0004](adr/0004-data-foundation.md).
 
 ## 8. Architecture ML
 
@@ -399,8 +403,8 @@ Un mode hybride est toléré pendant la migration, mais chaque réponse expose s
 
 ## 15. Décisions différées
 
-- fournisseur de données sportives;
-- cloud et stockage objet;
+- fournisseur de données sportives V1 : tranché dans [ADR 0005](adr/0005-data-providers-v1.md), **non branché**;
+- cloud et stockage objet (S3 prod ; filesystem en développement);
 - queue/broker de jobs;
 - fournisseur LLM;
 - outil concret de model registry;

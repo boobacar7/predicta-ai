@@ -1,0 +1,209 @@
+# Pipeline DATA
+
+Implémentation de référence : package Python `predicta_ingestion` dans `workers/ingestion`.
+
+## 1. Flux
+
+```text
+Provider adapter
+    │  RawEnvelope (bytes, headers, collected_at, data_mode)
+    ▼
+Raw store (immuable) + raw_payloads (métadonnées PostgreSQL)
+    │
+    ▼
+Validation (schéma, types, timestamps UTC, data_mode)
+    │  échec → quarantine_records
+    ▼
+Normalisation (provider JSON → modèles canoniques)
+    │
+    ▼
+Entity resolution (provider_id → canonical_id)
+    │  ambiguïté → quarantaine
+    ▼
+Déduplication (checksum raw, clé naturelle canonique)
+    │
+    ▼
+Canonical sink (PostgreSQL via modèles apps/api)
+    │
+    ▼
+Point-in-time reader (cutoff explicite, pour le worker ML)
+```
+
+Le pipeline ne publie pas de prédictions et n'appelle pas le Value Engine.
+
+## 2. Abstractions
+
+| Protocole | Responsabilité |
+| --- | --- |
+| `FootballProvider` / `BasketballProvider` / `TennisProvider` / `OddsProvider` | Collecte uniquement. Retourne du raw. |
+| `RawStore` | Écriture append-only, lecture par id, jamais d'update. |
+| `Validator` | Schéma + invariants. Pas de « réparation ». |
+| `Normalizer` | Mapping provider → canonique. Un adapter par fournisseur. |
+| `IdentityResolver` | Mapping d'identités, création déterministe, refus des fusions ambiguës. |
+| `CanonicalSink` | Persistance. Mémoire pour tests, SQL pour l'API. |
+| `PointInTimeStore` | Lectures bornées par cutoff. |
+
+Aucun module `canonical` n'importe un client HTTP.
+
+## 3. Modèles canoniques
+
+Définis dans `predicta_ingestion.canonical` :
+
+- `Sport`, `League`, `Team`, `Player`
+- `Match`, `MatchEvent`
+- `TeamStats`, `PlayerStats`
+- `OddsSnapshot` (+ sélections)
+- `StandingSnapshot`, `Injury`, `Lineup` (extensions football-first)
+
+Chaque objet métier porte un `Provenance` :
+
+- `provider`
+- `provider_id`
+- `collected_at`
+- `event_at` (nullable si non applicable)
+- `available_at`
+- `source`
+- `freshness`
+- `data_mode`
+- `raw_payload_id`
+
+Les statistiques restent typées par `stat_key` + unité + `availability`. Un zéro métier n'est écrit que s'il est explicitement présent dans le raw validé.
+
+## 4. Ingestion raw
+
+`RawEnvelope` contient le body binaire, le content-type, le provider, la ressource, une clé de requête et `collected_at`.
+
+Le store filesystem (`FilesystemRawStore`) écrit :
+
+```text
+{root}/{data_mode}/{provider}/{yyyy}/{mm}/{dd}/{raw_id}.json
+```
+
+Le fichier n'est jamais écrasé. Un checksum SHA-256 identique court-circuite l'écriture (déduplication). `data_mode=mock` et `live` sont des arbres disjoints.
+
+PostgreSQL table `raw_payloads` : id, provider, resource_type, checksum, storage_uri, collected_at, data_mode. Pas de payload complet en base.
+
+## 5. Validation
+
+Rejets immédiats :
+
+- datetime naïf (sans timezone);
+- `data_mode` absent ou `live` sur une fixture de test;
+- cote décimale ≤ 1;
+- sport inconnu;
+- identifiant provider vide;
+- score présent alors que le match n'est pas `finished` / `live` selon la règle du sport;
+- payload trop volumineux (limite documentée dans la config).
+
+Les erreurs provider (timeout, 429, 5xx, auth) ne sont pas transformées en entités vides. Elles échouent le run avec un statut d'erreur.
+
+## 6. Normalisation
+
+Chaque adapter possède un normalizer. Exemple conceptuel API-Football :
+
+```text
+fixture.teams.home.id  → Team.provider_id
+fixture.fixture.date   → Match.kickoff_at (UTC)
+fixture.fixture.status → Match.status (enum canonique)
+```
+
+Les enums provider sont mappés vers des enums canoniques. Une valeur inconnue va en quarantaine ; elle n'est pas coercée vers `unknown` silencieusement pour les champs critiques (statut de match, marché de cotes).
+
+## 7. Résolution d'identités
+
+Ordre :
+
+1. Lookup exact `provider, entity_type, provider_entity_id`.
+2. Sinon lookup secondaire nom normalisé + sport + ligue (égalité stricte après normalisation Unicode).
+3. Si 0 candidat : créer un canonical id déterministe et insérer le mapping.
+4. Si ≥ 2 candidats : quarantaine `ambiguous_identity`.
+
+Les IDs déterministes sont des slugs stables, pas un hash opaque, afin de rester lisibles (`tm_football_arsenal_epl`). Un suffixe numérique n'est ajouté qu'après collision réelle.
+
+## 8. Déduplication
+
+| Objet | Clé naturelle |
+| --- | --- |
+| Raw | `(provider, checksum_sha256)` |
+| Mapping | `(provider, entity_type, provider_entity_id)` |
+| Match | canonical id issu du mapping provider match |
+| Odds snapshot | `(provider, bookmaker, match_id, market, observed_at)` |
+| Standing | `(league_id, season, team_id, as_of, provider)` |
+| Stats snapshot | `(entity_id, season, stat_key, as_of, provider)` |
+
+Les upserts sont idempotents. Relancer un run ne duplique pas les faits.
+
+## 9. Stockage et historique
+
+Les tables de faits volumineuses sont append-only. Un classement n'est pas écrasé : un nouveau `as_of` est inséré. Les cotes déjà persistées ne sont pas mises à jour.
+
+Reproductibilité d'un dataset :
+
+1. figer `cutoff_at`;
+2. lire via `PointInTimeStore`;
+3. hasher les canonical ids + `available_at` max par type;
+4. enregistrer le hash à côté de la version de code.
+
+## 10. Point-in-time (contrat ML)
+
+```text
+PointInTimeStore.matches_finished_before(cutoff)
+PointInTimeStore.odds_as_of(match_id, cutoff)
+PointInTimeStore.standings_as_of(league_id, cutoff)
+PointInTimeStore.injuries_as_of(team_id, cutoff)
+PointInTimeStore.lineups_as_of(match_id, cutoff)
+```
+
+Toute méthode applique :
+
+```text
+available_at < cutoff_at
+event_at is None OR event_at < cutoff_at
+data_mode filtré explicitement par l'appelant
+```
+
+Une composition publiée après le coup d'envoi n'entre pas dans les features pre-match. Un résultat du match cible n'est jamais accessible pour ce match.
+
+Le DATA layer expose les observations ; il ne calcule pas Elo, xG agrégé ou form ratings. Ces features appartiennent au worker ML, qui doit utiliser exclusivement ce reader.
+
+## 11. Cotes et Value Engine
+
+Le pipeline persiste :
+
+- bookmaker / provider
+- market
+- selection
+- decimal odds
+- timestamps
+- match_id canonique
+- source
+
+Il ne remplit pas `implied_probability_raw`, `no_vig_probability`, `edge` ni `expected_value`. Ces colonnes existantes côté API restent à la charge du Value Engine.
+
+## 12. Tennis et basketball
+
+Les protocoles et modèles canoniques existent. La table `matches` v1 exige encore `home_team_id` / `away_team_id` pour rester compatible avec l'API football. Le tennis (joueur contre joueur) exigera une migration ultérieure `match_participants` ; elle n'est pas anticipée de façon destructive ici.
+
+## 13. Exécution
+
+```bash
+cd workers/ingestion
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+cp .env.example .env
+pytest
+```
+
+Le mode par défaut est mock. Un run live sans validation lève `LiveIngestionDisabled`.
+
+## 14. Handoff ML
+
+L'agent ML doit :
+
+- importer `predicta_ingestion.pit` plutôt que de joindre SQL librement;
+- versionner les définitions de features;
+- n'utiliser que `available_at < cutoff`;
+- traiter `availability=unavailable` comme donnée manquante;
+- ignorer toute ligne `data_mode=mock` dans un entraînement présenté comme réel;
+- ne pas lire `predictions` pour entraîner le même marché sans protocole dédié (fuite).

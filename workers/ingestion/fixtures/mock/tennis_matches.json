@@ -1,0 +1,23 @@
+{
+  "data_mode": "mock",
+  "note": "Fixture fictive tennis. Ne pas interpréter comme un résultat ATP/WTA réel.",
+  "provider": "mock.api_tennis",
+  "items": [
+    {
+      "id": "atp-mock-441",
+      "kickoff": "2026-09-08T11:00:00Z",
+      "status": "finished",
+      "surface": "hard",
+      "tournament": {
+        "id": "mock-open",
+        "name": "Mock Open",
+        "country": "Mockland",
+        "season": "2026"
+      },
+      "home_player": { "id": "p1", "name": "Lina Serra", "country": "ESP" },
+      "away_player": { "id": "p2", "name": "Nora Veld", "country": "NED" },
+      "home_score": 2,
+      "away_score": 0
+    }
+  ]
+}
