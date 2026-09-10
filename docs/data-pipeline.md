@@ -146,12 +146,15 @@ normalisées.
 
 ## 7. Résolution d'identités
 
-Ordre :
+Ordre déterministe, sans fuzzy matching :
 
-1. Lookup exact `provider, entity_type, provider_entity_id`.
-2. Sinon lookup secondaire nom normalisé + sport + ligue (égalité stricte après normalisation Unicode).
-3. Si 0 candidat : créer un canonical id déterministe et insérer le mapping.
-4. Si ≥ 2 candidats : quarantaine `ambiguous_identity`.
+1. Lookup exact `(provider, entity_type, provider_entity_id)`.
+2. Mapping historique explicite (alias de slug MLS ou id provider documenté).
+3. Nom normalisé (`slugify`, égalité stricte) **uniquement s'il existe un seul** canonical pour cette compétition.
+4. Si 0 candidat : créer un canonical id déterministe.
+5. Si ≥ 2 candidats : quarantaine `ambiguous_identity`.
+
+Les ligues Sportmonks sont identifiées par `{league_id}:{season}` : MLS `779` en 2024 et `779` en 2025 ne se marchent pas dessus.
 
 Les IDs déterministes sont des slugs stables, pas un hash opaque, afin de rester lisibles (`tm_football_arsenal_epl`). Un suffixe numérique n'est ajouté qu'après collision réelle.
 

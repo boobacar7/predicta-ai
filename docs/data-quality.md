@@ -68,6 +68,8 @@ Chaque saison ingérée produit :
 
 Les saisons **découvertes** (réponse Sportmonks) sont listées même si elles ne sont pas sélectionnées. Ne pas extrapoler « N années d'historique MLS » au-delà de cette liste.
 
+Le rapport d'historique inclut aussi `identity` / `identity_summary` : pour chaque équipe, `provider_entity_id`, nom provider, canonical id/nom, `resolution_method`, `confidence`. Les ligues sont scopées par saison (`779:2024` ≠ `779:2025`). Un mapping incertain n'est pas accepté : seuls `exact_id`, un alias MLS explicite, ou un nom normalisé **unique** sont retenus.
+
 ## 6. Mocks vs réel
 
 - Fixtures : `workers/ingestion/fixtures/`, toujours `data_mode=mock`.

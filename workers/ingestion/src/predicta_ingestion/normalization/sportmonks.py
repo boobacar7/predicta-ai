@@ -7,6 +7,7 @@ from predicta_ingestion.canonical.enums import DataMode, MatchStatus, SportCode
 from predicta_ingestion.canonical.models import CanonicalBatch, League, Match, Provenance, Sport, Team
 from predicta_ingestion.clock import Clock, parse_rfc3339
 from predicta_ingestion.errors import ValidationError
+from predicta_ingestion.identity.keys import league_provider_key
 from predicta_ingestion.ids import slugify, stable_entity_id
 from predicta_ingestion.providers.leagues import V1_LEAGUE_BY_SPORTMONKS_ID
 from predicta_ingestion.quality.freshness import classify_freshness
@@ -158,14 +159,22 @@ class SportmonksFootballNormalizer:
         country_name = None
         if isinstance(country_raw, dict) and country_raw.get("name"):
             country_name = str(country_raw["name"])
+        league_id = stable_entity_id("league", SportCode.FOOTBALL.value, "sportmonks", provider_id, season)
+        for existing in batch.leagues:
+            if existing.id == league_id:
+                return existing
         league = League(
-            id=stable_entity_id("league", SportCode.FOOTBALL.value, "sportmonks", provider_id, season),
+            id=league_id,
             sport_id=sport.id,
             name=str(raw.get("name") or (catalog.name if catalog else "")),
             country=country_name or (catalog.country if catalog else "Unknown"),
             season=season,
             tier=1,
-            provenance=self._provenance(stored, provider_id=provider_id, event_at=None),
+            provenance=self._provenance(
+                stored,
+                provider_id=league_provider_key(provider_id, season),
+                event_at=None,
+            ),
         )
         if not league.name:
             raise ValidationError("invalid_payload", "League name is missing.")
@@ -232,7 +241,6 @@ class SportmonksFootballNormalizer:
                 available_at=available_at,
             ),
         )
-        batch.leagues.append(league)
         batch.teams.extend([home_team, away_team])
         batch.matches.append(match)
 

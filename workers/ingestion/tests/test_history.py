@@ -72,6 +72,10 @@ def test_history_quality_report_counts_mls_seasons(clock, live_settings: Setting
     assert by_season["2023"].normalized_count == 1
     assert by_season["2024"].normalized_count == 3
     assert by_season["2024"].missing_score_count >= 1
+    assert "ambiguous_identity" not in by_season["2023"].quarantined_reasons
+    assert "ambiguous_identity" not in by_season["2024"].quarantined_reasons
+    assert "ambiguous_identity" not in by_season["2025"].quarantined_reasons
+    assert all(item.status != "quarantined" for item in report.identity)
     assert all(item.provider == "sportmonks" for item in report.seasons)
     assert all(item.data_mode == "live" for item in report.seasons)
     assert all(item.ingestion_run_id == report.ingestion_run_id for item in report.seasons)

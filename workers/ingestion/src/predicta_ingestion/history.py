@@ -7,6 +7,7 @@ from datetime import datetime
 from predicta_ingestion.canonical.enums import ResourceType, SportCode
 from predicta_ingestion.canonical.models import Match
 from predicta_ingestion.clock import Clock
+from predicta_ingestion.identity.resolver import IdentityDiagnostic
 from predicta_ingestion.ids import stable_entity_id
 from predicta_ingestion.persistence.memory import MemoryCanonicalSink, TeeCanonicalSink
 from predicta_ingestion.pipeline import IngestionPipeline
@@ -26,8 +27,18 @@ class HistoryIngestReport:
     dry_run: bool
     discovered: list[dict[str, object]] = field(default_factory=list)
     seasons: list[SeasonQualityReport] = field(default_factory=list)
+    identity: list[IdentityDiagnostic] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, object]:
+        identity_rows = [item.to_dict() for item in self.identity]
+        methods: dict[str, int] = {}
+        quarantined_identity = 0
+        for item in self.identity:
+            if item.status == "quarantined":
+                quarantined_identity += 1
+                continue
+            method = item.resolution_method or "unknown"
+            methods[method] = methods.get(method, 0) + 1
         return {
             "ingestion_run_id": self.ingestion_run_id,
             "provider": self.provider,
@@ -35,6 +46,11 @@ class HistoryIngestReport:
             "dry_run": self.dry_run,
             "discovered": self.discovered,
             "seasons": [item.to_dict() for item in self.seasons],
+            "identity": identity_rows,
+            "identity_summary": {
+                "resolved_by_method": methods,
+                "quarantined_count": quarantined_identity,
+            },
             "totals": {
                 "fetched_count": sum(item.fetched_count for item in self.seasons),
                 "normalized_count": sum(item.normalized_count for item in self.seasons),
@@ -115,6 +131,7 @@ def ingest_history(
             records_accepted=sum(item.inserted_count for item in report.seasons),
             records_quarantined=sum(item.quarantined_count for item in report.seasons),
         )
+    report.identity = pipeline._resolver.identity_report()
     return report
 
 

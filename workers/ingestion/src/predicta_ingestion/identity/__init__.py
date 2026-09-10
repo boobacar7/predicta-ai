@@ -1,3 +1,3 @@
-from predicta_ingestion.identity.resolver import IdentityBinding, IdentityResolver
+from predicta_ingestion.identity.resolver import IdentityBinding, IdentityDiagnostic, IdentityResolver
 
-__all__ = ["IdentityBinding", "IdentityResolver"]
+__all__ = ["IdentityBinding", "IdentityDiagnostic", "IdentityResolver"]
