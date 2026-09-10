@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from urllib.parse import unquote, urlparse
 
 import pytest
 from tests.conftest import TEST_SPORTMONKS_TOKEN
@@ -14,7 +15,7 @@ from predicta_ingestion.providers.errors import (
     ProviderRateLimited,
     ProviderUnavailable,
 )
-from predicta_ingestion.providers.http import RecordedSleep
+from predicta_ingestion.providers.http import RecordedSleep, describe_http_error
 from predicta_ingestion.providers.leagues import V1_FOOTBALL_LEAGUES
 from predicta_ingestion.providers.protocols import ProviderRequest
 from predicta_ingestion.providers.sportmonks import MAX_FIXTURE_RANGE_DAYS, SportmonksFootballProvider, _split_range
@@ -149,7 +150,7 @@ def test_v1_league_catalog_contains_mls_and_european_v1() -> None:
     }
 
 
-def test_fetch_fixtures_by_season_paginates_season_endpoint(clock: Clock) -> None:
+def test_fetch_fixtures_by_season_uses_documented_fixtures_filter(clock: Clock) -> None:
     transport = ScriptedTransport()
     provider = _provider(clock, transport)
     envelopes = provider.fetch(
@@ -163,8 +164,51 @@ def test_fetch_fixtures_by_season_paginates_season_endpoint(clock: Clock) -> Non
     assert envelopes
     assert all(item.resource is ResourceType.FIXTURES for item in envelopes)
     urls = [url for url, _headers in transport.calls]
-    assert any("/fixtures/seasons/18001" in url for url in urls)
+    assert any(urlparse(url).path.rstrip("/").endswith("/fixtures") for url in urls)
+    assert any("fixtureSeasons" in unquote(url) and "18001" in unquote(url) for url in urls)
+    assert any("fixtureLeagues:779" in unquote(url) for url in urls)
+    assert not any("/fixtures/seasons/" in url for url in urls)
     assert all("api_token" not in url for url in urls)
+
+
+def test_http_404_is_unavailable_with_endpoint_and_without_token(
+    clock: Clock,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level("DEBUG", logger="predicta_ingestion.providers.http")
+    transport = ScriptedTransport()
+    transport.force_status = 404
+    transport.force_body = b'{"message":"Not Found."}'
+    transport.force_headers = {"X-Request-Id": "sm-req-404"}
+    provider = _provider(clock, transport)
+    with pytest.raises(ProviderUnavailable) as exc:
+        provider.fetch(ProviderRequest(resource=ResourceType.SEASONS, sport=SportCode.FOOTBALL, league="MLS"))
+    message = str(exc.value)
+    assert "HTTP 404" in message
+    assert "GET" in message
+    assert "/seasons" in message
+    assert "request_id=sm-req-404" in message
+    assert TEST_SPORTMONKS_TOKEN not in message
+    assert_no_secret_in(exc.value)
+    assert TEST_SPORTMONKS_TOKEN not in caplog.text
+    assert "GET" in caplog.text
+    assert "/seasons" in caplog.text
+    assert "status=404" in caplog.text
+    assert "sm-req-404" in caplog.text
+
+
+def test_describe_http_error_redacts_token_in_url_and_request_id() -> None:
+    detail = describe_http_error(
+        method="GET",
+        url=f"https://api.sportmonks.com/v3/football/fixtures/seasons/18001?api_token={TEST_SPORTMONKS_TOKEN}",
+        status=404,
+        headers={"X-Request-Id": TEST_SPORTMONKS_TOKEN},
+        token=TEST_SPORTMONKS_TOKEN,
+    )
+    assert TEST_SPORTMONKS_TOKEN not in detail
+    assert "HTTP 404 GET /v3/football/fixtures/seasons/18001" in detail
+    assert "request_id=[redacted]" in detail
+    assert "api_token=" not in detail
 
 
 def test_date_range_is_split_under_sportmonks_limit() -> None:

@@ -1,4 +1,5 @@
 import json
+from urllib.parse import unquote, urlparse
 
 from tests.conftest import SPORTMONKS_FIXTURES, TEST_SPORTMONKS_TOKEN
 from tests.sportmonks_support import ScriptedTransport, assert_no_secret_in
@@ -66,7 +67,15 @@ def test_unknown_season_is_not_invented() -> None:
         raise AssertionError("missing seasons must not be invented")
 
 
-def test_season_discovery_fetch_uses_include_and_hides_token(clock: Clock) -> None:
+def test_parse_mls_seasons_from_get_all_seasons_payload() -> None:
+    payload = json.loads((SPORTMONKS_FIXTURES / "seasons_mls.json").read_text(encoding="utf-8"))
+    league = resolve_v1_leagues("mls")[0]
+    seasons = parse_discovered_seasons(payload, league)
+    assert [item.name for item in seasons] == ["2023", "2024", "2025"]
+    assert [item.provider_id for item in seasons] == ["18000", "18001", "18002"]
+
+
+def test_season_discovery_fetch_uses_season_leagues_filter_and_hides_token(clock: Clock) -> None:
     transport = ScriptedTransport()
     provider = SportmonksFootballProvider(
         enable_live=True,
@@ -77,8 +86,8 @@ def test_season_discovery_fetch_uses_include_and_hides_token(clock: Clock) -> No
     envelopes = provider.fetch(ProviderRequest(resource=ResourceType.SEASONS, sport=SportCode.FOOTBALL, league="MLS"))
     assert envelopes[0].resource is ResourceType.SEASONS
     url, headers = transport.calls[0]
-    assert "/leagues/779" in url
-    assert "seasons" in url
+    assert urlparse(url).path.rstrip("/").endswith("/seasons")
+    assert "seasonLeagues:779" in unquote(url)
     assert "api_token" not in url
     assert headers["Authorization"] == TEST_SPORTMONKS_TOKEN
     assert_no_secret_in(url)

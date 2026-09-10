@@ -1,0 +1,40 @@
+{
+  "data": [
+    {
+      "id": 18000,
+      "sport_id": 1,
+      "league_id": 779,
+      "name": "2023",
+      "finished": true,
+      "is_current": false,
+      "starting_at": "2023-02-25",
+      "ending_at": "2023-12-09"
+    },
+    {
+      "id": 18001,
+      "sport_id": 1,
+      "league_id": 779,
+      "name": "2024",
+      "finished": true,
+      "is_current": false,
+      "starting_at": "2024-02-21",
+      "ending_at": "2024-12-07"
+    },
+    {
+      "id": 18002,
+      "sport_id": 1,
+      "league_id": 779,
+      "name": "2025",
+      "finished": false,
+      "is_current": true,
+      "starting_at": "2025-02-22",
+      "ending_at": "2025-12-06"
+    }
+  ],
+  "pagination": {
+    "count": 3,
+    "per_page": 50,
+    "current_page": 1,
+    "has_more": false
+  }
+}

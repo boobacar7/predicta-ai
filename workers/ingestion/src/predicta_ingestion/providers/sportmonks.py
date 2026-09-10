@@ -19,7 +19,6 @@ DEFAULT_BASE_URL = "https://api.sportmonks.com/v3/football"
 MAX_FIXTURE_RANGE_DAYS = 100
 FIXTURE_INCLUDES = "participants;scores;league.country;season;venue;state"
 LEAGUE_INCLUDES = "country"
-SEASON_INCLUDES = "country;seasons"
 PER_PAGE = 50
 
 
@@ -67,7 +66,10 @@ class SportmonksFootballProvider:
             raise ProviderUnavailable(self.name, "V1 Sportmonks adapter only fetches leagues, seasons and fixtures.")
         leagues = resolve_v1_leagues(request.league)
         if request.resource is ResourceType.SEASONS:
-            return [self._fetch_league_seasons(league) for league in leagues]
+            discovered: list[RawEnvelope] = []
+            for league in leagues:
+                discovered.extend(self._paginate_seasons(league))
+            return discovered
         envelopes: list[RawEnvelope] = []
         if request.season is None:
             for league in leagues:
@@ -92,15 +94,26 @@ class SportmonksFootballProvider:
             request_key=f"sportmonks:league:{league.sportmonks_id}",
         )
 
-    def _fetch_league_seasons(self, league: V1FootballLeague) -> RawEnvelope:
-        path = f"/leagues/{league.sportmonks_id}"
-        query = {"include": SEASON_INCLUDES}
-        return self._get_envelope(
-            path=path,
-            query=query,
-            resource=ResourceType.SEASONS,
-            request_key=f"sportmonks:seasons:{league.sportmonks_id}",
-        )
+    def _paginate_seasons(self, league: V1FootballLeague) -> list[RawEnvelope]:
+        envelopes: list[RawEnvelope] = []
+        page = 1
+        while True:
+            query = {
+                "filters": f"seasonLeagues:{league.sportmonks_id}",
+                "per_page": str(PER_PAGE),
+                "page": str(page),
+            }
+            envelope = self._get_envelope(
+                path="/seasons",
+                query=query,
+                resource=ResourceType.SEASONS,
+                request_key=f"sportmonks:seasons:{league.sportmonks_id}:p{page}",
+            )
+            envelopes.append(envelope)
+            if not _has_more(self._parse_json(envelope.body)):
+                break
+            page += 1
+        return envelopes
 
     def _fetch_fixtures(self, request: ProviderRequest, leagues: tuple[V1FootballLeague, ...]) -> list[RawEnvelope]:
         if request.season:
@@ -126,10 +139,10 @@ class SportmonksFootballProvider:
         envelopes: list[RawEnvelope] = []
         page = 1
         while True:
-            path = f"/fixtures/seasons/{season_id}"
+            path = "/fixtures"
             query = {
                 "include": FIXTURE_INCLUDES,
-                "filters": f"fixtureLeagues:{league.sportmonks_id}",
+                "filters": f"fixtureLeagues:{league.sportmonks_id};fixtureSeasons:{season_id}",
                 "per_page": str(PER_PAGE),
                 "page": str(page),
             }

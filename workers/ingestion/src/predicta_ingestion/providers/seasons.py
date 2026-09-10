@@ -25,9 +25,17 @@ class DiscoveredSeason:
 
 def parse_discovered_seasons(payload: dict[str, Any], league: V1FootballLeague) -> list[DiscoveredSeason]:
     data = payload.get("data")
-    if not isinstance(data, dict):
-        raise ValidationError("invalid_payload", "Season discovery payload data must be a league object.")
-    seasons = _as_list(data.get("seasons"))
+    league_id_fallback = league.sportmonks_id
+    if isinstance(data, list):
+        seasons = data
+    elif isinstance(data, dict):
+        seasons = _as_list(data.get("seasons"))
+        league_id_fallback = _as_int(data.get("id"), league.sportmonks_id)
+    else:
+        raise ValidationError(
+            "invalid_payload",
+            "Season discovery payload data must be a season list or league object.",
+        )
     discovered: list[DiscoveredSeason] = []
     for item in seasons:
         if not isinstance(item, dict):
@@ -38,7 +46,7 @@ def parse_discovered_seasons(payload: dict[str, Any], league: V1FootballLeague) 
         name = str(item.get("name") or "").strip()
         if not name:
             raise ValidationError("missing_season", "Season name is missing.")
-        league_id = int(item.get("league_id") or data.get("id") or league.sportmonks_id)
+        league_id = _as_int(item.get("league_id"), league_id_fallback)
         discovered.append(
             DiscoveredSeason(
                 provider_id=str(provider_id),
@@ -98,6 +106,12 @@ def _as_list(value: object) -> list[Any]:
         if isinstance(nested, list):
             return nested
     return []
+
+
+def _as_int(value: object, fallback: int) -> int:
+    if value is None or value == "":
+        return fallback
+    return int(str(value))
 
 
 def _parse_date(value: object) -> date | None:

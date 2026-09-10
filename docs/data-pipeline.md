@@ -128,9 +128,12 @@ résultat comme feature pre-match.
 Découverte d'historique :
 
 ```text
-GET /leagues/{id}?include=country;seasons
-GET /fixtures/seasons/{seasonId}?include=participants;scores;league.country;season;venue;state
+GET /seasons?filters=seasonLeagues:{leagueId}
+GET /fixtures?include=participants;scores;league.country;season;venue;state&filters=fixtureLeagues:{leagueId};fixtureSeasons:{seasonId}
 ```
+
+Une fenêtre `--date-from` / `--date-to` utilise l'endpoint documenté
+`GET /fixtures/between/{start}/{end}` (max 100 jours) avec les mêmes filtres.
 
 MLS (Sportmonks id 779) est ingérée pour toutes les saisons réellement retournées.
 Les ligues européennes V1 sont limitées par défaut aux 3 saisons les plus récentes.

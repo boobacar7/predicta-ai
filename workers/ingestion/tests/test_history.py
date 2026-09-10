@@ -1,5 +1,6 @@
 import json
 from datetime import UTC, datetime
+from urllib.parse import unquote, urlparse
 
 from tests.conftest import TEST_SPORTMONKS_TOKEN
 from tests.sportmonks_support import ScriptedTransport, assert_no_secret_in, load_sportmonks
@@ -13,6 +14,7 @@ from predicta_ingestion.identity.resolver import IdentityResolver
 from predicta_ingestion.normalization.sportmonks import SportmonksFootballNormalizer
 from predicta_ingestion.persistence.memory import MemoryCanonicalSink
 from predicta_ingestion.pipeline import IngestionPipeline
+from predicta_ingestion.providers.errors import ProviderUnavailable
 from predicta_ingestion.providers.http import RecordedSleep
 from predicta_ingestion.providers.sportmonks import SportmonksFootballProvider
 from predicta_ingestion.raw.envelope import RawEnvelope
@@ -81,7 +83,9 @@ def test_history_quality_report_counts_mls_seasons(clock, live_settings: Setting
         assert match.kickoff_at.tzinfo is not None
 
 
-def test_history_fetch_uses_season_endpoint(clock, live_settings: Settings, tmp_path) -> None:
+def test_history_fetch_uses_documented_season_and_fixture_endpoints(
+    clock, live_settings: Settings, tmp_path
+) -> None:
     transport = ScriptedTransport()
     pipeline = _history_pipeline(clock, live_settings, tmp_path)
     ingest_history(
@@ -92,12 +96,41 @@ def test_history_fetch_uses_season_endpoint(clock, live_settings: Settings, tmp_
         season="18001",
     )
     urls = [url for url, _headers in transport.calls]
-    assert any("/leagues/779" in url and "seasons" in url for url in urls)
-    assert any("/fixtures/seasons/18001" in url for url in urls)
+    decoded = [unquote(url) for url in urls]
+    assert any(urlparse(url).path.rstrip("/").endswith("/seasons") for url in urls)
+    assert any("seasonLeagues:779" in url for url in decoded)
+    assert any(
+        urlparse(url).path.rstrip("/").endswith("/fixtures") and "fixtureSeasons:18001" in unquote(url)
+        for url in urls
+    )
+    assert not any("/fixtures/seasons/" in url for url in urls)
+    assert not any("/leagues/779" in url and "seasons" in url for url in urls)
     assert all("api_token" not in url for url in urls)
     for url, headers in transport.calls:
         assert_no_secret_in(url)
         assert headers["Authorization"] == TEST_SPORTMONKS_TOKEN
+
+
+def test_history_http_404_is_not_swallowed(clock, live_settings: Settings, tmp_path) -> None:
+    transport = ScriptedTransport()
+    transport.not_found_substrings = ["/fixtures"]
+    pipeline = _history_pipeline(clock, live_settings, tmp_path)
+    try:
+        ingest_history(
+            provider=_provider(clock, transport),
+            pipeline=pipeline,
+            clock=clock,
+            league="mls",
+            season="18001",
+        )
+    except ProviderUnavailable as exc:
+        message = str(exc)
+        assert "HTTP 404" in message
+        assert "/fixtures" in message
+        assert TEST_SPORTMONKS_TOKEN not in message
+        assert_no_secret_in(exc)
+    else:
+        raise AssertionError("HTTP 404 must not be swallowed by a mock fallback")
 
 
 def test_season_with_date_window_uses_between_filter(clock, live_settings: Settings, tmp_path) -> None:
@@ -211,5 +244,7 @@ def test_european_history_does_not_fetch_uncapped_seasons(clock, live_settings: 
     selected = {item["season"] for item in report.discovered if item["selected"]}
     assert "2023/2024" not in selected
     urls = [url for url, _ in transport.calls]
-    assert not any("/fixtures/seasons/23611" in url for url in urls)
-    assert any("/fixtures/seasons/23614" in url for url in urls)
+    decoded = [unquote(url) for url in urls]
+    assert not any("fixtureSeasons:23611" in url for url in decoded)
+    assert any("fixtureSeasons:23614" in url for url in decoded)
+    assert not any("/fixtures/seasons/" in url for url in urls)

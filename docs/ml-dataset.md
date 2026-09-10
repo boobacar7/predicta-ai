@@ -32,9 +32,9 @@ historique de référence.
 
 Le pipeline :
 
-1. appelle `GET /leagues/779?include=country;seasons` ;
+1. appelle `GET /seasons?filters=seasonLeagues:779` ;
 2. parse uniquement les saisons **présentes dans la réponse** ;
-3. ingère chaque saison sélectionnée via `/fixtures/seasons/{id}` ;
+3. ingère chaque saison sélectionnée via `GET /fixtures?filters=fixtureLeagues:779;fixtureSeasons:{id}` ;
 4. rapporte `fetched / normalized / inserted / duplicate / quarantined`.
 
 Les fichiers `workers/ingestion/fixtures/sportmonks/league_mls.json` sont des
