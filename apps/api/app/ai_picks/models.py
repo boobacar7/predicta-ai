@@ -9,6 +9,7 @@ from typing import Literal
 from pydantic import Field, field_serializer
 
 from app.core.clock import to_rfc3339
+from app.match_identity.models import MatchIdentity
 from app.odds.types import DataMode, Football1x2Selection
 from app.schemas import ApiModel, FootballModelStatus
 
@@ -36,15 +37,34 @@ class ExclusionReason(StrEnum):
 @dataclass(frozen=True, slots=True)
 class MatchCandidate:
     match_id: str
+    home_team_id: str
+    away_team_id: str
+    home_team: str | None
+    away_team: str | None
     league: str
     kickoff_at: datetime
+
+    @classmethod
+    def from_identity(cls, identity: MatchIdentity) -> MatchCandidate:
+        return cls(
+            match_id=identity.match_id,
+            home_team_id=identity.home_team_id,
+            away_team_id=identity.away_team_id,
+            home_team=identity.home_team,
+            away_team=identity.away_team,
+            league=identity.league,
+            kickoff_at=identity.kickoff_at,
+        )
 
 
 @dataclass(frozen=True, slots=True)
 class Opportunity:
     match_id: str
     sport: str
+    home_team: str | None
+    away_team: str | None
     league: str
+    kickoff_at: datetime
     market: str
     selection: Football1x2Selection
     model_probability: Decimal
@@ -68,7 +88,10 @@ class Opportunity:
 class AiPick(ApiModel):
     match_id: str = Field(min_length=1, max_length=128)
     sport: Literal["football"] = "football"
+    home_team: str | None = Field(min_length=1)
+    away_team: str | None = Field(min_length=1)
     league: str = Field(min_length=1)
+    kickoff_at: datetime
     market: Literal["1X2"] = "1X2"
     selection: Literal["HOME", "DRAW", "AWAY"]
     model_probability: float = Field(gt=0, lt=1)
@@ -89,7 +112,7 @@ class AiPick(ApiModel):
     data_mode: DataMode
     status: Literal["eligible"] = "eligible"
 
-    @field_serializer("cutoff_at", "generated_at")
+    @field_serializer("kickoff_at", "cutoff_at", "generated_at")
     def _timestamps(self, value: datetime) -> str:
         return to_rfc3339(value)
 

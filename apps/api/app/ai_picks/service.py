@@ -166,7 +166,10 @@ class AiPicksEngine:
                 Opportunity(
                     match_id=candidate.match_id,
                     sport=analysis.sport,
+                    home_team=candidate.home_team,
+                    away_team=candidate.away_team,
                     league=candidate.league,
+                    kickoff_at=candidate.kickoff_at,
                     market=analysis.market,
                     selection=selection,
                     model_probability=probabilities[selection],
@@ -315,7 +318,10 @@ class AiPicksEngine:
     def _to_pick(item: Opportunity, *, rank: int) -> AiPick:
         return AiPick(
             match_id=item.match_id,
+            home_team=item.home_team,
+            away_team=item.away_team,
             league=item.league,
+            kickoff_at=item.kickoff_at,
             selection=item.selection.value,
             model_probability=float(item.model_probability),
             odds=float(item.odds),

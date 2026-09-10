@@ -1,37 +1,21 @@
 from __future__ import annotations
 
-from datetime import date, datetime
-from pathlib import Path
+from datetime import date
 
 from app.ai_picks.models import MatchCandidate
-from app.predictions.runtime import ensure_ml_on_path
+from app.match_identity.repository import MatchIdentityRepository
 
 
-class ParquetMatchCandidateSource:
-    """Resolve the configured V0.1 universe from the real PIT dataset."""
+class CanonicalMatchCandidateSource:
+    """Resolve the configured V0.1 universe through canonical match identity."""
 
-    def __init__(self, dataset_path: Path, match_ids: tuple[str, ...]) -> None:
-        ensure_ml_on_path()
-        from predicta_ml.features.dataset import load_football_dataset
-
-        dataset = load_football_dataset(dataset_path)
-        configured = set(match_ids)
-        candidates: list[MatchCandidate] = []
-        for _, row in dataset.frame.iterrows():
-            match_id = str(row["match_id"])
-            if match_id not in configured:
+    def __init__(self, identities: MatchIdentityRepository, match_ids: tuple[str, ...]) -> None:
+        candidates = []
+        for match_id in sorted(set(match_ids)):
+            identity = identities.get(match_id)
+            if identity is None:
                 continue
-            value = row["event_at"]
-            kickoff = value.to_pydatetime() if hasattr(value, "to_pydatetime") else value
-            if not isinstance(kickoff, datetime):
-                raise ValueError(f"Invalid event_at for AI Picks candidate '{match_id}'.")
-            candidates.append(
-                MatchCandidate(
-                    match_id=match_id,
-                    league=str(row["competition_name"]),
-                    kickoff_at=kickoff,
-                )
-            )
+            candidates.append(MatchCandidate.from_identity(identity))
         self._candidates = tuple(sorted(candidates, key=lambda item: item.match_id))
 
     def list_candidates(self, *, match_date: date | None, league: str | None) -> list[MatchCandidate]:

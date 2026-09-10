@@ -274,6 +274,8 @@ paths:
         Returns match context plus currently available statistics, odds,
         prediction and form. Missing sections are `null` or empty and are
         explained through `unavailable_fields`; they are never fabricated.
+        Canonical historical IDs not projected into the frontend repository
+        return the structural `HistoricalMatchIdentity` variant.
       parameters:
         - $ref: "#/components/parameters/XRequestId"
         - $ref: "#/components/parameters/MatchId"
@@ -1424,7 +1426,10 @@ components:
       required:
         - match_id
         - sport
+        - home_team
+        - away_team
         - league
+        - kickoff_at
         - market
         - selection
         - model_probability
@@ -1450,9 +1455,19 @@ components:
         sport:
           type: string
           enum: [football]
+        home_team:
+          type: [string, "null"]
+          minLength: 1
+          description: Canonical home-team display name; null when the identity label is unavailable.
+        away_team:
+          type: [string, "null"]
+          minLength: 1
+          description: Canonical away-team display name; null when the identity label is unavailable.
         league:
           type: string
           minLength: 1
+        kickoff_at:
+          $ref: "#/components/schemas/Timestamp"
         market:
           type: string
           enum: ["1X2"]
@@ -1782,6 +1797,43 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/UnavailableField"
+
+    HistoricalMatchIdentity:
+      type: object
+      additionalProperties: false
+      required:
+        - match_id
+        - home_team_id
+        - away_team_id
+        - home_team
+        - away_team
+        - league
+        - kickoff_at
+        - data_mode
+        - resource_scope
+      properties:
+        match_id:
+          $ref: "#/components/schemas/Identifier"
+        home_team_id:
+          $ref: "#/components/schemas/Identifier"
+        away_team_id:
+          $ref: "#/components/schemas/Identifier"
+        home_team:
+          type: [string, "null"]
+          minLength: 1
+        away_team:
+          type: [string, "null"]
+          minLength: 1
+        league:
+          type: string
+          minLength: 1
+        kickoff_at:
+          $ref: "#/components/schemas/Timestamp"
+        data_mode:
+          $ref: "#/components/schemas/DataMode"
+        resource_scope:
+          type: string
+          enum: [structural_identity]
 
     ValueOpportunity:
       type: object
@@ -2446,7 +2498,9 @@ components:
           required: [data]
           properties:
             data:
-              $ref: "#/components/schemas/MatchDetail"
+              oneOf:
+                - $ref: "#/components/schemas/MatchDetail"
+                - $ref: "#/components/schemas/HistoricalMatchIdentity"
 
     MatchStatisticsEnvelope:
       allOf:

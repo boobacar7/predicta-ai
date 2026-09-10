@@ -41,7 +41,17 @@ class StaticPredictionService:
 
 class StaticCandidateSource:
     def __init__(self, candidates: list[MatchCandidate] | None = None) -> None:
-        self.candidates = candidates or [MatchCandidate(MATCH_ID, "Test League", CUTOFF)]
+        self.candidates = candidates or [
+            MatchCandidate(
+                match_id=MATCH_ID,
+                home_team_id="tm_home",
+                away_team_id="tm_away",
+                home_team="Home FC",
+                away_team="Away FC",
+                league="Test League",
+                kickoff_at=CUTOFF,
+            )
+        ]
         self.last_filters: tuple[date | None, str | None] | None = None
 
     def list_candidates(self, *, match_date: date | None, league: str | None) -> list[MatchCandidate]:
@@ -212,7 +222,10 @@ def _opportunity(
     return Opportunity(
         match_id=match_id,
         sport="football",
+        home_team="Home FC",
+        away_team="Away FC",
         league="League",
+        kickoff_at=CUTOFF,
         market="1X2",
         selection=selection,
         model_probability=Decimal("0.6"),
@@ -258,8 +271,8 @@ def test_filters_are_passed_to_candidate_source() -> None:
 
 def test_pagination_preserves_global_ranks() -> None:
     candidates = [
-        MatchCandidate("match_a", "Test League", CUTOFF),
-        MatchCandidate("match_b", "Test League", CUTOFF),
+        MatchCandidate("match_a", "tm_home", "tm_away", "Home FC", "Away FC", "Test League", CUTOFF),
+        MatchCandidate("match_b", "tm_home", "tm_away", "Home FC", "Away FC", "Test League", CUTOFF),
     ]
     result = _engine(source=StaticCandidateSource(candidates)).list_picks(
         _query(limit=1, offset=1)
@@ -270,7 +283,15 @@ def test_pagination_preserves_global_ranks() -> None:
 
 
 def test_duplicate_match_candidates_do_not_duplicate_selections() -> None:
-    duplicate = MatchCandidate(MATCH_ID, "Test League", CUTOFF)
+    duplicate = MatchCandidate(
+        MATCH_ID,
+        "tm_home",
+        "tm_away",
+        "Home FC",
+        "Away FC",
+        "Test League",
+        CUTOFF,
+    )
     result = _engine(source=StaticCandidateSource([duplicate, duplicate])).list_picks(_query())
     keys = {(item.match_id, item.market, item.selection) for item in result.items}
     assert len(keys) == len(result.items)

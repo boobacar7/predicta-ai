@@ -2,9 +2,15 @@ from datetime import timedelta
 
 from app.ai_picks.config import AiPicksThresholds
 from app.ai_picks.service import AiPicksEngine
-from app.ai_picks.source import ParquetMatchCandidateSource
+from app.ai_picks.source import CanonicalMatchCandidateSource
 from app.core.clock import Clock
 from app.core.config import Settings
+from app.match_identity.repository import (
+    MatchIdentityRepository,
+    ParquetArchiveMatchIdentityRepository,
+    SqlMatchIdentityRepository,
+)
+from app.match_identity.service import MatchResolutionService
 from app.odds.providers import LiveOddsProvider, MockOddsProvider, OddsProvider
 from app.odds.repository import InMemoryOddsRepository, OddsRepository
 from app.odds.service import OddsService
@@ -29,6 +35,8 @@ class AppContainer:
         self.repos: RepositoryBundle = self._build_repos()
         self.catalog = CatalogService(self.repos)
         self.matches = MatchService(self.repos)
+        self._match_identities: MatchIdentityRepository | None = None
+        self._match_resolution: MatchResolutionService | None = None
         self.dashboard = DashboardService(self.repos, clock)
         self.picks = PickService(self.repos)
         self.values = ValueListService(self.repos)
@@ -71,12 +79,29 @@ class AppContainer:
             )
         return self._football_values
 
+    def match_identities(self) -> MatchIdentityRepository:
+        if self._match_identities is None:
+            self._match_identities = (
+                SqlMatchIdentityRepository(self.settings)
+                if self.settings.repository == "sql"
+                else ParquetArchiveMatchIdentityRepository(
+                    self.settings.football_dataset_path,
+                    self.settings.football_raw_archive_dir,
+                )
+            )
+        return self._match_identities
+
+    def match_resolution(self) -> MatchResolutionService:
+        if self._match_resolution is None:
+            self._match_resolution = MatchResolutionService(self.matches, self.match_identities())
+        return self._match_resolution
+
     def football_ai_picks(self) -> AiPicksEngine:
         if self._football_ai_picks is None:
             self._football_ai_picks = AiPicksEngine(
                 values=self.football_values(),
-                candidates=ParquetMatchCandidateSource(
-                    self.settings.football_dataset_path,
+                candidates=CanonicalMatchCandidateSource(
+                    self.match_identities(),
                     self.settings.ai_picks_candidate_match_ids,
                 ),
                 thresholds=AiPicksThresholds(

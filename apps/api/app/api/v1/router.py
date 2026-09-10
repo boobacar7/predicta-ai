@@ -7,6 +7,7 @@ from fastapi import APIRouter, Query, Request
 from app.ai_picks.models import AiPicksQuery
 from app.api.deps import envelope, filter_market, get_container, paginate
 from app.core.container import AppContainer
+from app.match_identity.models import HistoricalMatchIdentity
 from app.schemas import AnalystRequest, MatchStatus, SportCode
 
 router = APIRouter()
@@ -96,7 +97,9 @@ def get_matches(
 
 @router.get("/matches/{match_id}")
 def get_match(request: Request, match_id: str) -> dict[str, object]:
-    return envelope(request, _container(request).matches.get_match(match_id))
+    resource = _container(request).match_resolution().get(match_id)
+    data_mode = resource.data_mode if isinstance(resource, HistoricalMatchIdentity) else None
+    return envelope(request, resource, data_mode=data_mode)
 
 
 @router.get("/matches/{match_id}/stats")

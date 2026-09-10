@@ -27,10 +27,34 @@ dans `apps/api/app/ai_picks/`.
 ## Univers V0.1
 
 L'univers de matchs est explicite et configurable par
-`PREDICTA_API_AI_PICKS_CANDIDATE_MATCH_IDS`. Les identités, ligues et kickoffs
-sont résolus depuis le parquet PIT réel. La valeur par défaut contient le match
-couvert par le provider de cotes fictif V0.1. Cette limite évite de parcourir
-des milliers de matchs sans cotes et ne simule aucun provider live.
+`PREDICTA_API_AI_PICKS_CANDIDATE_MATCH_IDS`. Les IDs canoniques, ligues et
+kickoffs sont résolus depuis le parquet PIT réel. Les libellés structurels des
+équipes proviennent du payload brut immuable référencé par
+`raw_payload_id`; en mode SQL, les jointures canoniques
+`matches → teams/leagues` sont la source prioritaire. La valeur par défaut
+contient le match couvert par le provider de cotes fictif V0.1. Cette limite
+évite de parcourir des milliers de matchs sans cotes et ne simule aucun
+provider live.
+
+## Match identity
+
+`match_id` reste l'identifiant canonique PREDICTA
+(`mth_football-sportmonks-*`). Les IDs provider bruts ne sont jamais exposés à
+sa place. `home_team_id` et `away_team_id` servent à vérifier que les
+participants du payload de provenance correspondent aux équipes canoniques du
+dataset avant de publier leurs noms.
+
+Chaque AI Pick publie désormais `home_team`, `away_team`, `league` et
+`kickoff_at`. Les noms sont des clés requises mais nullables dans le contrat :
+si la provenance structurelle manque ou diverge, aucun nom n'est inventé.
+`GET /api/v1/matches/{match_id}` utilise le même resolver et retourne une
+projection `HistoricalMatchIdentity` lorsque l'agrégat frontend complet
+n'existe pas.
+
+Cette projection applique une liste blanche stricte : IDs, participants,
+ligue et kickoff. Elle ne lit ni statut final, ni scores, ni événements. Le
+kickoff doit être identique à `event_at` dans le dataset PIT. L'enrichissement
+d'identité n'introduit donc aucune donnée post-kickoff dans AI Picks.
 
 ## Éligibilité et exclusions
 

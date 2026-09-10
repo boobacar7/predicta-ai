@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     football_model_version: str = "football-elo-v1-candidate"
     football_registry_dir: Path = _REPO_ROOT / "workers" / "ml" / "var" / "registry"
     football_dataset_path: Path = _REPO_ROOT / "workers" / "ingestion" / "var" / "football-1x2-history.parquet"
+    football_raw_archive_dir: Path = _REPO_ROOT / "workers" / "ingestion" / "var" / "raw"
     ai_picks_candidate_match_ids: tuple[str, ...] = ("mth_football-sportmonks-19719892",)
     ai_picks_minimum_edge: Decimal = Decimal("0")
     ai_picks_minimum_ev: Decimal = Decimal("0")

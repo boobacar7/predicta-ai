@@ -33,6 +33,15 @@ Le préfixe est défini par le serveur OpenAPI `/api/v1`. Ainsi, le chemin OpenA
 
 Le détail d'un match embarque actuellement `stats`, `odds` et `prediction` afin d'éviter plusieurs allers-retours dans les vues existantes. Les sous-ressources utilisent les mêmes DTO backend; elles ne doivent pas être calculées différemment.
 
+`GET /matches/{match_id}` conserve ce `MatchDetail` pour les matchs du
+repository frontend. Pour un ID historique canonique présent dans le dataset
+PIT mais absent de ce repository, la même route retourne
+`HistoricalMatchIdentity` : `match_id`, IDs et noms canoniques des équipes,
+ligue, kickoff et `data_mode`. `home_team` et `away_team` sont des clés
+obligatoires mais nullables : une identité absente n'est jamais remplacée par
+un nom fictif. Cette variante ne contient volontairement ni score, ni statut,
+ni événement post-kickoff.
+
 `GET /football/value/{match_id}` est le contrat backend strict du Value Engine
 0.1. Il appelle le Prediction Service existant, puis choisit le dernier
 snapshot de cotes complet tel que `available_at <= cutoff_at`. Sa réponse
