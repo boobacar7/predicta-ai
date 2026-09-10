@@ -1,8 +1,11 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_REPO_ROOT = Path(__file__).resolve().parents[4]
 
 DataMode = Literal["mock", "live"]
 RepositoryKind = Literal["mock", "sql"]
@@ -31,6 +34,9 @@ class Settings(BaseSettings):
     value_formula_version: str = "value-engine-0.1"
     analyst_llm_model: str = "mock-explainer-0.1"
     analyst_prompt_version: str = "analyst-prompt-0.1"
+    football_model_version: str = "football-elo-v1-candidate"
+    football_registry_dir: Path = _REPO_ROOT / "workers" / "ml" / "var" / "registry"
+    football_dataset_path: Path = _REPO_ROOT / "workers" / "ingestion" / "var" / "football-1x2-history.parquet"
 
     @field_validator("cors_origins", mode="before")
     @classmethod

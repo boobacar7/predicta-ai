@@ -1,5 +1,6 @@
 from app.core.clock import Clock
 from app.core.config import Settings
+from app.predictions.service import FootballPredictionService, build_football_prediction_service
 from app.repositories.mock import MockRepositoryBundle
 from app.repositories.protocols import RepositoryBundle
 from app.services.application import (
@@ -24,6 +25,17 @@ class AppContainer:
         self.values = ValueListService(self.repos)
         self.performance = PerformanceService(self.repos)
         self.analyst = AnalystService(self.matches, clock, settings)
+        self._football_predictions: FootballPredictionService | None = None
+
+    def football_predictions(self) -> FootballPredictionService:
+        if self._football_predictions is None:
+            self._football_predictions = build_football_prediction_service(
+                clock=self.clock,
+                registry_dir=self.settings.football_registry_dir,
+                dataset_path=self.settings.football_dataset_path,
+                model_version=self.settings.football_model_version,
+            )
+        return self._football_predictions
 
     def _build_repos(self) -> RepositoryBundle:
         if self.settings.repository == "sql":

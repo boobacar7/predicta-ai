@@ -9,6 +9,7 @@ from app.schemas import (
     DashboardSnapshot,
     Fact,
     FactPack,
+    MatchDetail,
     MatchStatus,
     PerformanceReport,
     Pick,
@@ -181,7 +182,7 @@ class AnalystService:
             ),
         )
 
-    def _build_fact_pack(self, match) -> FactPack:
+    def _build_fact_pack(self, match: MatchDetail) -> FactPack:
         now = self._clock.now()
         facts: list[Fact] = [
             Fact(

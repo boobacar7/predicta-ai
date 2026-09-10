@@ -444,7 +444,7 @@ class ModelMetric(Base):
     theoretical_roi: Mapped[float | None] = mapped_column(Numeric(18, 10), nullable=True)
     theoretical_max_drawdown: Mapped[float | None] = mapped_column(Numeric(18, 10), nullable=True)
     prediction_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     model_version: Mapped[ModelVersion] = relationship(back_populates="metrics")
@@ -523,8 +523,8 @@ class AiAnalysis(Base):
 
     id: Mapped[str] = mapped_column(String(128), primary_key=True)
     match_id: Mapped[str] = mapped_column(ForeignKey("matches.id"), nullable=False, index=True)
-    fact_pack: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    messages: Mapped[list] = mapped_column(JSONB, nullable=False)
+    fact_pack: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    messages: Mapped[list[Any]] = mapped_column(JSONB, nullable=False)
     llm_model: Mapped[str] = mapped_column(String(128), nullable=False)
     prompt_version: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

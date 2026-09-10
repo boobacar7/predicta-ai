@@ -1,20 +1,20 @@
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 from fastapi import Request
 
 from app.core.container import AppContainer
-from app.schemas import Envelope, MatchDetail, OddsSnapshot, PredictionDetail
+from app.schemas import DataMode, Envelope, MatchDetail, OddsSnapshot, PredictionDetail
 
 
 def get_container(request: Request) -> AppContainer:
-    return request.app.state.container
+    return cast(AppContainer, request.app.state.container)
 
 
-def envelope(request: Request, data: Any) -> dict[str, Any]:
+def envelope(request: Request, data: Any, *, data_mode: DataMode | None = None) -> dict[str, Any]:
     settings = request.app.state.settings
-    payload = Envelope(
-        data_mode=settings.resolved_data_mode(),
+    payload: Envelope[Any] = Envelope(
+        data_mode=data_mode or settings.resolved_data_mode(),
         generated_at=request.app.state.container.clock.now(),
         request_id=request.state.request_id,
         data=data,

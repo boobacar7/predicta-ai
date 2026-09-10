@@ -367,6 +367,48 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
+  /football/predictions/{match_id}:
+    get:
+      operationId: getFootballModelPrediction
+      tags: [Predictions]
+      summary: Get candidate football 1X2 model probabilities
+      description: |
+        Serves calibrated P(Home), P(Draw) and P(Away) from the versioned
+        football Elo artefact currently registered for this route
+        (`football-elo-v1-candidate`, `model_status=candidate`).
+
+        This is a statistical estimate, never a certainty, and never a betting
+        recommendation. Odds, expected value and the Value Engine are out of
+        scope. Point-in-time Elo features are loaded from
+        `football-1x2-history-0.3`; rows that are missing, mock, or only
+        knowable after kickoff are refused.
+
+        `GET /matches/{match_id}/prediction` is unchanged and remains the
+        published frontend DTO. A future champion can replace the loaded
+        artefact behind this path without changing the response schema.
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+        - $ref: "#/components/parameters/MatchId"
+        - $ref: "#/components/parameters/CutoffAt"
+      responses:
+        "200":
+          description: Calibrated 1X2 probabilities from the registered football model
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FootballModelPredictionEnvelope"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/ValidationProblem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+
   /picks:
     get:
       operationId: getPicks
@@ -554,6 +596,17 @@ components:
         type: integer
         minimum: 0
         default: 0
+    CutoffAt:
+      name: cutoff_at
+      in: query
+      required: false
+      description: |
+        Exclusive-of-future PIT boundary. Omit to use kickoff (`pre_kickoff`).
+        Values after kickoff are rejected as temporal leakage. Values before
+        kickoff are rejected because this candidate only stores the pre-kickoff
+        Elo snapshot.
+      schema:
+        $ref: "#/components/schemas/Timestamp"
     MatchId:
       name: match_id
       in: path
@@ -635,6 +688,21 @@ components:
       minimum: 0
       maximum: 1
       description: Raw ratio; 0.68 means 68%. Null means unavailable.
+
+    Probability:
+      type: number
+      exclusiveMinimum: 0
+      exclusiveMaximum: 1
+      description: |
+        Raw ratio in (0, 1). 0.68 means 68%. Never a certainty. The three 1X2
+        probabilities on FootballModelPrediction sum to 1.
+
+    FootballModelStatus:
+      type: string
+      enum: [candidate, champion]
+      description: |
+        Serving status of the loaded artefact. V1 always returns `candidate`.
+        A later champion keeps this field and the rest of the schema.
 
     DataMode:
       type: string
@@ -1020,6 +1088,61 @@ components:
             $ref: "#/components/schemas/PredictionFactor"
         quality:
           $ref: "#/components/schemas/DataQuality"
+
+    FootballModelPrediction:
+      type: object
+      additionalProperties: false
+      description: |
+        1X2 probabilities from the registered football model. Values are
+        statistical estimates that sum to 1. They are never certainties, odds,
+        expected value, or betting recommendations.
+      required:
+        - match_id
+        - sport
+        - market
+        - home_probability
+        - draw_probability
+        - away_probability
+        - model_version
+        - dataset_version
+        - feature_schema_version
+        - model_status
+        - cutoff_at
+        - cutoff_policy
+        - generated_at
+      properties:
+        match_id:
+          $ref: "#/components/schemas/Identifier"
+        sport:
+          type: string
+          enum: [football]
+        market:
+          type: string
+          enum: ["1X2"]
+        home_probability:
+          $ref: "#/components/schemas/Probability"
+        draw_probability:
+          $ref: "#/components/schemas/Probability"
+        away_probability:
+          $ref: "#/components/schemas/Probability"
+        model_version:
+          type: string
+          minLength: 1
+        dataset_version:
+          type: string
+          minLength: 1
+        feature_schema_version:
+          type: string
+          minLength: 1
+        model_status:
+          $ref: "#/components/schemas/FootballModelStatus"
+        cutoff_at:
+          $ref: "#/components/schemas/Timestamp"
+        cutoff_policy:
+          type: string
+          minLength: 1
+        generated_at:
+          $ref: "#/components/schemas/Timestamp"
 
     OddsSelection:
       type: object
@@ -1884,6 +2007,15 @@ components:
               anyOf:
                 - $ref: "#/components/schemas/PredictionDetail"
                 - type: "null"
+
+    FootballModelPredictionEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: "#/components/schemas/FootballModelPrediction"
 
     PickListEnvelope:
       allOf:

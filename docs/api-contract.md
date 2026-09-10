@@ -23,6 +23,7 @@ Le préfixe est défini par le serveur OpenAPI `/api/v1`. Ainsi, le chemin OpenA
 | GET | `/api/v1/matches/{match_id}/stats` | sous-ressource canonique de statistiques |
 | GET | `/api/v1/matches/{match_id}/odds` | dernier snapshot de cotes compatible |
 | GET | `/api/v1/matches/{match_id}/prediction` | prédiction publiée et calibrée |
+| GET | `/api/v1/football/predictions/{match_id}` | probabilités 1X2 du modèle football versionné (`candidate`) |
 | GET | `/api/v1/picks` | signaux modèle publiés |
 | GET | `/api/v1/value` | évaluations value déterministes |
 | GET | `/api/v1/performance` | santé, séries et calibration du modèle |

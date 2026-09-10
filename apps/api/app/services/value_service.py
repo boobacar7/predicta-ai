@@ -1,5 +1,5 @@
 from app.domain import value_engine as ve
-from app.schemas import MatchDetail, OddsSnapshot, ValueOpportunity, ValuePreview
+from app.schemas import MatchDetail, OddsSelection, OddsSnapshot, ValueOpportunity, ValuePreview
 from app.services.projections import to_match_summary
 
 
@@ -67,5 +67,5 @@ def best_opportunity(match: MatchDetail) -> ValueOpportunity | None:
     return max(items, key=lambda item: item.edge_raw or -1)
 
 
-def _selection_for(odds: OddsSnapshot, selection: str):
+def _selection_for(odds: OddsSnapshot, selection: str) -> OddsSelection | None:
     return next((item for item in odds.selections if item.selection == selection), None)

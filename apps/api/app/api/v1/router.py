@@ -1,4 +1,5 @@
-from datetime import date
+from datetime import date, datetime
+from typing import Annotated
 
 from fastapi import APIRouter, Query, Request
 
@@ -120,6 +121,16 @@ def get_match_prediction(
 ) -> dict[str, object]:
     match = _container(request).matches.get_match(match_id)
     return envelope(request, filter_market(match, market, "prediction"))
+
+
+@router.get("/football/predictions/{match_id}")
+def get_football_model_prediction(
+    request: Request,
+    match_id: str,
+    cutoff_at: Annotated[datetime | None, Query()] = None,
+) -> dict[str, object]:
+    prediction = _container(request).football_predictions().predict(match_id, cutoff_at)
+    return envelope(request, prediction, data_mode="live")
 
 
 @router.get("/picks")

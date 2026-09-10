@@ -10,5 +10,9 @@ def test_alembic_heads_data_ingestion() -> None:
     config.set_main_option("script_location", str(ini.parent / "alembic"))
     script = ScriptDirectory.from_config(config)
     revisions = list(script.walk_revisions())
-    assert [item.revision for item in revisions] == ["0002_data_ingestion", "0001_initial"]
-    assert script.get_current_head() == "0002_data_ingestion"
+    assert [item.revision for item in revisions] == [
+        "0003_league_competition_identity",
+        "0002_data_ingestion",
+        "0001_initial",
+    ]
+    assert script.get_current_head() == "0003_league_competition_identity"

@@ -43,6 +43,7 @@ def test_openapi_paths_are_implemented() -> None:
         "/matches/{match_id}/stats",
         "/matches/{match_id}/odds",
         "/matches/{match_id}/prediction",
+        "/football/predictions/{match_id}",
         "/picks",
         "/value",
         "/performance",
