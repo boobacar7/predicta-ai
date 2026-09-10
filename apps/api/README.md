@@ -44,4 +44,5 @@ Préfixe public : `/api/v1`. Santé opérationnelle hors contrat : `GET /health`
 
 Probabilités football 1X2 du candidat Elo : `GET /api/v1/football/predictions/{match_id}`.
 Analyse PIT Odds + Value football 1X2 : `GET /api/v1/football/value/{match_id}`.
+AI Picks statistiques et déterministes : `GET /api/v1/football/ai-picks`.
 Le DTO frontend `GET /api/v1/matches/{match_id}/prediction` n'est pas modifié.

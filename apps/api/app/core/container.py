@@ -1,3 +1,8 @@
+from datetime import timedelta
+
+from app.ai_picks.config import AiPicksThresholds
+from app.ai_picks.service import AiPicksEngine
+from app.ai_picks.source import ParquetMatchCandidateSource
 from app.core.clock import Clock
 from app.core.config import Settings
 from app.odds.providers import LiveOddsProvider, MockOddsProvider, OddsProvider
@@ -45,6 +50,7 @@ class AppContainer:
             repository=odds_repository,
         )
         self._football_values: FootballValueService | None = None
+        self._football_ai_picks: AiPicksEngine | None = None
 
     def football_predictions(self) -> FootballPredictionService:
         if self._football_predictions is None:
@@ -64,6 +70,23 @@ class AppContainer:
                 odds=self.football_odds,
             )
         return self._football_values
+
+    def football_ai_picks(self) -> AiPicksEngine:
+        if self._football_ai_picks is None:
+            self._football_ai_picks = AiPicksEngine(
+                values=self.football_values(),
+                candidates=ParquetMatchCandidateSource(
+                    self.settings.football_dataset_path,
+                    self.settings.ai_picks_candidate_match_ids,
+                ),
+                thresholds=AiPicksThresholds(
+                    minimum_edge=self.settings.ai_picks_minimum_edge,
+                    minimum_ev=self.settings.ai_picks_minimum_ev,
+                    minimum_model_probability=self.settings.ai_picks_minimum_model_probability,
+                    maximum_odds_age=timedelta(seconds=self.settings.ai_picks_maximum_odds_age_seconds),
+                ),
+            )
+        return self._football_ai_picks
 
     def _build_repos(self) -> RepositoryBundle:
         if self.settings.repository == "sql":

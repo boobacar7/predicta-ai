@@ -1,8 +1,10 @@
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Query, Request
 
+from app.ai_picks.models import AiPicksQuery
 from app.api.deps import envelope, filter_market, get_container, paginate
 from app.core.container import AppContainer
 from app.schemas import AnalystRequest, MatchStatus, SportCode
@@ -141,6 +143,29 @@ def get_football_match_value(
 ) -> dict[str, object]:
     analysis = _container(request).football_values().evaluate(match_id, cutoff_at)
     return envelope(request, analysis, data_mode=analysis.metadata.data_mode)
+
+
+@router.get("/football/ai-picks")
+def get_football_ai_picks(
+    request: Request,
+    date: date | None = None,
+    league: str | None = Query(default=None, min_length=1, max_length=128),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    min_edge: Annotated[Decimal | None, Query(ge=-1, lt=1)] = None,
+    min_ev: Annotated[Decimal | None, Query(ge=-1)] = None,
+) -> dict[str, object]:
+    result = _container(request).football_ai_picks().list_picks(
+        AiPicksQuery(
+            match_date=date,
+            league=league,
+            limit=limit,
+            offset=offset,
+            minimum_edge=min_edge,
+            minimum_ev=min_ev,
+        )
+    )
+    return envelope(request, result)
 
 
 @router.get("/picks")

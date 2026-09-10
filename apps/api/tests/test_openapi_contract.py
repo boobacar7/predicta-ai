@@ -45,6 +45,7 @@ def test_openapi_paths_are_implemented() -> None:
         "/matches/{match_id}/prediction",
         "/football/predictions/{match_id}",
         "/football/value/{match_id}",
+        "/football/ai-picks",
         "/picks",
         "/value",
         "/performance",
@@ -75,6 +76,7 @@ def test_responses_match_openapi_envelopes() -> None:
         "FootballValueAnalysisEnvelope",
         client.get("/api/v1/football/value/mth_football-sportmonks-19719892").json(),
     )
+    _validate("AiPicksEnvelope", client.get("/api/v1/football/ai-picks").json())
     _validate(
         "AnalystEnvelope",
         client.post(

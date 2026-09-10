@@ -1,3 +1,4 @@
+from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -37,6 +38,11 @@ class Settings(BaseSettings):
     football_model_version: str = "football-elo-v1-candidate"
     football_registry_dir: Path = _REPO_ROOT / "workers" / "ml" / "var" / "registry"
     football_dataset_path: Path = _REPO_ROOT / "workers" / "ingestion" / "var" / "football-1x2-history.parquet"
+    ai_picks_candidate_match_ids: tuple[str, ...] = ("mth_football-sportmonks-19719892",)
+    ai_picks_minimum_edge: Decimal = Decimal("0")
+    ai_picks_minimum_ev: Decimal = Decimal("0")
+    ai_picks_minimum_model_probability: Decimal = Decimal("0")
+    ai_picks_maximum_odds_age_seconds: int = Field(default=86400, gt=0)
 
     @field_validator("cors_origins", mode="before")
     @classmethod

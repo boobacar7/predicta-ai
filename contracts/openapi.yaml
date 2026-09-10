@@ -445,6 +445,40 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
+  /football/ai-picks:
+    get:
+      operationId: getFootballAiPicks
+      tags: [Picks]
+      summary: Rank eligible football 1X2 statistical opportunities
+      description: |
+        Orchestrates the validated Prediction, Odds, and Value services, then
+        applies deterministic eligibility, scoring, and ranking. AI Picks does
+        not calculate model probabilities and does not use an LLM or randomness.
+        Candidate model status remains visible and does not imply certainty.
+        Invalid opportunities are returned with structured exclusion reasons.
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+        - $ref: "#/components/parameters/MatchDateFilter"
+        - $ref: "#/components/parameters/AiPicksLeagueFilter"
+        - $ref: "#/components/parameters/AiPicksLimit"
+        - $ref: "#/components/parameters/Offset"
+        - $ref: "#/components/parameters/MinimumEdge"
+        - $ref: "#/components/parameters/MinimumEv"
+      responses:
+        "200":
+          description: Deterministically ranked AI Picks and explicit exclusions
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiPicksEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationProblem"
+        default:
+          $ref: "#/components/responses/Problem"
+
   /picks:
     get:
       operationId: getPicks
@@ -583,6 +617,14 @@ components:
       required: false
       schema:
         $ref: "#/components/schemas/Identifier"
+    AiPicksLeagueFilter:
+      name: league
+      in: query
+      required: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
     MatchDateFilter:
       name: date
       in: query
@@ -623,6 +665,32 @@ components:
         minimum: 1
         maximum: 100
         default: 50
+    AiPicksLimit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    MinimumEdge:
+      name: min_edge
+      in: query
+      required: false
+      description: Request-level override for the centralized minimum edge.
+      schema:
+        type: number
+        minimum: -1
+        exclusiveMaximum: 1
+    MinimumEv:
+      name: min_ev
+      in: query
+      required: false
+      description: Request-level override for the centralized minimum expected value.
+      schema:
+        type: number
+        minimum: -1
     Offset:
       name: offset
       in: query
@@ -1349,6 +1417,205 @@ components:
           $ref: "#/components/schemas/FootballValueBySelection"
         metadata:
           $ref: "#/components/schemas/FootballValueMetadata"
+
+    AiPick:
+      type: object
+      additionalProperties: false
+      required:
+        - match_id
+        - sport
+        - league
+        - market
+        - selection
+        - model_probability
+        - odds
+        - implied_probability
+        - no_vig_probability
+        - edge
+        - ev
+        - opportunity_score
+        - rank
+        - odds_source
+        - model_version
+        - model_status
+        - value_engine_version
+        - ai_picks_version
+        - cutoff_at
+        - generated_at
+        - data_mode
+        - status
+      properties:
+        match_id:
+          $ref: "#/components/schemas/Identifier"
+        sport:
+          type: string
+          enum: [football]
+        league:
+          type: string
+          minLength: 1
+        market:
+          type: string
+          enum: ["1X2"]
+        selection:
+          type: string
+          enum: [HOME, DRAW, AWAY]
+        model_probability:
+          $ref: "#/components/schemas/Probability"
+        odds:
+          type: number
+          exclusiveMinimum: 1
+        implied_probability:
+          $ref: "#/components/schemas/Probability"
+        no_vig_probability:
+          $ref: "#/components/schemas/Probability"
+        edge:
+          type: number
+          exclusiveMinimum: -1
+          exclusiveMaximum: 1
+        ev:
+          type: number
+          minimum: -1
+        opportunity_score:
+          type: number
+          description: Transparent V0.1 score, exactly EV plus edge.
+        rank:
+          type: integer
+          minimum: 1
+        odds_source:
+          type: string
+          minLength: 1
+        model_version:
+          type: string
+          minLength: 1
+        model_status:
+          $ref: "#/components/schemas/FootballModelStatus"
+        value_engine_version:
+          type: string
+          minLength: 1
+        ai_picks_version:
+          type: string
+          enum: [ai-picks-0.1]
+        cutoff_at:
+          $ref: "#/components/schemas/Timestamp"
+        generated_at:
+          $ref: "#/components/schemas/Timestamp"
+        data_mode:
+          $ref: "#/components/schemas/DataMode"
+        status:
+          type: string
+          enum: [eligible]
+
+    AiPickExclusionReason:
+      type: string
+      enum:
+        - negative_ev
+        - negative_edge
+        - below_minimum_ev
+        - below_minimum_edge
+        - below_minimum_model_probability
+        - invalid_odds
+        - incomplete_market
+        - prediction_unavailable
+        - pit_unavailable
+        - invalid_prediction
+        - invalid_value
+        - stale_odds
+
+    AiPickExclusion:
+      type: object
+      additionalProperties: false
+      required: [match_id, league, market, selection, status, reason, detail]
+      properties:
+        match_id:
+          $ref: "#/components/schemas/Identifier"
+        league:
+          type: string
+          minLength: 1
+        market:
+          type: string
+          enum: ["1X2"]
+        selection:
+          type: [string, "null"]
+          enum: [HOME, DRAW, AWAY, null]
+        status:
+          type: string
+          enum: [excluded]
+        reason:
+          $ref: "#/components/schemas/AiPickExclusionReason"
+        detail:
+          type: string
+          minLength: 1
+
+    AiPicksMetadata:
+      type: object
+      additionalProperties: false
+      required:
+        - ai_picks_version
+        - scoring_formula
+        - ranking_order
+        - minimum_edge
+        - minimum_ev
+        - minimum_model_probability
+        - maximum_odds_age_seconds
+        - evaluated_matches
+        - eligible_opportunities
+        - excluded_opportunities
+        - candidate_model_allowed
+      properties:
+        ai_picks_version:
+          type: string
+          enum: [ai-picks-0.1]
+        scoring_formula:
+          type: string
+          enum: ["opportunity_score = EV + Edge"]
+        ranking_order:
+          type: string
+        minimum_edge:
+          type: number
+        minimum_ev:
+          type: number
+        minimum_model_probability:
+          type: number
+        maximum_odds_age_seconds:
+          type: integer
+          minimum: 1
+        evaluated_matches:
+          type: integer
+          minimum: 0
+        eligible_opportunities:
+          type: integer
+          minimum: 0
+        excluded_opportunities:
+          type: integer
+          minimum: 0
+        candidate_model_allowed:
+          type: boolean
+          const: true
+
+    AiPicksResult:
+      type: object
+      additionalProperties: false
+      required: [items, exclusions, total, limit, offset, metadata]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AiPick"
+        exclusions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AiPickExclusion"
+        total:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+        offset:
+          type: integer
+          minimum: 0
+        metadata:
+          $ref: "#/components/schemas/AiPicksMetadata"
 
     OddsSelection:
       type: object
@@ -2231,6 +2498,15 @@ components:
           properties:
             data:
               $ref: "#/components/schemas/FootballValueAnalysis"
+
+    AiPicksEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: "#/components/schemas/AiPicksResult"
 
     PickListEnvelope:
       allOf:
