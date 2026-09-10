@@ -10,6 +10,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from predicta_ingestion.canonical.enums import DataMode, ResourceType, SportCode
 from predicta_ingestion.clock import ensure_utc
 
+_VOLATILE_JSON_KEYS = frozenset({"rate_limit", "subscription"})
+_VOLATILE_PAGINATION_KEYS = frozenset({"next_cursor"})
+
 
 class RawEnvelope(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -37,7 +40,24 @@ class RawEnvelope(BaseModel):
 
     @property
     def checksum_sha256(self) -> str:
-        return hashlib.sha256(self.body).hexdigest()
+        return hashlib.sha256(stable_checksum_bytes(self.body)).hexdigest()
 
     def json_payload(self) -> Any:
         return json.loads(self.body.decode("utf-8"))
+
+
+def stable_checksum_bytes(body: bytes) -> bytes:
+    """Hash Sportmonks payloads without volatile quota/subscription metadata."""
+    try:
+        payload = json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return body
+    if not isinstance(payload, dict):
+        return body
+    stable = {key: value for key, value in payload.items() if key not in _VOLATILE_JSON_KEYS}
+    pagination = stable.get("pagination")
+    if isinstance(pagination, dict):
+        stable["pagination"] = {
+            key: value for key, value in pagination.items() if key not in _VOLATILE_PAGINATION_KEYS
+        }
+    return json.dumps(stable, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")

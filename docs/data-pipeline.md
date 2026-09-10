@@ -79,7 +79,7 @@ Le store filesystem (`FilesystemRawStore`) écrit :
 {root}/{data_mode}/{provider}/{yyyy}/{mm}/{dd}/{raw_id}.json
 ```
 
-Le fichier n'est jamais écrasé. Un checksum SHA-256 identique court-circuite l'écriture (déduplication). `data_mode=mock` et `live` sont des arbres disjoints.
+Le fichier n'est jamais écrasé. Un checksum SHA-256 identique court-circuite l'écriture (déduplication), y compris après réouverture du process : le store indexe les JSON déjà présents et recalcule le checksum courant à partir du body. Les métadonnées volatiles Sportmonks (`rate_limit`, `subscription`, `pagination.next_cursor`) sont exclues du checksum. `data_mode=mock` et `live` sont des arbres disjoints.
 
 PostgreSQL table `raw_payloads` : id, provider, resource_type, checksum, storage_uri, collected_at, data_mode. Pas de payload complet en base.
 

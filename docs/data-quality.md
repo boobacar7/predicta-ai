@@ -56,7 +56,7 @@ Un replay après correction de mapping produit un nouvel ingest ; le raw d'origi
 
 Rejouer le même payload (même checksum) ne crée pas de nouvelle entité. Un snapshot de cotes au même `(provider, bookmaker, match, market, available_at)` est un no-op.
 
-Relancer `ingest-history` sur la même saison Sportmonks : pas de doublon de matchs canoniques, raw inchangé, `ingestion_run_id` distinct. Si Sportmonks corrige un payload, le checksum change : nouveau raw immuable + upsert du match.
+Relancer `ingest-history` sur la même saison Sportmonks : pas de doublon de matchs canoniques, raw inchangé, `ingestion_run_id` distinct. Le quota `rate_limit`, `subscription` et le curseur de pagination du JSON Sportmonks n'entrent pas dans le checksum. Si Sportmonks corrige un payload, le checksum change : nouveau raw immuable + upsert du match.
 
 ## 5bis. Rapport d'ingestion historique
 
