@@ -409,6 +409,39 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
+  /football/value/{match_id}:
+    get:
+      operationId: getFootballMatchValue
+      tags: [Value]
+      summary: Evaluate football 1X2 value at a point-in-time cutoff
+      description: |
+        Combines the candidate Prediction Service probabilities with the latest
+        complete odds snapshot satisfying `available_at <= cutoff_at`. The Value
+        Engine never creates model probabilities. Odds, edge and EV are ratios,
+        not recommendations or guarantees.
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+        - $ref: "#/components/parameters/MatchId"
+        - $ref: "#/components/parameters/CutoffAt"
+      responses:
+        "200":
+          description: Deterministic football 1X2 value analysis
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FootballValueAnalysisEnvelope"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/ValidationProblem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+
   /picks:
     get:
       operationId: getPicks
@@ -1143,6 +1176,176 @@ components:
           minLength: 1
         generated_at:
           $ref: "#/components/schemas/Timestamp"
+
+    ValuePrediction:
+      type: object
+      additionalProperties: false
+      required: [home_probability, draw_probability, away_probability]
+      properties:
+        home_probability:
+          $ref: "#/components/schemas/Probability"
+        draw_probability:
+          $ref: "#/components/schemas/Probability"
+        away_probability:
+          $ref: "#/components/schemas/Probability"
+
+    FootballValueOdds:
+      type: object
+      additionalProperties: false
+      required:
+        - bookmaker
+        - provider_id
+        - home_odds
+        - draw_odds
+        - away_odds
+        - collected_at
+        - available_at
+      properties:
+        bookmaker:
+          type: string
+          minLength: 1
+        provider_id:
+          type: string
+          minLength: 1
+        home_odds:
+          type: number
+          exclusiveMinimum: 1
+        draw_odds:
+          type: number
+          exclusiveMinimum: 1
+        away_odds:
+          type: number
+          exclusiveMinimum: 1
+        collected_at:
+          $ref: "#/components/schemas/Timestamp"
+        available_at:
+          $ref: "#/components/schemas/Timestamp"
+
+    SelectionMarketProbabilities:
+      type: object
+      additionalProperties: false
+      required: [implied_probability, no_vig_probability]
+      properties:
+        implied_probability:
+          $ref: "#/components/schemas/Probability"
+        no_vig_probability:
+          $ref: "#/components/schemas/Probability"
+
+    FootballValueMarket:
+      type: object
+      additionalProperties: false
+      required: [overround, home, draw, away]
+      properties:
+        overround:
+          type: number
+          exclusiveMinimum: 0
+          description: Sum of the three raw implied probabilities before no-vig normalization.
+        home:
+          $ref: "#/components/schemas/SelectionMarketProbabilities"
+        draw:
+          $ref: "#/components/schemas/SelectionMarketProbabilities"
+        away:
+          $ref: "#/components/schemas/SelectionMarketProbabilities"
+
+    SelectionValue:
+      type: object
+      additionalProperties: false
+      required: [edge, ev]
+      properties:
+        edge:
+          type: number
+          exclusiveMinimum: -1
+          exclusiveMaximum: 1
+          description: Model probability minus raw implied probability.
+        ev:
+          type: number
+          minimum: -1
+          description: Model probability multiplied by decimal odds, minus 1.
+
+    FootballValueBySelection:
+      type: object
+      additionalProperties: false
+      required: [home, draw, away]
+      properties:
+        home:
+          $ref: "#/components/schemas/SelectionValue"
+        draw:
+          $ref: "#/components/schemas/SelectionValue"
+        away:
+          $ref: "#/components/schemas/SelectionValue"
+
+    FootballValueMetadata:
+      type: object
+      additionalProperties: false
+      required:
+        - value_engine_version
+        - model_version
+        - model_status
+        - dataset_version
+        - feature_schema_version
+        - odds_source
+        - cutoff_at
+        - generated_at
+        - data_mode
+      properties:
+        value_engine_version:
+          type: string
+          minLength: 1
+        model_version:
+          type: string
+          minLength: 1
+        model_status:
+          $ref: "#/components/schemas/FootballModelStatus"
+        dataset_version:
+          type: string
+          minLength: 1
+        feature_schema_version:
+          type: string
+          minLength: 1
+        odds_source:
+          type: string
+          minLength: 1
+        cutoff_at:
+          $ref: "#/components/schemas/Timestamp"
+        generated_at:
+          $ref: "#/components/schemas/Timestamp"
+        data_mode:
+          $ref: "#/components/schemas/DataMode"
+
+    FootballValueAnalysis:
+      type: object
+      additionalProperties: false
+      description: |
+        Statistical football 1X2 value analysis. It is not a betting
+        recommendation and does not guarantee an outcome or return.
+      required:
+        - match_id
+        - sport
+        - market
+        - prediction
+        - odds
+        - market_probabilities
+        - value
+        - metadata
+      properties:
+        match_id:
+          $ref: "#/components/schemas/Identifier"
+        sport:
+          type: string
+          enum: [football]
+        market:
+          type: string
+          enum: ["1X2"]
+        prediction:
+          $ref: "#/components/schemas/ValuePrediction"
+        odds:
+          $ref: "#/components/schemas/FootballValueOdds"
+        market_probabilities:
+          $ref: "#/components/schemas/FootballValueMarket"
+        value:
+          $ref: "#/components/schemas/FootballValueBySelection"
+        metadata:
+          $ref: "#/components/schemas/FootballValueMetadata"
 
     OddsSelection:
       type: object
@@ -2016,6 +2219,15 @@ components:
           properties:
             data:
               $ref: "#/components/schemas/FootballModelPrediction"
+
+    FootballValueAnalysisEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: "#/components/schemas/FootballValueAnalysis"
 
     PickListEnvelope:
       allOf:

@@ -44,6 +44,7 @@ def test_openapi_paths_are_implemented() -> None:
         "/matches/{match_id}/odds",
         "/matches/{match_id}/prediction",
         "/football/predictions/{match_id}",
+        "/football/value/{match_id}",
         "/picks",
         "/value",
         "/performance",
@@ -70,6 +71,10 @@ def test_responses_match_openapi_envelopes() -> None:
     for path, schema_name in cases:
         _validate(schema_name, client.get(path).json())
     _validate("MatchDetailEnvelope", client.get("/api/v1/matches/mth_northgate_harbor").json())
+    _validate(
+        "FootballValueAnalysisEnvelope",
+        client.get("/api/v1/football/value/mth_football-sportmonks-19719892").json(),
+    )
     _validate(
         "AnalystEnvelope",
         client.post(

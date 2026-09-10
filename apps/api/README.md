@@ -43,4 +43,5 @@ Depuis la racine : `npm run verify:api`.
 Préfixe public : `/api/v1`. Santé opérationnelle hors contrat : `GET /health`, `GET /ready`.
 
 Probabilités football 1X2 du candidat Elo : `GET /api/v1/football/predictions/{match_id}`.
+Analyse PIT Odds + Value football 1X2 : `GET /api/v1/football/value/{match_id}`.
 Le DTO frontend `GET /api/v1/matches/{match_id}/prediction` n'est pas modifié.

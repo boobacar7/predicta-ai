@@ -133,6 +133,16 @@ def get_football_model_prediction(
     return envelope(request, prediction, data_mode="live")
 
 
+@router.get("/football/value/{match_id}")
+def get_football_match_value(
+    request: Request,
+    match_id: str,
+    cutoff_at: Annotated[datetime | None, Query()] = None,
+) -> dict[str, object]:
+    analysis = _container(request).football_values().evaluate(match_id, cutoff_at)
+    return envelope(request, analysis, data_mode=analysis.metadata.data_mode)
+
+
 @router.get("/picks")
 def get_picks(
     request: Request,

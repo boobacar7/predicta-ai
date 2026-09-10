@@ -24,12 +24,22 @@ Le préfixe est défini par le serveur OpenAPI `/api/v1`. Ainsi, le chemin OpenA
 | GET | `/api/v1/matches/{match_id}/odds` | dernier snapshot de cotes compatible |
 | GET | `/api/v1/matches/{match_id}/prediction` | prédiction publiée et calibrée |
 | GET | `/api/v1/football/predictions/{match_id}` | probabilités 1X2 du modèle football versionné (`candidate`) |
+| GET | `/api/v1/football/value/{match_id}` | analyse PIT odds + value du marché football 1X2 |
 | GET | `/api/v1/picks` | signaux modèle publiés |
 | GET | `/api/v1/value` | évaluations value déterministes |
 | GET | `/api/v1/performance` | santé, séries et calibration du modèle |
 | POST | `/api/v1/ai/analyze` | explication fondée sur un fact pack |
 
 Le détail d'un match embarque actuellement `stats`, `odds` et `prediction` afin d'éviter plusieurs allers-retours dans les vues existantes. Les sous-ressources utilisent les mêmes DTO backend; elles ne doivent pas être calculées différemment.
+
+`GET /football/value/{match_id}` est le contrat backend strict du Value Engine
+0.1. Il appelle le Prediction Service existant, puis choisit le dernier
+snapshot de cotes complet tel que `available_at <= cutoff_at`. Sa réponse
+distingue les probabilités modèle, les cotes décimales, les probabilités
+implicites brutes et no-vig, puis `edge` et `ev`. Elle expose les versions du
+modèle, du dataset, du schéma de features et du moteur, ainsi que la source des
+cotes et le `data_mode`. Voir
+[`value-engine-v0.1.md`](value-engine/value-engine-v0.1.md).
 
 ## Enveloppe
 
@@ -93,6 +103,9 @@ La v1 conserve la forme déjà consommée :
 - Overround : ratio positif ou nul.
 - Edge : différence de probabilités dans `[-1, 1]`.
 - EV : `(calibrated_probability * decimal_odds) - 1`, minimum `-1`.
+- Dans `FootballValueMarket`, `overround` est la somme des probabilités
+  implicites brutes utilisée comme dénominateur no-vig. La marge conventionnelle
+  serait `overround - 1`.
 - ROI théorique : ratio de backtest, minimum `-1`; jamais une promesse.
 - `theoretical_max_drawdown` : ratio non positif dans `[-1, 0]`; `-0.084` représente une baisse maximale théorique de 8,4 %.
 - Les comptes sont des entiers positifs ou nuls.

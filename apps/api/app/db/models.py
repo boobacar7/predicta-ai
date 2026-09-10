@@ -277,19 +277,21 @@ class OddsSnapshot(Base):
             "observed_at",
             name="uq_odds_snapshot_natural",
         ),
+        UniqueConstraint("provider", "provider_id", name="uq_odds_snapshot_provider_id"),
     )
 
     id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    provider_id: Mapped[str] = mapped_column(String(255), nullable=False)
     match_id: Mapped[str] = mapped_column(ForeignKey("matches.id"), nullable=False, index=True)
     market: Mapped[str] = mapped_column(String(64), nullable=False)
     bookmaker: Mapped[str] = mapped_column(String(128), nullable=False)
     provider: Mapped[str] = mapped_column(String(128), nullable=False)
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
-    available_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    collected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    source: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    available_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    collected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    source: Mapped[str] = mapped_column(String(128), nullable=False)
     freshness: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    data_mode: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    data_mode: Mapped[str] = mapped_column(String(16), nullable=False)
     raw_payload_id: Mapped[str | None] = mapped_column(ForeignKey("raw_payloads.id"), nullable=True)
     overround: Mapped[float | None] = mapped_column(Numeric(18, 10), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -299,7 +301,10 @@ class OddsSnapshot(Base):
 
 class OddsSelection(Base):
     __tablename__ = "odds_selections"
-    __table_args__ = (CheckConstraint("decimal_odds IS NULL OR decimal_odds > 1", name="ck_odds_gt_one"),)
+    __table_args__ = (
+        CheckConstraint("decimal_odds IS NULL OR decimal_odds > 1", name="ck_odds_gt_one"),
+        UniqueConstraint("snapshot_id", "selection", name="uq_odds_snapshot_selection"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     snapshot_id: Mapped[str] = mapped_column(ForeignKey("odds_snapshots.id"), nullable=False, index=True)
