@@ -207,4 +207,28 @@ Validé par le propriétaire produit. Détail : [ADR 0005](adr/0005-data-provide
 5. Compte et région du store S3.
 6. Création des comptes et injection des secrets **hors Git**, puis branchement d'un adapter à la fois.
 
-La validation des fournisseurs **n'autorise pas** encore `PREDICTA_INGESTION_ENABLE_LIVE=true`. Le branchement est une étape séparée.
+La validation des fournisseurs **n'autorise pas** un run live sans
+`PREDICTA_INGESTION_ENABLE_LIVE=true`, `PREDICTA_INGESTION_DATA_MODE=live` et
+`SPORTMONKS_API_TOKEN` dans l'environnement local.
+
+## 9. Lancer une ingestion Sportmonks
+
+1. Créer un compte Sportmonks (plan Growth) et copier le token dans
+   `workers/ingestion/.env` uniquement : `SPORTMONKS_API_TOKEN=`.
+2. `PREDICTA_INGESTION_ENABLE_LIVE=true` et `PREDICTA_INGESTION_DATA_MODE=live`.
+3. Migrer PostgreSQL (`apps/api` revision `0002_data_ingestion`).
+4. Commande :
+
+```bash
+cd workers/ingestion
+python -m predicta_ingestion ingest-football \
+  --league all \
+  --date-from 2026-08-01 \
+  --date-to 2026-09-10
+```
+
+`--league` accepte un slug V1 ou `all`. `--dry-run` n'écrit pas PostgreSQL.
+
+Un run réel se reconnaît à `provider=sportmonks`, `data_mode=live`, et des
+fichiers sous `var/raw/live/sportmonks/`. Les fixtures `fixtures/mock` ne
+sont jamais utilisées dans ce chemin.

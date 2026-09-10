@@ -82,9 +82,9 @@ lorsque le plan Growth le permet.
 
 ## Conséquences
 
-- Le prochain pas DATA est un adapter Sportmonks Growth **ou** The Odds API,
-  après création des comptes et injection des secrets en environnement local,
-  pas dans le dépôt.
+- L'adapter Sportmonks Football V1 (ligues + fixtures) est implémenté derrière
+  `PREDICTA_INGESTION_ENABLE_LIVE` et `SPORTMONKS_API_TOKEN`. Aucune clé n'entre
+  dans Git. The Odds API n'est pas branché dans cette étape.
 - L'agent ML V1 vise football, ligues listées ci-dessus, features point-in-time.
   Il n'attend pas basketball, tennis ni event streams.
 - Un écart Growth (ligue C1 incomplète, stats absentes) déclenche une revue de

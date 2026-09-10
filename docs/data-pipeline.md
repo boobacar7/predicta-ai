@@ -109,6 +109,21 @@ fixture.fixture.status → Match.status (enum canonique)
 
 Les enums provider sont mappés vers des enums canoniques. Une valeur inconnue va en quarantaine ; elle n'est pas coercée vers `unknown` silencieusement pour les champs critiques (statut de match, marché de cotes).
 
+Mapping Sportmonks V1 (fixtures) :
+
+```text
+fixture.id                 → Match.provider_id
+starting_at (UTC)          → Match.kickoff_at / event_at
+state_id                   → Match.status
+participants.meta.location → home/away teams
+scores[description=CURRENT] → home_score / away_score (finished/live only)
+```
+
+Un match `scheduled` n'emporte pas de score, même si le JSON contient `0`.
+Un résultat `finished` a `available_at` strictement après le coup d'envoi
+(`kickoff + 3h`, ou `collected_at` s'il est plus tôt). Le PIT refuse ce
+résultat comme feature pre-match.
+
 ## 7. Résolution d'identités
 
 Ordre :
@@ -195,7 +210,15 @@ cp .env.example .env
 pytest
 ```
 
-Le mode par défaut est mock. Un run live sans validation lève `LiveIngestionDisabled`.
+Mock par défaut. Live Sportmonks :
+
+```bash
+python -m predicta_ingestion ingest-football --league premier-league --date-from 2026-08-01 --date-to 2026-09-10 --dry-run
+```
+
+Sans `PREDICTA_INGESTION_ENABLE_LIVE=true` et sans `SPORTMONKS_API_TOKEN`,
+la commande lève `LiveIngestionDisabled` ou `ProviderNotConfigured`.
+Aucun fallback mock.
 
 ## 14. Handoff ML
 

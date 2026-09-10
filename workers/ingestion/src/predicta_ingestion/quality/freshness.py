@@ -8,6 +8,7 @@ from predicta_ingestion.raw.envelope import RawEnvelope
 
 FRESH_WINDOWS = {
     ResourceType.ODDS: (timedelta(minutes=15), timedelta(hours=2)),
+    ResourceType.LEAGUES: (timedelta(hours=6), timedelta(hours=24)),
     ResourceType.FIXTURES: (timedelta(minutes=5), timedelta(minutes=30)),
     ResourceType.STANDINGS: (timedelta(hours=6), timedelta(hours=24)),
     ResourceType.INJURIES: (timedelta(hours=6), timedelta(hours=24)),

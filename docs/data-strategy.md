@@ -121,20 +121,26 @@ Les choix V1 sont dans [ADR 0005](adr/0005-data-providers-v1.md) et
 
 Aucun adapter live n'effectue d'appel réseau tant que `PREDICTA_INGESTION_ENABLE_LIVE` n'est pas activé **et** que les secrets ne sont injectés que par l'environnement.
 
+L'adapter **Sportmonks Football** (ligues V1 + fixtures) est implémenté. Il refuse
+de tourner si le live n'est pas activé ou si `SPORTMONKS_API_TOKEN` est vide.
+Il ne retombe jamais sur les fixtures mock. The Odds API reste non branché.
+
+Guide de lancement : [workers/ingestion/README.md](../workers/ingestion/README.md).
+
 ## 11. Ordre de construction
 
 1. Abstractions, schémas, PIT, mocks et tests.
 2. Validation humaine des fournisseurs V1 (**faite**, ADR 0005).
-3. Branchement contrôlé d'un adapter (Sportmonks Growth **ou** The Odds API), secrets hors Git.
+3. Branchement contrôlé de l'adapter Sportmonks Growth (secrets hors Git).
 4. Backfill football historique produit via Sportmonks sur les ligues V1.
 5. Ingestion récurrente pre-match.
-6. Basketball, puis tennis, sur les mêmes contrats.
+6. The Odds API, puis basketball, puis tennis, sur les mêmes contrats.
 
 ## 12. Hors périmètre
 
 - modèles ML, ensemble, calibration (prochaine phase, football ligues V1);
 - scraping;
-- connexion payante automatique (la validation des fournisseurs n'est pas un branchement);
+- connexion payante automatique sans `PREDICTA_INGESTION_ENABLE_LIVE=true` et token local;
 - calcul Value Engine;
 - authentification utilisateur;
 - usage produit de football-data.co.uk avant licence commerciale explicite.

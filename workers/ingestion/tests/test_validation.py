@@ -45,6 +45,22 @@ def test_rejects_mock_payload_in_live_mode(settings: Settings) -> None:
     assert exc.value.reason_code == "data_mode_mismatch"
 
 
+def test_live_payload_without_data_mode_is_accepted(settings: Settings) -> None:
+    validator = Validator(settings)
+    envelope = RawEnvelope(
+        provider="sportmonks",
+        resource=ResourceType.FIXTURES,
+        request_key="sportmonks:test",
+        collected_at="2026-09-09T18:00:00Z",
+        data_mode=DataMode.LIVE,
+        sport=SportCode.FOOTBALL,
+        body=b'{"data": []}',
+    )
+    stored = StoredRaw(raw_id="raw_live", envelope=envelope, storage_uri="memory", duplicate=False)
+    payload = validator.validate(stored, expected_mode=DataMode.LIVE)
+    assert "data_mode" not in payload
+
+
 def test_naive_datetime_is_rejected() -> None:
     from predicta_ingestion.clock import ensure_utc
 

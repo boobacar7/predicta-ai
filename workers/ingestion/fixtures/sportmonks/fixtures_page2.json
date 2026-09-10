@@ -1,0 +1,58 @@
+{
+  "data": [
+    {
+      "id": 19140002,
+      "sport_id": 1,
+      "league_id": 8,
+      "season_id": 23614,
+      "state_id": 5,
+      "venue_id": 151,
+      "name": "Liverpool vs Manchester City",
+      "starting_at": "2026-09-07 14:00:00",
+      "starting_at_timestamp": 1788789600,
+      "result_info": "Liverpool won after full-time.",
+      "placeholder": false,
+      "participants": [
+        {
+          "id": 8,
+          "name": "Liverpool",
+          "short_code": "LIV",
+          "short_name": "Liverpool",
+          "meta": {"location": "home"}
+        },
+        {
+          "id": 9,
+          "name": "Manchester City",
+          "short_code": "MCI",
+          "short_name": "Man City",
+          "meta": {"location": "away"}
+        }
+      ],
+      "scores": [
+        {
+          "description": "CURRENT",
+          "score": {"goals": 2, "participant": "home"}
+        },
+        {
+          "description": "CURRENT",
+          "score": {"goals": 1, "participant": "away"}
+        }
+      ],
+      "league": {
+        "id": 8,
+        "name": "Premier League",
+        "country": {"id": 462, "name": "England"}
+      },
+      "season": {"id": 23614, "name": "2026/2027"},
+      "venue": {"id": 151, "name": "Anfield"},
+      "state": {"id": 5, "state": "FT", "name": "Full Time", "short_name": "FT"}
+    }
+  ],
+  "pagination": {
+    "count": 1,
+    "per_page": 50,
+    "current_page": 2,
+    "next_page": null,
+    "has_more": false
+  }
+}
