@@ -62,13 +62,16 @@ Relancer `ingest-history` sur la même saison Sportmonks : pas de doublon de mat
 
 Chaque saison ingérée produit :
 
-- `competition`, `season`, `fetched_count`, `normalized_count`, `inserted_count`
+- `competition`, `season`, `season_id`, `fetched_count`, `normalized_count`, `inserted_count`
 - `duplicate_count`, `quarantined_count`, `missing_score_count`, `missing_team_count`
+- `finished_count`, `future_count`, `other_status_count`, `team_count`
 - `date_min`, `date_max`, `provider`, `data_mode`, `ingestion_run_id`
 
 Les saisons **découvertes** (réponse Sportmonks) sont listées même si elles ne sont pas sélectionnées. Ne pas extrapoler « N années d'historique MLS » au-delà de cette liste.
 
-Le rapport d'historique inclut aussi `identity` / `identity_summary` : pour chaque équipe, `provider_entity_id`, nom provider, canonical id/nom, `resolution_method`, `confidence`. Les ligues sont scopées par saison (`779:2024` ≠ `779:2025`). Un mapping incertain n'est pas accepté : seuls `exact_id`, un alias MLS explicite, ou un nom normalisé **unique** sont retenus.
+Le rapport d'historique inclut aussi `identity` / `identity_summary` : pour chaque équipe, `provider_entity_id`, nom provider, canonical id/nom, `resolution_method`, `confidence`. Les ligues sont scopées par saison (`779:2024` ≠ `779:2025`). Un club qui apparaît dans une deuxième compétition **réutilise** le canonical id déjà lié au `provider_id` Sportmonks : une nouvelle identité n'est jamais créée seulement parce que le club joue la Champions League. Un mapping incertain n'est pas accepté : seuls `exact_id`, un alias MLS explicite, ou un nom normalisé **unique dans la compétition** sont retenus.
+
+`standings_probes` enregistre un GET `/standings/seasons/{seasonId}` (dernière saison sélectionnée) **sans persister**. Un 401/403/404 n'interrompt pas l'ingestion des fixtures. La table saisonnière Sportmonks est un snapshot courant, pas un classement Point-in-Time : l'historique PIT exigerait `/standings/rounds/{roundId}` avec `available_at`. Le dataset `football-1x2-history-0.3` n'utilise aucun standing.
 
 ## 6. Mocks vs réel
 

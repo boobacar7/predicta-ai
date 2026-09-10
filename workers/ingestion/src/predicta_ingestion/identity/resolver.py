@@ -145,6 +145,18 @@ class IdentityResolver:
             self._resolve_odds_match(snapshot)
         return quarantined
 
+    def hydrate(self, bindings: list[IdentityBinding]) -> None:
+        """Restore previously persisted maps so later competitions reuse canonical ids."""
+        for binding in bindings:
+            key = (binding.provider, binding.entity_type.value, binding.provider_entity_id)
+            if key in self._by_provider:
+                continue
+            self._by_provider[key] = binding
+            if binding.display_name and binding.canonical_id not in self._canonical_names:
+                self._canonical_names[binding.canonical_id] = binding.display_name
+            if binding.name_key:
+                self._index_name(binding.entity_type, binding.name_key, binding.canonical_id)
+
     def bind_explicit(
         self,
         *,

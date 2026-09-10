@@ -34,9 +34,7 @@ def test_point_in_time_hides_post_match_standings_and_same_match_result(
     assert [item.id for item in later] == [match.id]
 
 
-def test_cutoff_after_kickoff_is_rejected(
-    pipeline: IngestionPipeline, football_provider: MockFootballProvider
-) -> None:
+def test_cutoff_after_kickoff_is_rejected(pipeline: IngestionPipeline, football_provider: MockFootballProvider) -> None:
     pipeline.run(football_provider, ProviderRequest(resource=ResourceType.FIXTURES))
     match = next(iter(pipeline._sink.matches.values()))
     store = PointInTimeStore(pipeline._sink)

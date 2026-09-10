@@ -33,9 +33,25 @@ def reconstruct_pre_match_elo(
 ) -> dict[str, tuple[float, float]]:
     """Walk finished matches and record ratings *before* each kickoff.
 
+    Ratings are keyed by `canonical_team_id`. All competitions share one
+    timeline: a Ligue 1 result updates the same club that later plays in the
+    Champions League.
+
     Snapshot at `event_at` (kickoff). Apply the result only at `available_at`.
     A later match whose kickoff is before the previous result is available does
     not inherit that result. Ratings after match N are never written onto N.
+
+    Equal timestamps: events are ordered by
+    `(timestamp, kind, match_id)` where snapshot `kind=0` runs before update
+    `kind=1`. Two matches that kick off at the same instant therefore both see
+    the pre-match ratings; neither result can affect the other at that
+    timestamp.
+
+    If `available_at` of match A is greater than or equal to the kickoff of
+    match B, A's result must not change B's pre-match Elo. When the two
+    timestamps are equal, B's snapshot (`kind=0`) still runs before A's update
+    (`kind=1`). The cutoff is therefore `available_at < T`, not `<=`. Remaining
+    ties use the canonical `match_id` so the walk is deterministic.
     """
     ordered = [
         item

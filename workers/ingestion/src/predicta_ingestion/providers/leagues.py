@@ -27,9 +27,7 @@ V1_FOOTBALL_LEAGUES: tuple[V1FootballLeague, ...] = (
     V1FootballLeague("champions-league", "UEFA Champions League", "Europe", 2),
 )
 
-EUROPEAN_V1_LEAGUES: tuple[V1FootballLeague, ...] = tuple(
-    item for item in V1_FOOTBALL_LEAGUES if item.slug != MLS_SLUG
-)
+EUROPEAN_V1_LEAGUES: tuple[V1FootballLeague, ...] = tuple(item for item in V1_FOOTBALL_LEAGUES if item.slug != MLS_SLUG)
 
 V1_LEAGUE_BY_SLUG = {item.slug: item for item in V1_FOOTBALL_LEAGUES}
 V1_LEAGUE_BY_SPORTMONKS_ID = {item.sportmonks_id: item for item in V1_FOOTBALL_LEAGUES}

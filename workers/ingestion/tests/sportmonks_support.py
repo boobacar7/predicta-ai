@@ -29,6 +29,7 @@ class ScriptedTransport:
         self.invalid_json_once = False
         self.rate_limit_remaining = 0
         self.not_found_substrings: list[str] = []
+        self.standings_status: int = 403
 
     def get(self, url: str, *, headers: dict[str, str], timeout: float) -> HttpResponse:
         del timeout
@@ -67,6 +68,15 @@ class ScriptedTransport:
                 status_code=404,
                 body=b'{"message":"Not Found."}',
                 headers={"X-Request-Id": "sm-test-404"},
+                url=url,
+            )
+        if "/standings/" in path:
+            if self.standings_status == 200:
+                return HttpResponse(status_code=200, body=load_sportmonks("standings_season.json"), headers={}, url=url)
+            return HttpResponse(
+                status_code=self.standings_status,
+                body=b'{"message":"This endpoint is not available on the current plan."}',
+                headers={"X-Request-Id": "sm-test-standings"},
                 url=url,
             )
         if path.endswith("/seasons"):

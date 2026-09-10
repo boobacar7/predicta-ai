@@ -19,9 +19,7 @@ def test_football_normalization_maps_status_and_unavailable_stat(
     assert unavailable[0].value is None
 
 
-def test_odds_are_not_converted_to_value_metrics(
-    pipeline: IngestionPipeline, odds_provider: MockOddsProvider
-) -> None:
+def test_odds_are_not_converted_to_value_metrics(pipeline: IngestionPipeline, odds_provider: MockOddsProvider) -> None:
     pipeline.run(odds_provider, ProviderRequest(resource=ResourceType.ODDS))
     snapshot = next(iter(pipeline._sink.odds.values()))
     assert snapshot.selections[0].decimal_odds == Decimal("1.85")

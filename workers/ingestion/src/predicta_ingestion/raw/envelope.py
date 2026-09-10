@@ -57,7 +57,5 @@ def stable_checksum_bytes(body: bytes) -> bytes:
     stable = {key: value for key, value in payload.items() if key not in _VOLATILE_JSON_KEYS}
     pagination = stable.get("pagination")
     if isinstance(pagination, dict):
-        stable["pagination"] = {
-            key: value for key, value in pagination.items() if key not in _VOLATILE_PAGINATION_KEYS
-        }
+        stable["pagination"] = {key: value for key, value in pagination.items() if key not in _VOLATILE_PAGINATION_KEYS}
     return json.dumps(stable, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")

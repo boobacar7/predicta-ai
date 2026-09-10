@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import urlencode
@@ -8,7 +9,13 @@ from urllib.parse import urlencode
 from predicta_ingestion.canonical.enums import DataMode, ResourceType, SportCode
 from predicta_ingestion.clock import Clock
 from predicta_ingestion.errors import ValidationError
-from predicta_ingestion.providers.errors import LiveIngestionDisabled, ProviderNotConfigured, ProviderUnavailable
+from predicta_ingestion.providers.errors import (
+    LiveIngestionDisabled,
+    ProviderAuthError,
+    ProviderNotConfigured,
+    ProviderRateLimited,
+    ProviderUnavailable,
+)
 from predicta_ingestion.providers.http import HttpTransport, HttpxTransport, RetryingJsonClient, Sleeper
 from predicta_ingestion.providers.leagues import V1FootballLeague, resolve_v1_leagues
 from predicta_ingestion.providers.protocols import ProviderHealth, ProviderRequest
@@ -19,7 +26,42 @@ DEFAULT_BASE_URL = "https://api.sportmonks.com/v3/football"
 MAX_FIXTURE_RANGE_DAYS = 100
 FIXTURE_INCLUDES = "participants;scores;league.country;season;venue;state"
 LEAGUE_INCLUDES = "country"
+STANDINGS_INCLUDES = "participant"
 PER_PAGE = 50
+
+
+@dataclass(frozen=True)
+class StandingsProbe:
+    """Read-only Sportmonks standings check. Never persists rows."""
+
+    competition: str
+    league_slug: str
+    season_id: str
+    endpoint: str
+    available: bool
+    http_status: int | None
+    row_count: int
+    participant_count: int
+    sample_fields: list[str]
+    pit_capable: bool
+    persisted: bool
+    detail: str
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "competition": self.competition,
+            "league_slug": self.league_slug,
+            "season_id": self.season_id,
+            "endpoint": self.endpoint,
+            "available": self.available,
+            "http_status": self.http_status,
+            "row_count": self.row_count,
+            "participant_count": self.participant_count,
+            "sample_fields": self.sample_fields,
+            "pit_capable": self.pit_capable,
+            "persisted": self.persisted,
+            "detail": self.detail,
+        }
 
 
 class SportmonksFootballProvider:
@@ -77,6 +119,68 @@ class SportmonksFootballProvider:
         if request.resource is ResourceType.FIXTURES:
             envelopes.extend(self._fetch_fixtures(request, leagues))
         return envelopes
+
+    def probe_standings(self, *, league: V1FootballLeague, season_id: str) -> StandingsProbe:
+        """GET /standings/seasons/{id} once. 401/403/404 do not abort history ingest."""
+        self._require_live()
+        endpoint = f"/standings/seasons/{season_id}"
+        try:
+            envelope = self._get_envelope(
+                path=endpoint,
+                query={"include": STANDINGS_INCLUDES},
+                resource=ResourceType.STANDINGS,
+                request_key=f"sportmonks:standings:season:{season_id}",
+            )
+        except ProviderAuthError:
+            return _standings_probe(
+                league=league,
+                season_id=season_id,
+                endpoint=endpoint,
+                available=False,
+                http_status=None,
+                detail="Sportmonks rejected the standings request (401/403). Not persisted.",
+            )
+        except ProviderRateLimited:
+            return _standings_probe(
+                league=league,
+                season_id=season_id,
+                endpoint=endpoint,
+                available=False,
+                http_status=429,
+                detail="Sportmonks rate-limited the standings probe. Not persisted.",
+            )
+        except ProviderUnavailable as exc:
+            return _standings_probe(
+                league=league,
+                season_id=season_id,
+                endpoint=endpoint,
+                available=False,
+                http_status=_http_status_from_detail(exc.detail),
+                detail=exc.detail,
+            )
+        payload = self._parse_json(envelope.body)
+        rows = _standings_rows(payload)
+        fields = sorted({key for row in rows if isinstance(row, dict) for key in row})
+        participants = {
+            row.get("participant_id") for row in rows if isinstance(row, dict) and row.get("participant_id") is not None
+        }
+        return _standings_probe(
+            league=league,
+            season_id=season_id,
+            endpoint=endpoint,
+            available=True,
+            http_status=200,
+            row_count=len(rows),
+            participant_count=len(participants),
+            sample_fields=fields,
+            pit_capable=False,
+            persisted=False,
+            detail=(
+                "Season table is a current snapshot, not point-in-time. "
+                "Historical PIT would require /standings/rounds/{roundId} with available_at. "
+                "Rows were not persisted."
+            ),
+        )
 
     def _require_live(self) -> None:
         if not self._enable_live:
@@ -232,6 +336,55 @@ class SportmonksFootballProvider:
         if message and "data" not in payload:
             raise ProviderUnavailable(self.name, redact_text(str(message), self._token))
         return payload
+
+
+def _standings_probe(
+    *,
+    league: V1FootballLeague,
+    season_id: str,
+    endpoint: str,
+    available: bool,
+    http_status: int | None,
+    detail: str,
+    row_count: int = 0,
+    participant_count: int = 0,
+    sample_fields: list[str] | None = None,
+    pit_capable: bool = False,
+    persisted: bool = False,
+) -> StandingsProbe:
+    return StandingsProbe(
+        competition=league.name,
+        league_slug=league.slug,
+        season_id=season_id,
+        endpoint=endpoint,
+        available=available,
+        http_status=http_status,
+        row_count=row_count,
+        participant_count=participant_count,
+        sample_fields=sample_fields or [],
+        pit_capable=pit_capable,
+        persisted=persisted,
+        detail=detail,
+    )
+
+
+def _standings_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    data = payload.get("data")
+    if isinstance(data, list):
+        return [item for item in data if isinstance(item, dict)]
+    if isinstance(data, dict):
+        return [data]
+    return []
+
+
+def _http_status_from_detail(detail: str) -> int | None:
+    if "HTTP 404" in detail:
+        return 404
+    if "HTTP 400" in detail:
+        return 400
+    if "HTTP 429" in detail:
+        return 429
+    return None
 
 
 def _date_window(request: ProviderRequest, now: datetime) -> tuple[datetime, datetime]:

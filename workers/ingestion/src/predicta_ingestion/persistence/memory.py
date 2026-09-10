@@ -147,8 +147,7 @@ class MemoryCanonicalSink:
 
     def _dedupe_standings(self, incoming: list[StandingSnapshot], result: PersistResult) -> list[StandingSnapshot]:
         seen = {
-            (item.league_id, item.season, item.team_id, item.as_of, item.provenance.provider)
-            for item in self.standings
+            (item.league_id, item.season, item.team_id, item.as_of, item.provenance.provider) for item in self.standings
         }
         accepted: list[StandingSnapshot] = []
         for item in incoming:
@@ -192,4 +191,3 @@ class TeeCanonicalSink:
         recorder = getattr(self._sql, "record_run", None)
         if callable(recorder):
             recorder(**kwargs)
-

@@ -19,7 +19,7 @@ from predicta_ingestion.ids import stable_entity_id
 from predicta_ingestion.ml.dataset import MlDataset, build_ml_dataset
 from predicta_ingestion.ml.export import write_dataset_artifacts
 from predicta_ingestion.ml.quality import build_quality_report
-from predicta_ingestion.persistence.load import load_memory_sink
+from predicta_ingestion.persistence.load import hydrate_resolver_from_sql, load_memory_sink
 from predicta_ingestion.persistence.memory import MemoryCanonicalSink, TeeCanonicalSink
 from predicta_ingestion.persistence.sql import SqlCanonicalSink
 from predicta_ingestion.pipeline import IngestionPipeline, IngestionReport
@@ -56,7 +56,7 @@ def main(argv: list[str] | None = None) -> int:
         "build-ml-dataset",
         help="Build a point-in-time 1X2 dataset from ingested PostgreSQL rows. Does not train a model.",
     )
-    dataset.add_argument("--league", default="mls", help=f"League slug, alias (MLS), or 'all'. {_LEAGUE_HELP}")
+    dataset.add_argument("--league", default="all", help=f"League slug, alias (MLS), or 'all'. {_LEAGUE_HELP}")
     dataset.add_argument(
         "--season",
         help="Limit labeled rows to this season name (Elo/form still use earlier PIT facts).",
@@ -129,14 +129,15 @@ def _dispatch(args: argparse.Namespace, settings: Settings) -> dict[str, object]
                 payload["dataset_paths"] = write_dataset_artifacts(dataset, output)
         return payload
     if args.command == "build-ml-dataset":
-        dataset = build_dataset_from_sql(
-            settings=settings,
-            league=args.league,
-            season=getattr(args, "season", None),
+        store = _sql_store(settings)
+        dataset = build_ml_dataset(
+            store,
+            competition=None if args.league in {None, "", "all"} else args.league,
+            seasons=None if not getattr(args, "season", None) else [args.season],
         )
         payload = _dataset_summary(dataset)
-        payload["dataset_paths"] = write_dataset_artifacts(dataset, args.write_dataset)
-        payload["quality"] = build_quality_report(dataset)
+        payload["dataset_paths"] = write_dataset_artifacts(dataset, args.write_dataset, store=store)
+        payload["quality"] = build_quality_report(dataset, store=store)
         return payload
     raise RuntimeError(f"Unknown command '{args.command}'.")
 
@@ -208,19 +209,24 @@ def run_history(
 def build_dataset_from_sql(
     *,
     settings: Settings,
-    league: str = "mls",
+    league: str = "all",
     season: str | None = None,
 ) -> MlDataset:
+    store = _sql_store(settings)
+    seasons = None if not season else [season]
+    return build_ml_dataset(
+        store,
+        competition=None if league in {None, "", "all"} else league,
+        seasons=seasons,
+    )
+
+
+def _sql_store(settings: Settings) -> PointInTimeStore:
     engine = create_engine(settings.database_url, pool_pre_ping=True, future=True)
     sink = load_memory_sink(engine)
     if not sink.matches:
         raise RuntimeError("No ingested matches in PostgreSQL. Run ingest-history before building the dataset.")
-    seasons = None if not season else [season]
-    return build_ml_dataset(
-        PointInTimeStore(sink),
-        competition=None if league in {None, "", "all"} else league,
-        seasons=seasons,
-    )
+    return PointInTimeStore(sink)
 
 
 def _dataset_summary(dataset: MlDataset) -> dict[str, object]:
@@ -229,13 +235,17 @@ def _dataset_summary(dataset: MlDataset) -> dict[str, object]:
         reasons[item.reason] = reasons.get(item.reason, 0) + 1
     return {
         "dataset_version": dataset.dataset_version,
+        "feature_schema_version": dataset.feature_schema_version,
         "code_version": dataset.code_version,
         "cutoff_policy": dataset.cutoff_policy,
+        "source": dataset.source,
+        "generated_at": dataset.generated_at.isoformat(),
         "observation_count": dataset.observation_count,
         "rejected_count": dataset.rejected_count,
         "rejection_reasons": reasons,
         "feature_count": len(dataset.feature_schema),
         "standings_available": dataset.standings_available,
+        "competitions": dataset.competitions,
         "seasons": dataset.seasons,
         "period_start": dataset.period_start.isoformat() if dataset.period_start else None,
         "period_end": dataset.period_end.isoformat() if dataset.period_end else None,
@@ -269,21 +279,24 @@ def _assert_live_ready(settings: Settings) -> None:
 def _build_pipeline(settings: Settings, clock: Clock, *, dry_run: bool, history: bool) -> IngestionPipeline:
     raw_store = FilesystemRawStore(Path(settings.raw_store_path))
     memory = MemoryCanonicalSink()
+    resolver = IdentityResolver(clock)
     sink: MemoryCanonicalSink | SqlCanonicalSink | TeeCanonicalSink
     if dry_run:
         sink = memory
     elif history:
         engine = create_engine(settings.database_url, pool_pre_ping=True, future=True)
+        hydrate_resolver_from_sql(resolver, engine)
         sink = TeeCanonicalSink(memory, SqlCanonicalSink(clock=clock, engine=engine))
     else:
         engine = create_engine(settings.database_url, pool_pre_ping=True, future=True)
+        hydrate_resolver_from_sql(resolver, engine)
         sink = SqlCanonicalSink(clock=clock, engine=engine)
     return IngestionPipeline(
         settings=settings,
         clock=clock,
         raw_store=raw_store,
         sink=sink,
-        resolver=IdentityResolver(clock),
+        resolver=resolver,
         dry_run=dry_run,
     )
 

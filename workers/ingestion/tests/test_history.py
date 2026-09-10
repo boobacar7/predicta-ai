@@ -79,17 +79,36 @@ def test_history_quality_report_counts_mls_seasons(clock, live_settings: Setting
     assert all(item.provider == "sportmonks" for item in report.seasons)
     assert all(item.data_mode == "live" for item in report.seasons)
     assert all(item.ingestion_run_id == report.ingestion_run_id for item in report.seasons)
+    assert by_season["2024"].finished_count == 2
+    assert by_season["2024"].future_count == 1
+    payload = report.to_dict()
+    totals = payload["totals"]
+    assert totals["finished_count"] == 4
+    assert totals["future_count"] == 1
+    assert totals["team_count"] >= 1
+    identity_summary = payload["identity_summary"]
+    assert identity_summary["er_issue_count"] == 0
+    assert report.standings_probes
+    assert report.standings_probes[0].available is False
+    assert report.standings_probes[0].persisted is False
+    assert report.standings_probes[0].pit_capable is False
     sink = memory_sink(pipeline)
+    leagues = {item.season: item for item in sink.leagues.values() if item.name == "Major League Soccer"}
+    assert leagues["2024"].competition_id == "mls"
+    assert leagues["2024"].provider_season_id == "18001"
     for match in sink.matches.values():
         assert match.provenance.provider == "sportmonks"
         assert match.provenance.raw_payload_id
         assert match.provenance.event_at == match.kickoff_at
         assert match.kickoff_at.tzinfo is not None
+        league = sink.leagues[match.league_id]
+        assert league.competition_id == "mls"
+        assert league.provider_season_id
+        assert league.season
+        assert league.name == "Major League Soccer"
 
 
-def test_history_fetch_uses_documented_season_and_fixture_endpoints(
-    clock, live_settings: Settings, tmp_path
-) -> None:
+def test_history_fetch_uses_documented_season_and_fixture_endpoints(clock, live_settings: Settings, tmp_path) -> None:
     transport = ScriptedTransport()
     pipeline = _history_pipeline(clock, live_settings, tmp_path)
     ingest_history(
@@ -104,11 +123,11 @@ def test_history_fetch_uses_documented_season_and_fixture_endpoints(
     assert any(urlparse(url).path.rstrip("/").endswith("/seasons") for url in urls)
     assert any("seasonLeagues:779" in url for url in decoded)
     assert any(
-        urlparse(url).path.rstrip("/").endswith("/fixtures") and "fixtureSeasons:18001" in unquote(url)
-        for url in urls
+        urlparse(url).path.rstrip("/").endswith("/fixtures") and "fixtureSeasons:18001" in unquote(url) for url in urls
     )
     assert not any("/fixtures/seasons/" in url for url in urls)
     assert not any("/leagues/779" in url and "seasons" in url for url in urls)
+    assert any("/standings/seasons/" in url for url in urls)
     assert all("api_token" not in url for url in urls)
     for url, headers in transport.calls:
         assert_no_secret_in(url)
@@ -275,3 +294,25 @@ def test_european_history_does_not_fetch_uncapped_seasons(clock, live_settings: 
     assert not any("fixtureSeasons:23611" in url for url in decoded)
     assert any("fixtureSeasons:23614" in url for url in decoded)
     assert not any("/fixtures/seasons/" in url for url in urls)
+
+
+def test_standings_probe_does_not_persist_or_abort(clock, live_settings: Settings, tmp_path) -> None:
+    transport = ScriptedTransport()
+    transport.standings_status = 200
+    pipeline = _history_pipeline(clock, live_settings, tmp_path)
+    report = ingest_history(
+        provider=_provider(clock, transport),
+        pipeline=pipeline,
+        clock=clock,
+        league="mls",
+        season="18002",
+    )
+    assert report.standings_probes[0].available is True
+    assert report.standings_probes[0].row_count == 2
+    assert report.standings_probes[0].persisted is False
+    assert report.standings_probes[0].pit_capable is False
+    assert memory_sink(pipeline).standings == []
+    dumped = json.dumps(report.to_dict())
+    assert TEST_SPORTMONKS_TOKEN not in dumped
+    urls = [url for url, _ in transport.calls]
+    assert any("/standings/seasons/18002" in url for url in urls)

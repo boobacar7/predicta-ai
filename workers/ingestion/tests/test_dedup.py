@@ -17,9 +17,7 @@ def test_raw_checksum_deduplicates(pipeline: IngestionPipeline, football_provide
     assert len(pipeline._sink.matches) == 1
 
 
-def test_odds_snapshot_natural_key_deduplicates(
-    pipeline: IngestionPipeline, odds_provider: MockOddsProvider
-) -> None:
+def test_odds_snapshot_natural_key_deduplicates(pipeline: IngestionPipeline, odds_provider: MockOddsProvider) -> None:
     pipeline.run(odds_provider, ProviderRequest(resource=ResourceType.ODDS))
     pipeline.run(odds_provider, ProviderRequest(resource=ResourceType.ODDS))
     assert len(pipeline._sink.odds) == 1

@@ -14,7 +14,7 @@ from predicta_ingestion.pipeline import IngestionPipeline
 from predicta_ingestion.providers.leagues import V1FootballLeague, resolve_v1_leagues
 from predicta_ingestion.providers.protocols import ProviderRequest
 from predicta_ingestion.providers.seasons import DiscoveredSeason, parse_discovered_seasons, select_seasons
-from predicta_ingestion.providers.sportmonks import SportmonksFootballProvider
+from predicta_ingestion.providers.sportmonks import SportmonksFootballProvider, StandingsProbe
 from predicta_ingestion.quality.history import SeasonQualityReport, build_season_quality_report
 from predicta_ingestion.raw.envelope import RawEnvelope
 
@@ -28,6 +28,8 @@ class HistoryIngestReport:
     discovered: list[dict[str, object]] = field(default_factory=list)
     seasons: list[SeasonQualityReport] = field(default_factory=list)
     identity: list[IdentityDiagnostic] = field(default_factory=list)
+    standings_probes: list[StandingsProbe] = field(default_factory=list)
+    unique_team_count: int = 0
 
     def to_dict(self) -> dict[str, object]:
         identity_rows = [item.to_dict() for item in self.identity]
@@ -50,13 +52,20 @@ class HistoryIngestReport:
             "identity_summary": {
                 "resolved_by_method": methods,
                 "quarantined_count": quarantined_identity,
+                "er_issue_count": quarantined_identity,
             },
+            "standings_probes": [item.to_dict() for item in self.standings_probes],
+            "competitions": _competition_rollups(self.seasons, self.discovered, self.unique_team_count),
             "totals": {
                 "fetched_count": sum(item.fetched_count for item in self.seasons),
                 "normalized_count": sum(item.normalized_count for item in self.seasons),
                 "inserted_count": sum(item.inserted_count for item in self.seasons),
                 "duplicate_count": sum(item.duplicate_count for item in self.seasons),
                 "quarantined_count": sum(item.quarantined_count for item in self.seasons),
+                "finished_count": sum(item.finished_count for item in self.seasons),
+                "future_count": sum(item.future_count for item in self.seasons),
+                "other_status_count": sum(item.other_status_count for item in self.seasons),
+                "team_count": self.unique_team_count,
             },
         }
 
@@ -118,6 +127,15 @@ def ingest_history(
                     run_id=run_id,
                 )
             )
+        if selected:
+            report.standings_probes.append(provider.probe_standings(league=item, season_id=selected[-1].provider_id))
+    team_ids = {item.id for item in sink.teams.values()}
+    for match in sink.matches.values():
+        if match.home_team_id:
+            team_ids.add(match.home_team_id)
+        if match.away_team_id:
+            team_ids.add(match.away_team_id)
+    report.unique_team_count = len(team_ids)
     recorder = getattr(pipeline._sink, "record_run", None)
     if callable(recorder) and not pipeline._dry_run:
         has_quarantine = any(item.quarantined_count for item in report.seasons)
@@ -133,6 +151,40 @@ def ingest_history(
         )
     report.identity = pipeline._resolver.identity_report()
     return report
+
+
+def _competition_rollups(
+    seasons: list[SeasonQualityReport],
+    discovered: list[dict[str, object]],
+    unique_team_count: int,
+) -> list[dict[str, object]]:
+    grouped: dict[str, list[SeasonQualityReport]] = {}
+    discovered_by: dict[str, list[dict[str, object]]] = {}
+    for item in seasons:
+        grouped.setdefault(item.competition, []).append(item)
+    for row in discovered:
+        name = str(row.get("competition") or "")
+        discovered_by.setdefault(name, []).append(row)
+    rollups: list[dict[str, object]] = []
+    for name, rows in grouped.items():
+        found = discovered_by.get(name, [])
+        rollups.append(
+            {
+                "competition": name,
+                "discovered_season_count": len(found),
+                "selected_season_count": len(rows),
+                "fetched_count": sum(item.fetched_count for item in rows),
+                "normalized_count": sum(item.normalized_count for item in rows),
+                "inserted_count": sum(item.inserted_count for item in rows),
+                "duplicate_count": sum(item.duplicate_count for item in rows),
+                "quarantined_count": sum(item.quarantined_count for item in rows),
+                "finished_count": sum(item.finished_count for item in rows),
+                "future_count": sum(item.future_count for item in rows),
+                "other_status_count": sum(item.other_status_count for item in rows),
+                "team_count": unique_team_count if len(grouped) == 1 else sum(item.team_count for item in rows),
+            }
+        )
+    return rollups
 
 
 def memory_sink(pipeline: IngestionPipeline) -> MemoryCanonicalSink:
@@ -208,8 +260,7 @@ def _ingest_season(
     season_matches = [
         match
         for match in sink.matches.values()
-        if _match_in_season(match, sink, discovered, league)
-        and _within_dates(match, date_from, date_to)
+        if _match_in_season(match, sink, discovered, league) and _within_dates(match, date_from, date_to)
     ]
     after_ids = {item.id for item in season_matches}
     inserted = after_ids - before_ids

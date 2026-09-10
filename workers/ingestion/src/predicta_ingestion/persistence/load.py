@@ -6,9 +6,11 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from predicta_ingestion.canonical.enums import DataMode, MatchStatus, SportCode
+from predicta_ingestion.canonical.enums import DataMode, EntityType, MatchStatus, ResolutionMethod, SportCode
 from predicta_ingestion.canonical.models import League, Match, Provenance, Sport, Team
 from predicta_ingestion.clock import ensure_utc
+from predicta_ingestion.identity.keys import team_name_key
+from predicta_ingestion.identity.resolver import IdentityBinding, IdentityResolver
 from predicta_ingestion.persistence.memory import MemoryCanonicalSink
 
 
@@ -25,7 +27,12 @@ def load_memory_sink(engine: Engine) -> MemoryCanonicalSink:
                 provenance=_catalog_provenance(row["id"], created),
             )
         for row in connection.execute(
-            text("SELECT id, sport_id, name, country, season, tier, created_at FROM leagues")
+            text(
+                """
+                SELECT id, sport_id, name, country, season, tier, slug, provider_season_id, created_at
+                FROM leagues
+                """
+            )
         ).mappings():
             created = _utc(row["created_at"])
             sink.leagues[row["id"]] = League(
@@ -35,6 +42,8 @@ def load_memory_sink(engine: Engine) -> MemoryCanonicalSink:
                 country=row["country"],
                 season=row["season"],
                 tier=row["tier"],
+                competition_id=row["slug"],
+                provider_season_id=row["provider_season_id"],
                 provenance=_catalog_provenance(row["id"], created),
             )
         for row in connection.execute(
@@ -63,6 +72,83 @@ def load_memory_sink(engine: Engine) -> MemoryCanonicalSink:
             match = _match_from_row(dict(row))
             sink.matches[match.id] = match
     return sink
+
+
+def hydrate_resolver_from_sql(resolver: IdentityResolver, engine: Engine) -> int:
+    """Load provider_entity_maps so sequential competition ingest reuses canonical ids."""
+    bindings: list[IdentityBinding] = []
+    with engine.connect() as connection:
+        teams = {
+            row["id"]: Team(
+                id=row["id"],
+                sport_id=row["sport_id"],
+                league_id=row["league_id"],
+                name=row["name"],
+                short_name=row["short_name"],
+                abbreviation=row["abbreviation"],
+                provenance=_catalog_provenance(row["id"], _utc(row["created_at"])),
+            )
+            for row in connection.execute(
+                text("SELECT id, sport_id, league_id, name, short_name, abbreviation, created_at FROM teams")
+            ).mappings()
+        }
+        leagues = {
+            row["id"]: League(
+                id=row["id"],
+                sport_id=row["sport_id"],
+                name=row["name"],
+                country=row["country"],
+                season=row["season"],
+                tier=row["tier"],
+                competition_id=row["slug"] if "slug" in row else None,
+                provider_season_id=row["provider_season_id"] if "provider_season_id" in row else None,
+                provenance=_catalog_provenance(row["id"], _utc(row["created_at"])),
+            )
+            for row in connection.execute(
+                text(
+                    """
+                    SELECT id, sport_id, name, country, season, tier, slug, provider_season_id, created_at
+                    FROM leagues
+                    """
+                )
+            ).mappings()
+        }
+        for row in connection.execute(
+            text(
+                """
+                SELECT provider, entity_type, provider_entity_id, canonical_id,
+                       resolution_method, confidence
+                FROM provider_entity_maps
+                """
+            )
+        ).mappings():
+            entity_type = EntityType(row["entity_type"])
+            method_raw = row["resolution_method"] or ResolutionMethod.EXACT_ID.value
+            try:
+                method = ResolutionMethod(method_raw)
+            except ValueError:
+                method = ResolutionMethod.EXACT_ID
+            name_key = None
+            display_name = None
+            if entity_type is EntityType.TEAM:
+                team = teams.get(row["canonical_id"])
+                if team is not None:
+                    name_key, _aliased = team_name_key(team, leagues.get(team.league_id))
+                    display_name = team.name
+            bindings.append(
+                IdentityBinding(
+                    provider=row["provider"],
+                    entity_type=entity_type,
+                    provider_entity_id=row["provider_entity_id"],
+                    canonical_id=row["canonical_id"],
+                    method=method,
+                    confidence=float(row["confidence"] or 1.0),
+                    name_key=name_key,
+                    display_name=display_name,
+                )
+            )
+    resolver.hydrate(bindings)
+    return len(bindings)
 
 
 def _match_from_row(row: dict[str, Any]) -> Match:

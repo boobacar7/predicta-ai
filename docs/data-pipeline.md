@@ -181,7 +181,7 @@ Reproductibilité d'un dataset :
 2. lire via `PointInTimeStore` ;
 3. construire `build_ml_dataset(competition, seasons, cutoff_policy)` ;
 4. hasher les canonical ids + `available_at` max par type ;
-5. enregistrer le hash à côté de `dataset_version` (`football-1x2-history-0.2`).
+5. enregistrer le hash à côté de `dataset_version` (`football-1x2-history-0.3`).
 
 Correction d'un payload Sportmonks : le raw d'origine reste immuable. Un payload
 corrigé (checksum différent) crée un nouvel enregistrement raw et un upsert
@@ -209,16 +209,19 @@ Une composition publiée après le coup d'envoi n'entre pas dans les features pr
 
 Les features de forme football (`predicta_ingestion.ml.features`) n'utilisent que des
 matchs dont `event_at < kickoff` et `available_at < kickoff`. Fenêtres rolling 5 et
-10, plus les totaux prior. Un résultat pas encore disponible est exclu.
+10. Un résultat pas encore disponible est exclu. Le match cible n'entre jamais
+dans sa propre fenêtre.
 
 Le rating Elo pré-match (`predicta_ingestion.ml.elo`) est une reconstruction
-historique, pas un entraînement : snapshot au `event_at`, mise à jour uniquement
-quand `available_at` est atteint. Paramètres : initial 1500, K=20, avantage
-domicile +80. Le rating après le match N n'est jamais réinjecté dans le match N.
+historique **globale**, pas un entraînement : une seule timeline, clé
+`canonical_team_id`, toutes compétitions. Snapshot au `event_at`, mise à jour
+uniquement à `available_at`. Si `available_at` de A est `>=` kickoff de B, le
+résultat de A n'influence pas B. À timestamp égal, les snapshots précèdent les
+updates (`kind` 0 puis 1), puis `match_id`. Paramètres : initial 1500, K=20,
+avantage domicile +80. Le rating après le match N n'est jamais réinjecté dans N.
 
-Les classements ne sont pas encore ingérés depuis Sportmonks. Les features
-`home_standing_rank` / `away_standing_rank` restent `null` tant que des
-`StandingSnapshot` PIT-valides n'existent pas. Ils ne sont pas interpolés.
+Les classements Sportmonks ne sont **pas** des features du dataset
+`football-1x2-history-0.3`. Un snapshot saisonnier courant n'est pas Point-in-Time.
 
 ## 11. Cotes et Value Engine
 
@@ -268,7 +271,26 @@ python -m predicta_ingestion build-ml-dataset --league MLS --write-dataset ./var
 ```
 
 `--dry-run` ne écrit ni PostgreSQL ni le store raw. Le rapport d'ingestion liste
-les saisons **découvertes** (réponse provider) et celles **sélectionnées**.
+les saisons **découvertes** (réponse provider) et celles **sélectionnées**, avec
+`finished_count`, `future_count`, `duplicate_count`, `quarantined_count`,
+`team_count` et un `standings_probes` (lecture seule, jamais persisté).
+
+Extension multi-compétitions (dry-run uniquement, pas d'ingestion massive) :
+
+```bash
+python -m predicta_ingestion ingest-history --league premier-league --dry-run
+python -m predicta_ingestion ingest-history --league ligue-1 --dry-run
+python -m predicta_ingestion ingest-history --league la-liga --dry-run
+python -m predicta_ingestion ingest-history --league bundesliga --dry-run
+python -m predicta_ingestion ingest-history --league serie-a --dry-run
+python -m predicta_ingestion ingest-history --league champions-league --dry-run
+python -m predicta_ingestion ingest-history --league MLS --dry-run
+```
+
+L'Europe est bornée aux 3 dernières saisons Sportmonks sauf `--all-seasons`.
+La MLS conserve toutes les saisons découvertes. L'Elo multi-compétitions doit
+être reconstruit sur l'union chronologique des matchs (même `canonical_team_id`
+en ligue et en Coupe d'Europe) ; ce n'est pas un second id club.
 
 Détail ML : [ml-dataset.md](ml-dataset.md).
 
@@ -277,7 +299,7 @@ Détail ML : [ml-dataset.md](ml-dataset.md).
 L'agent ML doit :
 
 - importer `predicta_ingestion.pit` et `predicta_ingestion.ml` plutôt que de joindre SQL librement;
-- versionner les définitions de features (`football-1x2-history-0.2`);
+- versionner les définitions de features (`football-1x2-history-0.3` / `football-1x2-features-0.3`);
 - n'utiliser que `available_at < cutoff` et `event_at < cutoff`;
 - traiter `availability=unavailable` et les ranks nuls comme donnée manquante;
 - ignorer toute ligne `data_mode=mock` dans un entraînement présenté comme réel;

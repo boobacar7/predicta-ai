@@ -219,7 +219,7 @@ class SportmonksFootballNormalizer:
         league_raw: dict[str, Any] = {
             "id": league_id,
             "name": (catalog.name if catalog else str(nested_league.get("name") or "")),
-            "season": {"name": season_name},
+            "season": {"id": raw.get("id"), "name": season_name},
         }
         if catalog is not None:
             league_raw["country"] = {"name": catalog.country}
@@ -246,6 +246,8 @@ class SportmonksFootballNormalizer:
             country=country_name or (catalog.country if catalog else "Unknown"),
             season=season,
             tier=1,
+            competition_id=catalog.slug if catalog is not None else None,
+            provider_season_id=_season_provider_id(raw),
             provenance=self._provenance(
                 stored,
                 provider_id=league_provider_key(provider_id, season),
@@ -403,7 +405,7 @@ def _score_for(scores: list[Any], location: str) -> int | None:
             current.append(item)
         elif description in {"2ND_HALF", "FULLTIME", "FULL_TIME", "FT"}:
             fallback.append(item)
-    chosen = (current or fallback)
+    chosen = current or fallback
     if not chosen:
         return None
     goals = chosen[0].get("score", {}).get("goals") if isinstance(chosen[0].get("score"), dict) else None
@@ -435,3 +437,12 @@ def _season_name(raw: dict[str, Any]) -> str:
     if raw.get("season_id") is not None:
         return str(raw["season_id"])
     return "unknown"
+
+
+def _season_provider_id(raw: dict[str, Any]) -> str | None:
+    season = raw.get("season")
+    if isinstance(season, dict) and season.get("id") is not None:
+        return str(season["id"])
+    if raw.get("season_id") is not None:
+        return str(raw["season_id"])
+    return None

@@ -204,13 +204,15 @@ class SqlCanonicalSink:
     def _upsert_league(self, league: League, now: object) -> None:
         self._execute(
             """
-            INSERT INTO leagues (id, sport_id, name, country, season, tier, created_at)
-            VALUES (:id, :sport_id, :name, :country, :season, :tier, :created_at)
+            INSERT INTO leagues (id, sport_id, name, country, season, tier, slug, provider_season_id, created_at)
+            VALUES (:id, :sport_id, :name, :country, :season, :tier, :slug, :provider_season_id, :created_at)
             ON CONFLICT (id) DO UPDATE SET
                 name = EXCLUDED.name,
                 country = EXCLUDED.country,
                 season = EXCLUDED.season,
-                tier = EXCLUDED.tier
+                tier = EXCLUDED.tier,
+                slug = EXCLUDED.slug,
+                provider_season_id = EXCLUDED.provider_season_id
             """,
             {
                 "id": league.id,
@@ -219,6 +221,8 @@ class SqlCanonicalSink:
                 "country": league.country,
                 "season": league.season,
                 "tier": league.tier,
+                "slug": league.competition_id,
+                "provider_season_id": league.provider_season_id,
                 "created_at": now,
             },
         )
@@ -231,8 +235,7 @@ class SqlCanonicalSink:
             ON CONFLICT (id) DO UPDATE SET
                 name = EXCLUDED.name,
                 short_name = EXCLUDED.short_name,
-                abbreviation = EXCLUDED.abbreviation,
-                league_id = EXCLUDED.league_id
+                abbreviation = EXCLUDED.abbreviation
             """,
             {
                 "id": team.id,

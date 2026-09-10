@@ -205,3 +205,82 @@ def test_identity_diagnostic_does_not_embed_tokens(clock: Clock) -> None:
     }
     assert row.provider_entity_id == "55"
     assert row.provider_name == "Austin FC"
+
+
+def _competition_league(clock: Clock, *, name: str, sportmonks_id: int, season: str, country: str) -> League:
+    sport_id = stable_entity_id("sport", SportCode.FOOTBALL.value)
+    return League(
+        id=stable_entity_id("league", SportCode.FOOTBALL.value, "sportmonks", str(sportmonks_id), season),
+        sport_id=sport_id,
+        name=name,
+        country=country,
+        season=season,
+        provenance=_provenance(clock, f"{sportmonks_id}:{season}"),
+    )
+
+
+def test_same_sportmonks_team_id_reused_across_competitions(clock: Clock) -> None:
+    resolver = IdentityResolver(clock)
+    ligue_1 = _competition_league(clock, name="Ligue 1", sportmonks_id=301, season="2025/2026", country="France")
+    ucl = _competition_league(
+        clock, name="UEFA Champions League", sportmonks_id=2, season="2025/2026", country="Europe"
+    )
+    psg_league = _team(clock, ligue_1, "591", "Paris Saint Germain")
+    psg_europe = _team(clock, ucl, "591", "Paris Saint-Germain")
+    first = resolver.resolve(
+        CanonicalBatch(sports=[_sport(clock)], leagues=[ligue_1], teams=[psg_league]),
+        data_mode=DataMode.LIVE,
+    )
+    second = resolver.resolve(
+        CanonicalBatch(sports=[_sport(clock)], leagues=[ucl], teams=[psg_europe]),
+        data_mode=DataMode.LIVE,
+    )
+    assert first == []
+    assert second == []
+    assert psg_europe.id == psg_league.id
+    assert resolver.lookup("sportmonks", EntityType.TEAM, "591") == psg_league.id
+    team_bindings = [item for item in resolver.bindings() if item.entity_type is EntityType.TEAM]
+    assert len({item.canonical_id for item in team_bindings}) == 1
+
+
+def test_same_display_name_in_two_competitions_does_not_mint_a_shared_canonical(clock: Clock) -> None:
+    resolver = IdentityResolver(clock)
+    premier = _competition_league(clock, name="Premier League", sportmonks_id=8, season="2025/2026", country="England")
+    mls = _mls_league(clock, "2025")
+    united_pl = _team(clock, premier, "14", "Manchester United")
+    united_mls = _team(clock, mls, "6708", "Manchester United")
+    resolver.resolve(
+        CanonicalBatch(sports=[_sport(clock)], leagues=[premier], teams=[united_pl]),
+        data_mode=DataMode.LIVE,
+    )
+    quarantined = resolver.resolve(
+        CanonicalBatch(sports=[_sport(clock)], leagues=[mls], teams=[united_mls]),
+        data_mode=DataMode.LIVE,
+    )
+    assert quarantined == []
+    assert united_mls.id != united_pl.id
+    assert resolver.lookup("sportmonks", EntityType.TEAM, "14") == united_pl.id
+    assert resolver.lookup("sportmonks", EntityType.TEAM, "6708") == united_mls.id
+
+
+def test_hydrated_identity_store_reuses_canonical_across_competitions(clock: Clock) -> None:
+    first = IdentityResolver(clock)
+    ligue_1 = _competition_league(clock, name="Ligue 1", sportmonks_id=301, season="2025/2026", country="France")
+    psg = _team(clock, ligue_1, "591", "Paris Saint Germain")
+    first.resolve(
+        CanonicalBatch(sports=[_sport(clock)], leagues=[ligue_1], teams=[psg]),
+        data_mode=DataMode.LIVE,
+    )
+    restored = IdentityResolver(clock)
+    restored.hydrate(first.bindings())
+    ucl = _competition_league(
+        clock, name="UEFA Champions League", sportmonks_id=2, season="2025/2026", country="Europe"
+    )
+    psg_ucl = _team(clock, ucl, "591", "Paris Saint-Germain")
+    quarantined = restored.resolve(
+        CanonicalBatch(sports=[_sport(clock)], leagues=[ucl], teams=[psg_ucl]),
+        data_mode=DataMode.LIVE,
+    )
+    assert quarantined == []
+    assert psg_ucl.id == psg.id
+    assert restored.lookup("sportmonks", EntityType.TEAM, "591") == psg.id

@@ -20,6 +20,10 @@ class SeasonQualityReport:
     quarantined_count: int
     missing_score_count: int
     missing_team_count: int
+    finished_count: int
+    future_count: int
+    other_status_count: int
+    team_count: int
     date_min: datetime | None
     date_max: datetime | None
     provider: str
@@ -39,6 +43,10 @@ class SeasonQualityReport:
             "quarantined_count": self.quarantined_count,
             "missing_score_count": self.missing_score_count,
             "missing_team_count": self.missing_team_count,
+            "finished_count": self.finished_count,
+            "future_count": self.future_count,
+            "other_status_count": self.other_status_count,
+            "team_count": self.team_count,
             "date_min": self.date_min.isoformat() if self.date_min else None,
             "date_max": self.date_max.isoformat() if self.date_max else None,
             "provider": self.provider,
@@ -70,6 +78,11 @@ def build_season_quality_report(
         for item in quarantined
         if item.reason_code in {"missing_provider_id", "same_team"} or "participant" in item.detail.lower()
     )
+    finished = [item for item in matches if item.status is MatchStatus.FINISHED]
+    future = [item for item in matches if item.status is MatchStatus.SCHEDULED]
+    team_ids = {item.home_team_id for item in matches if item.home_team_id} | {
+        item.away_team_id for item in matches if item.away_team_id
+    }
     return SeasonQualityReport(
         competition=competition,
         season=season,
@@ -81,6 +94,10 @@ def build_season_quality_report(
         quarantined_count=len(quarantined),
         missing_score_count=missing_scores,
         missing_team_count=missing_teams,
+        finished_count=len(finished),
+        future_count=len(future),
+        other_status_count=len(matches) - len(finished) - len(future),
+        team_count=len(team_ids),
         date_min=min(kickoffs) if kickoffs else None,
         date_max=max(kickoffs) if kickoffs else None,
         provider=provider,

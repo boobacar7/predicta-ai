@@ -93,6 +93,8 @@ class League(Base):
     country: Mapped[str] = mapped_column(String(128), nullable=False)
     season: Mapped[str] = mapped_column(String(32), nullable=False)
     tier: Mapped[int] = mapped_column(Integer, nullable=False)
+    slug: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    provider_season_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     sport: Mapped[Sport] = relationship(back_populates="leagues")
