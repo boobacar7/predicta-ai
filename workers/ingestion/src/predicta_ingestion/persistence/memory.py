@@ -20,6 +20,7 @@ from predicta_ingestion.canonical.models import (
     TeamStats,
 )
 from predicta_ingestion.quality.quarantine import QuarantineItem
+from predicta_ingestion.raw.store import StoredRaw
 
 
 @dataclass
@@ -34,6 +35,10 @@ T = TypeVar("T")
 
 class CanonicalSink(Protocol):
     def persist(self, batch: CanonicalBatch) -> PersistResult: ...
+
+    def record_raw(self, stored: StoredRaw) -> None: ...
+
+    def persist_identity(self, bindings: object) -> None: ...
 
 
 class MemoryCanonicalSink:
@@ -60,7 +65,7 @@ class MemoryCanonicalSink:
         result.inserted += self._upsert_map(self.leagues, {item.id: item for item in batch.leagues})
         result.inserted += self._upsert_map(self.teams, {item.id: item for item in batch.teams})
         result.inserted += self._upsert_map(self.players, {item.id: item for item in batch.players})
-        result.inserted += self._upsert_map(self.matches, {item.id: item for item in batch.matches})
+        result.inserted += self._upsert_matches({item.id: item for item in batch.matches})
         result.inserted += self._upsert_map(self.events, {item.id: item for item in batch.events})
         result.inserted += self._upsert_map(self.injuries, {item.id: item for item in batch.injuries})
         result.inserted += self._upsert_map(self.lineups, {item.id: item for item in batch.lineups})
@@ -81,8 +86,24 @@ class MemoryCanonicalSink:
         self.raw_checksums.add(checksum)
         return False
 
+    def record_raw(self, stored: StoredRaw) -> None:
+        del stored
+
+    def persist_identity(self, bindings: object) -> None:
+        return None
+
     def finished_matches(self) -> list[Match]:
         return [match for match in self.matches.values() if match.status is MatchStatus.FINISHED]
+
+    def _upsert_matches(self, incoming: dict[str, Match]) -> int:
+        written = 0
+        for key, value in incoming.items():
+            existing = self.matches.get(key)
+            if existing is not None and existing == value:
+                continue
+            self.matches[key] = value
+            written += 1
+        return written
 
     def _upsert_map(self, target: dict[str, T], incoming: dict[str, T]) -> int:
         inserted = 0

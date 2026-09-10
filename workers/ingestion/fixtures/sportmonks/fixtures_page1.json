@@ -1,0 +1,49 @@
+{
+  "data": [
+    {
+      "id": 19140001,
+      "sport_id": 1,
+      "league_id": 8,
+      "season_id": 23614,
+      "state_id": 1,
+      "venue_id": 214,
+      "name": "Arsenal vs Chelsea",
+      "starting_at": "2026-09-12 15:00:00",
+      "starting_at_timestamp": 1789225200,
+      "result_info": null,
+      "placeholder": false,
+      "participants": [
+        {
+          "id": 19,
+          "name": "Arsenal",
+          "short_code": "ARS",
+          "short_name": "Arsenal",
+          "meta": {"location": "home"}
+        },
+        {
+          "id": 18,
+          "name": "Chelsea",
+          "short_code": "CHE",
+          "short_name": "Chelsea",
+          "meta": {"location": "away"}
+        }
+      ],
+      "scores": [],
+      "league": {
+        "id": 8,
+        "name": "Premier League",
+        "country": {"id": 462, "name": "England"}
+      },
+      "season": {"id": 23614, "name": "2026/2027"},
+      "venue": {"id": 214, "name": "Emirates Stadium"},
+      "state": {"id": 1, "state": "NS", "name": "Not Started", "short_name": "NS"}
+    }
+  ],
+  "pagination": {
+    "count": 1,
+    "per_page": 50,
+    "current_page": 1,
+    "next_page": "https://api.sportmonks.com/v3/football/fixtures/between/2026-09-01/2026-09-14?page=2",
+    "has_more": true
+  }
+}

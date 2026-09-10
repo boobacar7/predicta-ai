@@ -16,12 +16,14 @@ class ProviderRequest:
         since: datetime | None = None,
         until: datetime | None = None,
         cursor: str | None = None,
+        league: str | None = None,
     ) -> None:
         self.resource = resource
         self.sport = sport
         self.since = since
         self.until = until
         self.cursor = cursor
+        self.league = league
 
 
 class ProviderHealth:

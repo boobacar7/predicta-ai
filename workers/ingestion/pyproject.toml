@@ -8,8 +8,11 @@ version = "0.1.0"
 description = "PREDICTA AI sports data ingestion, normalization and point-in-time reads."
 requires-python = ">=3.12"
 dependencies = [
-  "pydantic>=2.9",
-  "pydantic-settings>=2.5",
+    "httpx>=0.27",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.5",
+    "psycopg[binary]>=3.2",
+    "sqlalchemy>=2.0",
 ]
 
 [project.optional-dependencies]

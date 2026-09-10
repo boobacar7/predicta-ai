@@ -39,11 +39,6 @@ class ApiFootballProvider(DisabledLiveAdapter):
         super().__init__(name="api_football", enable_live=enable_live, api_key=api_key)
 
 
-class SportmonksFootballProvider(DisabledLiveAdapter):
-    def __init__(self, *, enable_live: bool, api_key: str) -> None:
-        super().__init__(name="sportmonks", enable_live=enable_live, api_key=api_key)
-
-
 class TheOddsApiProvider(DisabledLiveAdapter):
     def __init__(self, *, enable_live: bool, api_key: str) -> None:
         super().__init__(name="the_odds_api", enable_live=enable_live, api_key=api_key)
@@ -60,6 +55,7 @@ class ApiTennisProvider(DisabledLiveAdapter):
 
 
 RESOURCE_CONTRACT: dict[str, tuple[ResourceType, ...]] = {
+    "sportmonks": (ResourceType.LEAGUES, ResourceType.FIXTURES),
     "api_football": (
         ResourceType.FIXTURES,
         ResourceType.STANDINGS,

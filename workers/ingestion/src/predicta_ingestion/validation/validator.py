@@ -33,9 +33,15 @@ class Validator:
         if not isinstance(payload, dict):
             raise ValidationError("invalid_json", "Raw JSON root must be an object.")
         declared = payload.get("data_mode")
-        if declared != envelope.data_mode.value:
+        if envelope.data_mode is DataMode.MOCK:
+            if declared != DataMode.MOCK.value:
+                raise ValidationError(
+                    "data_mode_mismatch",
+                    "Payload data_mode must match the envelope and cannot be omitted.",
+                )
+        elif declared == DataMode.MOCK.value:
             raise ValidationError(
                 "data_mode_mismatch",
-                "Payload data_mode must match the envelope and cannot be omitted.",
+                "A mock fixture cannot be advertised as live data.",
             )
         return payload

@@ -34,6 +34,7 @@ class DataMode(StrEnum):
 
 
 class ResourceType(StrEnum):
+    LEAGUES = "leagues"
     FIXTURES = "fixtures"
     STANDINGS = "standings"
     MATCH_EVENTS = "match_events"

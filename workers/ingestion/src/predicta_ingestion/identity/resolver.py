@@ -15,6 +15,7 @@ class IdentityBinding:
     provider_entity_id: str
     canonical_id: str
     method: ResolutionMethod
+    confidence: float = 1.0
     name_key: str | None = None
 
 
@@ -30,6 +31,9 @@ class IdentityResolver:
     def lookup(self, provider: str, entity_type: EntityType, provider_entity_id: str) -> str | None:
         binding = self._by_provider.get((provider, entity_type.value, provider_entity_id))
         return None if binding is None else binding.canonical_id
+
+    def bindings(self) -> list[IdentityBinding]:
+        return list(self._by_provider.values())
 
     def resolve(self, batch: CanonicalBatch, *, data_mode: DataMode) -> list[QuarantineItem]:
         quarantined: list[QuarantineItem] = []
@@ -79,6 +83,7 @@ class IdentityResolver:
             provider_entity_id=provider_entity_id,
             canonical_id=canonical_id,
             method=ResolutionMethod.MANUAL,
+            confidence=1.0,
             name_key=name_key,
         )
         self._by_name.setdefault((entity_type.value, name_key), set()).add(canonical_id)
@@ -125,6 +130,7 @@ class IdentityResolver:
             provider_entity_id=provenance.provider_id,
             canonical_id=canonical_id,
             method=ResolutionMethod.EXACT_ID,
+            confidence=1.0,
             name_key=name_key,
         )
         self._by_name.setdefault((entity_type.value, name_key), set()).add(canonical_id)

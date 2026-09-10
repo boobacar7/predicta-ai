@@ -1,0 +1,30 @@
+{
+  "data": {
+    "id": 8,
+    "sport_id": 1,
+    "country_id": 462,
+    "name": "Premier League",
+    "active": true,
+    "short_code": "UK PL",
+    "type": "league",
+    "sub_type": "domestic",
+    "last_played_at": "2026-09-07 16:00:00",
+    "country": {
+      "id": 462,
+      "name": "England",
+      "official_name": "England",
+      "fifa_name": "ENG",
+      "iso2": "EN"
+    },
+    "season": {
+      "id": 23614,
+      "sport_id": 1,
+      "league_id": 8,
+      "name": "2026/2027",
+      "finished": false,
+      "is_current": true,
+      "starting_at": "2026-08-14",
+      "ending_at": "2027-05-23"
+    }
+  }
+}
