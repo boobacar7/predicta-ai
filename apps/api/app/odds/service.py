@@ -9,7 +9,7 @@ from app.odds.exceptions import (
 )
 from app.odds.providers import OddsProvider
 from app.odds.repository import OddsRepository
-from app.odds.types import FOOTBALL_1X2_MARKET, Football1x2Selection, OddsSnapshot
+from app.odds.types import FOOTBALL_1X2_MARKET, Football1x2Selection, OddsSnapshot, is_complete_football_1x2
 
 
 class OddsService:
@@ -24,14 +24,24 @@ class OddsService:
         market: str,
         cutoff_at: datetime,
     ) -> OddsSnapshot:
-        for snapshot in self._provider.fetch(match_id, market):
+        try:
+            fetched = self._provider.fetch(match_id, market)
+        except OddsUnavailableError:
+            fetched = ()
+
+        for snapshot in fetched:
             if snapshot.data_mode != self._provider.data_mode:
                 raise OddsUnavailableError("Odds provider returned an inconsistent data_mode.")
             if snapshot.source != self._provider.source:
                 raise OddsUnavailableError("Odds provider returned an inconsistent source.")
             self._repository.append(snapshot)
 
-        history = self._repository.history(match_id, market)
+        history = self._repository.history(
+            match_id,
+            market,
+            source=self._provider.source,
+            data_mode=self._provider.data_mode,
+        )
         eligible = tuple(item for item in history if item.available_at <= cutoff_at)
         if not eligible:
             if any(item.available_at > cutoff_at for item in history):
@@ -40,7 +50,8 @@ class OddsService:
                 )
             raise OddsUnavailableError("No odds snapshot is available for this match and market.")
 
-        snapshot = eligible[-1]
+        complete = tuple(item for item in eligible if is_complete_football_1x2(item))
+        snapshot = complete[-1] if complete else eligible[-1]
         self._validate_complete_market(snapshot)
         return snapshot
 

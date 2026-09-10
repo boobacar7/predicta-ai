@@ -10,7 +10,8 @@ def parse_rfc3339(value: str) -> datetime:
 
 
 def to_rfc3339(value: datetime) -> str:
-    utc_value = value.astimezone(UTC).replace(microsecond=0)
+    # Preserve fractional seconds so PIT cutoffs remain replayable.
+    utc_value = value.astimezone(UTC)
     return utc_value.isoformat().replace("+00:00", "Z")
 
 

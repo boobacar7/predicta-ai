@@ -68,3 +68,9 @@ class OddsSnapshot:
             raise ValueError("Odds snapshot must contain at least one selection.")
         if len(selections) != len(set(selections)):
             raise ValueError("Odds snapshot contains duplicate selections.")
+
+
+def is_complete_football_1x2(snapshot: OddsSnapshot) -> bool:
+    if snapshot.market != FOOTBALL_1X2_MARKET:
+        return False
+    return {item.selection for item in snapshot.selections} == set(Football1x2Selection)

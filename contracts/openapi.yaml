@@ -416,9 +416,12 @@ paths:
       summary: Evaluate football 1X2 value at a point-in-time cutoff
       description: |
         Combines the candidate Prediction Service probabilities with the latest
-        complete odds snapshot satisfying `available_at <= cutoff_at`. The Value
-        Engine never creates model probabilities. Odds, edge and EV are ratios,
-        not recommendations or guarantees.
+        complete odds snapshot from the active provider source and `data_mode`
+        that satisfies `available_at <= cutoff_at`. A newer incomplete snapshot
+        does not mask an older complete snapshot. The request cutoff bounds both
+        prediction and odds selection: no snapshot with `available_at > cutoff_at`
+        is used. The Value Engine never creates model probabilities. Odds, edge
+        and EV are ratios, not recommendations or guarantees.
       parameters:
         - $ref: "#/components/parameters/XRequestId"
         - $ref: "#/components/parameters/MatchId"
@@ -709,7 +712,7 @@ components:
     Timestamp:
       type: string
       format: date-time
-      description: RFC 3339 timestamp with timezone, normalized to UTC on persistence.
+      description: RFC 3339 timestamp with timezone, normalized to UTC. Fractional seconds are preserved so point-in-time cutoffs remain replayable.
 
     NullableTimestamp:
       anyOf:

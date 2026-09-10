@@ -4,13 +4,20 @@ from datetime import datetime
 from threading import RLock
 from typing import Protocol
 
-from app.odds.types import OddsSnapshot
+from app.odds.types import DataMode, OddsSnapshot
 
 
 class OddsRepository(Protocol):
     def append(self, snapshot: OddsSnapshot) -> None: ...
 
-    def history(self, match_id: str, market: str) -> tuple[OddsSnapshot, ...]: ...
+    def history(
+        self,
+        match_id: str,
+        market: str,
+        *,
+        source: str | None = None,
+        data_mode: DataMode | None = None,
+    ) -> tuple[OddsSnapshot, ...]: ...
 
 
 class InMemoryOddsRepository:
@@ -33,12 +40,22 @@ class InMemoryOddsRepository:
             self._snapshots[snapshot.id] = snapshot
             self._provider_ids[provider_key] = snapshot.id
 
-    def history(self, match_id: str, market: str) -> tuple[OddsSnapshot, ...]:
+    def history(
+        self,
+        match_id: str,
+        market: str,
+        *,
+        source: str | None = None,
+        data_mode: DataMode | None = None,
+    ) -> tuple[OddsSnapshot, ...]:
         with self._lock:
             snapshots = (
                 item
                 for item in self._snapshots.values()
-                if item.match_id == match_id and item.market == market
+                if item.match_id == match_id
+                and item.market == market
+                and (source is None or item.source == source)
+                and (data_mode is None or item.data_mode == data_mode)
             )
             return tuple(sorted(snapshots, key=_snapshot_order))
 

@@ -22,6 +22,16 @@ from app.value_engine.models import (
     ValuePrediction,
 )
 
+_REQUIRED_PREDICTION_METADATA = (
+    "model_version",
+    "model_status",
+    "dataset_version",
+    "feature_schema_version",
+    "cutoff_at",
+    "cutoff_policy",
+    "generated_at",
+)
+
 
 class PredictionService(Protocol):
     def predict(self, match_id: str, cutoff_at: datetime | None) -> FootballModelPrediction: ...
@@ -41,11 +51,12 @@ class FootballValueService:
 
     def evaluate(self, match_id: str, cutoff_at: datetime | None) -> FootballValueAnalysis:
         prediction = self._predictions.predict(match_id, cutoff_at)
-        model_probabilities = self._validate_prediction(prediction, match_id)
+        model_probabilities = self._validate_prediction(prediction, match_id, cutoff_at)
+        odds_cutoff = cutoff_at if cutoff_at is not None else prediction.cutoff_at
         snapshot = self._odds.market_at(
             match_id=match_id,
             market=FOOTBALL_1X2_MARKET,
-            cutoff_at=prediction.cutoff_at,
+            cutoff_at=odds_cutoff,
         )
         odds_by_selection = {
             item.selection: item.decimal_odds
@@ -115,19 +126,38 @@ class FootballValueService:
     def _validate_prediction(
         prediction: FootballModelPrediction,
         match_id: str,
+        requested_cutoff: datetime | None,
     ) -> dict[Football1x2Selection, Decimal]:
-        if prediction.match_id != match_id:
-            raise InvalidPredictionError("Prediction match_id does not match the requested match.")
-        if prediction.sport != SPORT_FOOTBALL or prediction.market != FOOTBALL_1X2_MARKET:
-            raise InvalidPredictionError("Prediction is incompatible with football 1X2 value.")
         try:
-            probabilities = {
-                Football1x2Selection.HOME: calculator.probability(prediction.home_probability),
-                Football1x2Selection.DRAW: calculator.probability(prediction.draw_probability),
-                Football1x2Selection.AWAY: calculator.probability(prediction.away_probability),
-            }
-        except ValueError as exc:
-            raise InvalidPredictionError(str(exc)) from exc
+            if prediction.match_id != match_id:
+                raise InvalidPredictionError("Prediction match_id does not match the requested match.")
+            if prediction.sport != SPORT_FOOTBALL or prediction.market != FOOTBALL_1X2_MARKET:
+                raise InvalidPredictionError("Prediction is incompatible with football 1X2 value.")
+            FootballValueService._require_metadata(prediction)
+            if requested_cutoff is not None and prediction.cutoff_at > requested_cutoff:
+                raise InvalidPredictionError(
+                    "Prediction cutoff_at is after the requested cutoff_at."
+                )
+            try:
+                probabilities = {
+                    Football1x2Selection.HOME: calculator.probability(prediction.home_probability),
+                    Football1x2Selection.DRAW: calculator.probability(prediction.draw_probability),
+                    Football1x2Selection.AWAY: calculator.probability(prediction.away_probability),
+                }
+            except (AttributeError, TypeError, ValueError) as exc:
+                raise InvalidPredictionError(str(exc) or "Prediction probabilities are invalid.") from exc
+        except AttributeError as exc:
+            raise InvalidPredictionError("Prediction is missing required metadata.") from exc
         if abs(sum(probabilities.values(), Decimal(0)) - Decimal(1)) > Decimal("0.000000001"):
             raise InvalidPredictionError("Prediction probabilities must sum to 1.")
         return probabilities
+
+    @staticmethod
+    def _require_metadata(prediction: FootballModelPrediction) -> None:
+        try:
+            values = {name: getattr(prediction, name) for name in _REQUIRED_PREDICTION_METADATA}
+        except AttributeError as exc:
+            raise InvalidPredictionError("Prediction is missing required metadata.") from exc
+        for name, value in values.items():
+            if value is None or value == "":
+                raise InvalidPredictionError(f"Prediction is missing required metadata: {name}.")

@@ -16,6 +16,8 @@ Une évaluation exige :
 - une prédiction football 1X2 valide pour le match demandé ;
 - les probabilités `HOME`, `DRAW` et `AWAY`, chacune dans `(0, 1)`, dont la
   somme vaut `1` à la tolérance contractuelle ;
+- les métadonnées `model_version`, `model_status`, `dataset_version`,
+  `feature_schema_version` et `cutoff_at` ;
 - un snapshot complet contenant exactement les trois sélections ;
 - une cote décimale finie strictement supérieure à `1` par sélection ;
 - une source, un `provider_id`, un bookmaker et un `data_mode` explicites ;
@@ -32,7 +34,7 @@ Pour une cote décimale `O` :
 implied_probability = 1 / O
 ```
 
-Pour le marché complet :
+Les calculs utilisent `Decimal`. Pour le marché complet :
 
 ```text
 raw_i = 1 / odds_i
@@ -40,10 +42,17 @@ overround = sum(raw_i)
 no_vig_i = raw_i / overround
 ```
 
+La division décimale peut laisser un résidu d'arrondi de l'ordre de `10^-28`
+avec la précision par défaut (28 chiffres). Le moteur refuse un résidu
+strictement plus grand que `1e-18`, ce qui signale une vraie erreur
+arithmétique. Le résidu restant, s'il existe, est alloué de façon
+déterministe à la sélection `AWAY` (dernier élément de l'ordre canonique
+`HOME`, `DRAW`, `AWAY`). Les trois probabilités no-vig retournées somment
+alors exactement à `Decimal(1)` et restent dans `(0, 1)`.
+
 Dans cette version, le champ `overround` désigne explicitement la somme des
 probabilités implicites brutes, conformément au contrat HTTP. La marge au sens
-`sum(raw_i) - 1` n'est pas exposée sous ce nom. La somme des trois probabilités
-`no_vig` vaut `1`.
+`sum(raw_i) - 1` n'est pas exposée sous ce nom.
 
 Pour une probabilité modèle `p` :
 
@@ -78,18 +87,39 @@ ev = (0.60 * 2.00) - 1 = 0.20
 La frontière PIT est inclusive :
 
 ```text
-odds.available_at <= prediction.cutoff_at
+odds.available_at <= cutoff_at
 ```
 
-L'Odds Service choisit le snapshot éligible le plus récent selon
-`available_at`, puis `collected_at`, puis son identifiant stable. Si des
-snapshots existent uniquement après le cutoff, l'évaluation est refusée comme
-fuite temporelle. Un snapshot collecté ou rendu disponible après le cutoff
-n'est jamais utilisé dans un calcul historique.
+`cutoff_at` est le cutoff de la requête. Si le Prediction Service retourne un
+`prediction.cutoff_at` strictement postérieur au cutoff demandé, l'évaluation
+est refusée. L'Odds Service n'utilise jamais `prediction.cutoff_at` pour
+sélectionner une cote lorsque la requête fournit un cutoff.
+
+Convention de timestamps du domaine :
+
+```text
+collected_at <= available_at <= cutoff_at
+```
+
+`collected_at` est le moment de collecte. `available_at` est le moment où la
+donnée est utilisable. Une cote avec `available_at > cutoff_at` n'est jamais
+utilisée, y compris lorsque `available_at` dépasse le cutoff d'une seule
+microseconde.
+
+L'Odds Service choisit le snapshot **complet** éligible le plus récent selon
+`available_at`, puis `collected_at`, puis son identifiant stable. Un snapshot
+incomplet plus récent ne masque pas un snapshot complet plus ancien. Si des
+snapshots existent uniquement après le cutoff, l'évaluation est refusée
+comme fuite temporelle.
+
+Les timestamps RFC 3339 conservent les fractions de seconde. Un cutoff
+sérialisé peut donc être rejoué à l'identique.
 
 Les snapshots sont append-only. Un même identifiant interne ou un même couple
 `(source, provider_id)` ne peut pas écraser une ancienne cote. Les historiques
-restent ordonnés et rejouables.
+sont isolés par `source` et `data_mode` du provider actif. Un fetch provider
+en échec n'empêche pas le rejeu d'un historique déjà persisté pour ce
+provider ; il ne synthétise aucune cote.
 
 ## Providers et data_mode
 
@@ -150,7 +180,10 @@ transformées en données partielles.
   fraîcheur supplémentaire ;
 - aucune création d'AI Picks et aucune recommandation frontend ;
 - les limites existantes de provisioning du modèle candidate restent hors
-  périmètre.
+  périmètre ;
+- `available_at` appartient au snapshot complet, pas à chaque sélection.
+  Un adapter live futur doit assembler un snapshot atomique ; un marché
+  partiel est refusé jusqu'à complétude.
 
 L'architecture Odds/Value n'ajoute aucune dépendance à un dataset ou artefact
 local. Seul le Prediction Service conserve ses dépendances de provisioning

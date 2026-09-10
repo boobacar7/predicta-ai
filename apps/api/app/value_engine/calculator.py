@@ -7,6 +7,11 @@ from app.odds.types import Football1x2Selection, decimal_odds
 
 VALUE_ENGINE_VERSION = "value-engine-0.1"
 
+# Default Decimal precision is 28 digits. Dividing implied probabilities by the
+# overround can therefore leave a rounding residual around 10^-28. A residual
+# larger than this bound is a genuine arithmetic failure, not rounding noise.
+NO_VIG_RESIDUAL_TOLERANCE = Decimal("1e-18")
+
 
 def probability(value: Decimal | float | str) -> Decimal:
     try:
@@ -41,9 +46,20 @@ def no_vig_probabilities(
         selection: value / overround
         for selection, value in raw.items()
     }
-    if sum(normalized.values(), Decimal(0)) != Decimal(1):
+    residual = Decimal(1) - sum(normalized.values(), Decimal(0))
+    if abs(residual) > NO_VIG_RESIDUAL_TOLERANCE:
+        raise ArithmeticError("No-vig probabilities do not form a valid simplex.")
+
+    # Canonical HOME/DRAW/AWAY order. The last selection absorbs the rounding
+    # residual so the returned simplex sums to Decimal(1) exactly.
+    ordered = tuple(Football1x2Selection)
+    simplex = {selection: normalized[selection] for selection in ordered[:-1]}
+    simplex[ordered[-1]] = Decimal(1) - sum(simplex.values(), Decimal(0))
+    if any(not Decimal(0) < value < Decimal(1) for value in simplex.values()):
+        raise ArithmeticError("No-vig probabilities must each lie in (0, 1).")
+    if sum(simplex.values(), Decimal(0)) != Decimal(1):
         raise ArithmeticError("No-vig probabilities do not sum to 1.")
-    return normalized, overround
+    return simplex, overround
 
 
 def edge(model_probability: Decimal | float | str, implied: Decimal | float | str) -> Decimal:

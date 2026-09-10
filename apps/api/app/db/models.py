@@ -278,6 +278,8 @@ class OddsSnapshot(Base):
             name="uq_odds_snapshot_natural",
         ),
         UniqueConstraint("provider", "provider_id", name="uq_odds_snapshot_provider_id"),
+        CheckConstraint("data_mode IN ('mock', 'live')", name="ck_odds_snapshots_data_mode"),
+        CheckConstraint("available_at >= collected_at", name="ck_odds_snapshots_available_at"),
     )
 
     id: Mapped[str] = mapped_column(String(128), primary_key=True)

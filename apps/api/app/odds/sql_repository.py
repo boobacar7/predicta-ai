@@ -4,13 +4,15 @@ from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import Settings
 from app.db.models import OddsSelection as OddsSelectionRow
 from app.db.models import OddsSnapshot as OddsSnapshotRow
 from app.db.session import get_session_factory
-from app.odds.types import Football1x2Selection, OddsSelection, OddsSnapshot
+from app.odds.types import DataMode, Football1x2Selection, OddsSelection, OddsSnapshot
+
+_SELECTION_ORDER = {selection: index for index, selection in enumerate(Football1x2Selection)}
 
 
 class SqlOddsRepository:
@@ -21,7 +23,11 @@ class SqlOddsRepository:
 
     def append(self, snapshot: OddsSnapshot) -> None:
         with self._session_factory() as session:
-            existing = session.get(OddsSnapshotRow, snapshot.id)
+            existing = session.get(
+                OddsSnapshotRow,
+                snapshot.id,
+                options=(selectinload(OddsSnapshotRow.selections),),
+            )
             if existing is not None:
                 if self._to_domain(existing) == snapshot:
                     return
@@ -58,11 +64,21 @@ class SqlOddsRepository:
                 session.commit()
             except IntegrityError as exc:
                 session.rollback()
+                persisted = self._existing_row(session, snapshot)
+                if persisted is not None and self._to_domain(persisted) == snapshot:
+                    return
                 raise ValueError(
                     "Odds provider_id already exists; snapshots cannot be overwritten."
                 ) from exc
 
-    def history(self, match_id: str, market: str) -> tuple[OddsSnapshot, ...]:
+    def history(
+        self,
+        match_id: str,
+        market: str,
+        *,
+        source: str | None = None,
+        data_mode: DataMode | None = None,
+    ) -> tuple[OddsSnapshot, ...]:
         statement = (
             select(OddsSnapshotRow)
             .where(
@@ -76,25 +92,54 @@ class SqlOddsRepository:
                 OddsSnapshotRow.id,
             )
         )
+        if source is not None:
+            statement = statement.where(OddsSnapshotRow.source == source)
+        if data_mode is not None:
+            statement = statement.where(OddsSnapshotRow.data_mode == data_mode)
         with self._session_factory() as session:
             return tuple(self._to_domain(row) for row in session.scalars(statement))
 
     @staticmethod
+    def _existing_row(session: Session, snapshot: OddsSnapshot) -> OddsSnapshotRow | None:
+        existing = session.get(
+            OddsSnapshotRow,
+            snapshot.id,
+            options=(selectinload(OddsSnapshotRow.selections),),
+        )
+        if existing is not None:
+            return existing
+        statement = (
+            select(OddsSnapshotRow)
+            .where(
+                OddsSnapshotRow.provider == snapshot.source,
+                OddsSnapshotRow.provider_id == snapshot.provider_id,
+            )
+            .options(selectinload(OddsSnapshotRow.selections))
+        )
+        return session.scalar(statement)
+
+    @staticmethod
     def _to_domain(row: OddsSnapshotRow) -> OddsSnapshot:
+        selections = tuple(
+            sorted(
+                (
+                    OddsSelection(
+                        Football1x2Selection(item.selection),
+                        Decimal(item.decimal_odds),
+                    )
+                    for item in row.selections
+                    if item.decimal_odds is not None
+                ),
+                key=lambda item: _SELECTION_ORDER[item.selection],
+            )
+        )
         return OddsSnapshot(
             id=row.id,
             provider_id=row.provider_id,
             match_id=row.match_id,
             bookmaker=row.bookmaker,
             market=row.market,
-            selections=tuple(
-                OddsSelection(
-                    Football1x2Selection(item.selection),
-                    Decimal(item.decimal_odds),
-                )
-                for item in row.selections
-                if item.decimal_odds is not None
-            ),
+            selections=selections,
             collected_at=row.collected_at,
             available_at=row.available_at,
             source=row.source,
