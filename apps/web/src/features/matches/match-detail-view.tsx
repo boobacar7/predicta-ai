@@ -160,10 +160,6 @@ function MatchDetailContent({ match }: { match: MatchDetail }) {
           </div>
         </section>
       ) : null}
-
-      <Link href={`/ai-analyst?match_id=${match.id}`} className="inline-block text-sm text-ai-strong hover:underline">
-        Ouvrir dans l&apos;AI Analyst
-      </Link>
     </div>
   );
 }
@@ -209,6 +205,13 @@ function HistoricalIdentityContent({ identity }: { identity: HistoricalMatchIden
         label="Statistiques, cotes, prédiction et chronologie"
         reason="Ce match n'est disponible que sous forme d'identité structurelle archivée ; aucune de ces sections n'est publiée pour cet identifiant."
       />
+
+      <Link
+        href={`/ai-analyst?match_id=${identity.match_id}`}
+        className="inline-block text-sm text-ai-strong hover:underline"
+      >
+        Ouvrir dans l&apos;AI Analyst
+      </Link>
     </div>
   );
 }

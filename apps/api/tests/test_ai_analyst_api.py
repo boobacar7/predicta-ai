@@ -136,6 +136,47 @@ def test_missing_artefact_is_not_replaced_by_mock_analysis(tmp_path: Path) -> No
     )
 
 
+def test_historical_match_details_and_analyst_share_identity() -> None:
+    client = make_client()
+    match = client.get(f"/api/v1/matches/{MATCH_ID}").json()["data"]
+    analyst = client.get(f"/api/v1/football/ai-analyst/{MATCH_ID}").json()["data"]
+    assert match["match_id"] == analyst["match_id"] == MATCH_ID
+    assert match["home_team"] == analyst["home_team"] == "Lincoln Red Imps"
+    assert match["away_team"] == analyst["away_team"] == "Inter Club d'Escaldes"
+    assert match["league"] == analyst["league"] == "Champions League"
+    assert match["kickoff_at"] == analyst["kickoff_at"] == KICKOFF
+
+
+def test_football_ai_analyst_respects_pit_microseconds() -> None:
+    client = make_client()
+    _assert_problem(
+        client.get(
+            f"/api/v1/football/ai-analyst/{MATCH_ID}",
+            params={"cutoff_at": "2026-07-07T15:59:59.999999Z"},
+            headers={"X-Request-ID": "req_pit_before"},
+        ),
+        status=422,
+        type_uri="/problems/pit-features-unavailable",
+    )
+    exact = client.get(
+        f"/api/v1/football/ai-analyst/{MATCH_ID}",
+        params={"cutoff_at": KICKOFF},
+        headers={"X-Request-ID": "req_pit_exact"},
+    )
+    assert exact.status_code == 200
+    assert exact.json()["data"]["match_id"] == MATCH_ID
+    assert exact.json()["data"]["kickoff_at"] == KICKOFF
+    _assert_problem(
+        client.get(
+            f"/api/v1/football/ai-analyst/{MATCH_ID}",
+            params={"cutoff_at": "2026-07-07T16:00:00.000001Z"},
+            headers={"X-Request-ID": "req_pit_after"},
+        ),
+        status=409,
+        type_uri="/problems/temporal-leakage",
+    )
+
+
 def test_openapi_declares_football_ai_analyst() -> None:
     spec = yaml.safe_load(CONTRACT.read_text())
     assert "/football/ai-analyst/{match_id}" in spec["paths"]

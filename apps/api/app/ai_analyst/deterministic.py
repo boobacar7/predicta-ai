@@ -3,6 +3,8 @@ from __future__ import annotations
 from decimal import Decimal
 
 from app.ai_analyst.context import AnalystContext
+from app.ai_analyst.grounding import assert_statements_grounded
+from app.ai_analyst.language import FORBIDDEN_CLAIMS
 from app.ai_analyst.models import (
     ANALYST_PROVIDER_ID,
     ANALYST_VERSION,
@@ -13,24 +15,8 @@ from app.ai_analyst.models import (
     FootballAnalystFactor,
     selection_direction,
 )
+from app.ai_analyst.statements import FactualClaim, GroundedStatement, render_statements
 from app.odds.types import Football1x2Selection
-
-FORBIDDEN_CLAIMS = (
-    "garanti",
-    "guarantee",
-    "sûr",
-    "sure win",
-    "safe bet",
-    "certain",
-    "100%",
-    "blessure",
-    "injury",
-    "composition",
-    "lineup",
-    "mise",
-    "pari recommandé",
-    "gain",
-)
 
 
 def format_percent(value: Decimal) -> str:
@@ -42,6 +28,23 @@ def format_points(value: Decimal) -> str:
     rendered = f"{(value * Decimal(100)):.1f}"
     signed = rendered if value < 0 else f"+{rendered}"
     return f"{signed.replace('.', ',')} points"
+
+
+def _favorite_claims(
+    context: AnalystContext,
+    favorite: Football1x2Selection,
+    favorite_field: str,
+    probability: Decimal,
+) -> tuple[FactualClaim, ...]:
+    claims = [
+        FactualClaim("version", context.prediction.model_version, "model_version"),
+        FactualClaim("probability", float(probability), favorite_field),
+    ]
+    if favorite is Football1x2Selection.HOME and context.identity.home_team:
+        claims.append(FactualClaim("team", context.identity.home_team, "home_team"))
+    elif favorite is Football1x2Selection.AWAY and context.identity.away_team:
+        claims.append(FactualClaim("team", context.identity.away_team, "away_team"))
+    return tuple(claims)
 
 
 def selection_label(context: AnalystContext, selection: Football1x2Selection) -> str:
@@ -88,8 +91,10 @@ class DeterministicAnalystProvider:
             availability=context.context_availability(),
             missing=list(context.missing()),
         )
+        statements = self.grounded_summary(context)
+        assert_statements_grounded(context, statements)
         explanation = FootballAnalystExplanation(
-            summary=self._summary(context, favorite),
+            summary=render_statements(statements),
             key_factors=factors,
             strengths=self._strengths(context),
             risks=self._risks(context),
@@ -102,39 +107,95 @@ class DeterministicAnalystProvider:
         self._assert_no_forbidden_language(explanation.summary)
         return explanation
 
-    def _summary(self, context: AnalystContext, favorite: Football1x2Selection) -> str:
+    def grounded_summary(self, context: AnalystContext) -> tuple[GroundedStatement, ...]:
+        favorite = context.favorite_selection()
         probability = context.prediction.probability(favorite)
-        sentences = [
-            (
-                f"Le modèle {context.prediction.model_version} attribue "
-                f"{format_percent(probability)} de probabilité à {selection_label(context, favorite)}."
+        label = selection_label(context, favorite)
+        favorite_field = {
+            Football1x2Selection.HOME: "home_probability",
+            Football1x2Selection.DRAW: "draw_probability",
+            Football1x2Selection.AWAY: "away_probability",
+        }[favorite]
+        statements = [
+            GroundedStatement(
+                statement=(
+                    f"Le modèle {context.prediction.model_version} attribue "
+                    f"{format_percent(probability)} de probabilité à {label}."
+                ),
+                evidence_ids=(
+                    "prediction.model_version",
+                    f"prediction.{favorite_field}",
+                    "prediction.model_favorite",
+                ),
+                factual_claims=_favorite_claims(context, favorite, favorite_field, probability),
             )
         ]
         if context.value is not None:
-            sentences.append(
-                "La probabilité implicite brute de la cote disponible est de "
-                f"{format_percent(context.value.implied_probability)}."
-            )
-            sentences.append(
-                f"L'écart modèle-marché (edge) est de {format_points(context.value.edge)}."
-            )
-            sentences.append(
-                f"L'espérance théorique (EV) calculée par {context.value.value_engine_version} "
-                f"est de {format_points(context.value.ev)}."
+            statements.extend(
+                [
+                    GroundedStatement(
+                        statement=(
+                            "La probabilité implicite brute de la cote disponible est de "
+                            f"{format_percent(context.value.implied_probability)}."
+                        ),
+                        evidence_ids=("value.implied_probability", "value.odds"),
+                        factual_claims=(
+                            FactualClaim(
+                                "probability",
+                                float(context.value.implied_probability),
+                                "implied_probability",
+                            ),
+                        ),
+                    ),
+                    GroundedStatement(
+                        statement=f"L'écart modèle-marché (edge) est de {format_points(context.value.edge)}.",
+                        evidence_ids=("value.edge",),
+                        factual_claims=(FactualClaim("edge", float(context.value.edge), "edge"),),
+                    ),
+                    GroundedStatement(
+                        statement=(
+                            f"L'espérance théorique (EV) calculée par {context.value.value_engine_version} "
+                            f"est de {format_points(context.value.ev)}."
+                        ),
+                        evidence_ids=("value.ev", "value.value_engine_version"),
+                        factual_claims=(
+                            FactualClaim("ev", float(context.value.ev), "ev"),
+                            FactualClaim("version", context.value.value_engine_version, "value_engine_version"),
+                        ),
+                    ),
+                ]
             )
         else:
-            sentences.append(
-                "Aucune cote PIT n'est disponible dans le contexte validé ; "
-                "aucune probabilité implicite, edge ou EV n'est affirmée."
+            statements.append(
+                GroundedStatement(
+                    statement=(
+                        "Aucune cote PIT n'est disponible dans le contexte validé ; "
+                        "aucune probabilité implicite, edge ou EV n'est affirmée."
+                    ),
+                    evidence_ids=("value.odds", "value.edge", "value.ev"),
+                    factual_claims=(),
+                )
             )
-        sentences.append("Ces valeurs sont des estimations statistiques, pas un résultat futur.")
+        statements.append(
+            GroundedStatement(
+                statement="Ces valeurs sont des estimations statistiques, pas un résultat futur.",
+                evidence_ids=(),
+                factual_claims=(),
+            )
+        )
         if context.missing():
-            sentences.append(
-                "Données explicitement indisponibles : "
-                + ", ".join(context.missing())
-                + ". Elles n'ont pas été complétées."
+            statements.append(
+                GroundedStatement(
+                    statement=(
+                        "Données explicitement indisponibles : "
+                        + ", ".join(context.missing())
+                        + ". Elles n'ont pas été complétées."
+                    ),
+                    evidence_ids=(),
+                    factual_claims=(),
+                )
             )
-        return " ".join(sentences)
+        return tuple(statements)
 
     def _factors(self, context: AnalystContext, favorite: Football1x2Selection) -> list[FootballAnalystFactor]:
         factors = [

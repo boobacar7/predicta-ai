@@ -16,13 +16,17 @@ validated identity
   → Prediction Service
   → Value Engine (optionnel)
   → AnalystContext immuable
+  → AnalystEvidence (faits whitelistés)
+  → GroundedStatement (faits + narration)
   → AnalystProvider.generate_analysis(context)
+  → assert_grounded
   → GET /api/v1/football/ai-analyst/{match_id}
 ```
 
 Le LLM, s'il est branché plus tard, reste strictement downstream du contexte.
 `DeterministicAnalystProvider` est le provider par défaut et ne nécessite
-aucune clé externe.
+aucune clé externe. Un futur `LLMAnalystProvider` ne pourra produire qu'une
+narration grounded : il ne devient jamais source of truth.
 
 ## Contrat
 
@@ -68,7 +72,9 @@ Chaque facteur porte un `source` interne :
 - identifiant du snapshot de cotes lorsqu'un âge de cote est exposé
 
 Le résumé n'insère que des nombres présents dans le contexte. S'il n'y a pas
-de cote, le texte dit que l'implicite, l'edge et l'EV sont absents.
+de cote, le texte dit que l'implicite, l'edge et l'EV sont absents. Un
+pourcentage, une cote, un EV ou une équipe absents du contexte font échouer
+`assert_grounded`, y compris lorsqu'ils n'apparaissent que dans le texte.
 
 ## PIT
 
@@ -121,11 +127,24 @@ structurelle, probabilités, métadonnées modèle, value optionnelle,
 - `availability`
 - `cutoff_at` lorsqu'il s'applique
 
-Trois couches restent séparées :
+Quatre couches restent séparées :
 
-1. faits issus du contexte (`AnalystEvidence`) ;
-2. interprétation narrative (`summary`, facteurs, forces, risques) ;
-3. données indisponibles (`availability=unavailable`, `missing`).
+1. **faits** issus du contexte (`AnalystEvidence`) : identité, probabilités,
+   cotes, edge, EV, versions, cutoff, `data_mode` ;
+2. **evidence** : whitelist immuable. Un `evidence_id` inconnu est refusé ;
+3. **narration** : `GroundedStatement.statement` est une interprétation.
+   `factual_claims` doivent reproduire un champ evidence disponible.
+   Le texte rendu (`summary`, forces, risques, `confidence.basis`) est
+   rescanné : tout nombre, cote, EV, équipe ou date non présents dans le
+   contexte est rejeté. La prose qualitative sans fait nouveau reste
+   autorisée ;
+4. **frontière provider** : le provider raconte le contexte. Il ne possède
+   aucune donnée. `DeterministicAnalystProvider` émet des
+   `GroundedStatement` puis `render_statements`. Un futur
+   `LLMAnalystProvider` devra faire de même.
+
+Les DTOs `prediction` et `value` sont reconstruits par le service depuis
+`AnalystContext`, jamais depuis le texte du provider.
 
 ## Futur provider LLM
 
@@ -139,13 +158,16 @@ Le LLM ne pourra jamais modifier :
 - cotes
 - edge / EV
 - `model_version`
+- `dataset_version`
+- `value_engine_version`
 - `cutoff_at`
 - `data_mode`
 - le résultat Value Engine
 
 Le service reconstruit `prediction` et `value` depuis le contexte, puis
-appelle `assert_grounded`. Un facteur ou un texte hors evidence est refusé.
-Aucune dépendance LLM n'est ajoutée dans V0.1.
+appelle `assert_grounded`. Un facteur, une `FactualClaim` ou un texte hors
+evidence est refusé. Exemple : contexte HOME 41,7 % et résumé « HOME 80 % »
+→ rejet. Aucune dépendance LLM n'est ajoutée dans V0.1.
 
 ## Sécurité anti-hallucination
 
