@@ -118,11 +118,14 @@ Résolus par [`contracts/openapi.yaml`](../contracts/openapi.yaml) :
 - les enveloppes, erreurs RFC 9457, filtres, enums, disponibilités et fraîcheurs
   sont définis.
 
-`AiPick`, `AiPickExclusion`, `AiPicksMetadata`, `AiPicksResult` et
-`HistoricalMatchIdentity` sont des alias de
+`AiPick`, `AiPickExclusion`, `AiPicksMetadata`, `AiPicksResult`,
+`HistoricalMatchIdentity` et les types `FootballAiAnalyst*` sont des alias de
 `src/types/generated/api.ts`, régénéré par `npm run generate:api-types`
 depuis `contracts/openapi.yaml`. Le reste de `api.ts` reste manuscrit
 tant que la migration OpenAPI n'est pas totale.
+
+`GET /api/v1/football/ai-analyst/{match_id}` est le contrat backend de
+l'analyste football. Aucune page n'est branchée dans cette passe.
 
 ### Identité de match — consommé depuis `c31a367`
 

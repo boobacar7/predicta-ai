@@ -148,6 +148,16 @@ def get_football_match_value(
     return envelope(request, analysis, data_mode=analysis.metadata.data_mode)
 
 
+@router.get("/football/ai-analyst/{match_id}")
+def get_football_ai_analyst(
+    request: Request,
+    match_id: str,
+    cutoff_at: Annotated[datetime | None, Query()] = None,
+) -> dict[str, object]:
+    report = _container(request).football_ai_analyst().explain(match_id, cutoff_at)
+    return envelope(request, report, data_mode=report.analyst.data_quality.data_mode)
+
+
 @router.get("/football/ai-picks")
 def get_football_ai_picks(
     request: Request,

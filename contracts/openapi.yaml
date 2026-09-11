@@ -481,6 +481,47 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
+  /football/ai-analyst/{match_id}:
+    get:
+      operationId: getFootballAiAnalyst
+      tags: [Analyst]
+      summary: Explain a football 1X2 match from validated context only
+      description: |
+        Downstream explanation of already validated prediction, identity, and
+        optional value-engine outputs. The analyst never chooses a bet, never
+        recalculates probabilities, and never invents odds, injuries, lineups,
+        statistics, or results. Missing inputs stay `unavailable`. Temporal
+        leakage, missing predictions, and missing artefacts remain structured
+        errors. The default provider is deterministic and requires no external
+        LLM. `analysis_version` is `ai-analyst-0.1` and is distinct from
+        `value-engine-0.1`.
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+        - $ref: "#/components/parameters/MatchId"
+        - $ref: "#/components/parameters/CutoffAt"
+      responses:
+        "200":
+          description: Fact-grounded football analyst report
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FootballAiAnalystEnvelope"
+        "400":
+          $ref: "#/components/responses/ValidationProblem"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/ValidationProblem"
+        "503":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+
   /picks:
     get:
       operationId: getPicks
@@ -1632,6 +1673,249 @@ components:
         metadata:
           $ref: "#/components/schemas/AiPicksMetadata"
 
+    FootballAnalystFactorType:
+      type: string
+      enum:
+        - model_probability
+        - market_probability
+        - edge
+        - ev
+        - data_freshness
+        - model_status
+
+    FootballAnalystFactorDirection:
+      type: string
+      enum: [home, away, draw, neutral]
+
+    FootballAnalystFactor:
+      type: object
+      additionalProperties: false
+      required: [type, label, value, direction, source]
+      properties:
+        type:
+          $ref: "#/components/schemas/FootballAnalystFactorType"
+        label:
+          type: string
+          minLength: 1
+        value:
+          type: [number, "null"]
+          description: Raw numeric value from the validated context; null when the factor is qualitative.
+        direction:
+          anyOf:
+            - $ref: "#/components/schemas/FootballAnalystFactorDirection"
+            - type: "null"
+        source:
+          type: string
+          minLength: 1
+          description: Internal source identifier. Never a fabricated provider name.
+
+    FootballAnalystPrediction:
+      type: object
+      additionalProperties: false
+      required:
+        - home_probability
+        - draw_probability
+        - away_probability
+        - model_version
+        - model_status
+        - dataset_version
+        - cutoff_at
+        - source
+      properties:
+        home_probability:
+          $ref: "#/components/schemas/Probability"
+        draw_probability:
+          $ref: "#/components/schemas/Probability"
+        away_probability:
+          $ref: "#/components/schemas/Probability"
+        model_version:
+          type: string
+          minLength: 1
+        model_status:
+          $ref: "#/components/schemas/FootballModelStatus"
+        dataset_version:
+          type: string
+          minLength: 1
+        cutoff_at:
+          $ref: "#/components/schemas/Timestamp"
+        source:
+          type: string
+          minLength: 1
+
+    FootballAnalystValue:
+      type: object
+      additionalProperties: false
+      required:
+        - availability
+        - selection
+        - odds
+        - implied_probability
+        - no_vig_probability
+        - edge
+        - ev
+        - value_engine_version
+        - source
+      properties:
+        availability:
+          type: string
+          enum: [available, unavailable]
+        selection:
+          type: [string, "null"]
+          enum: [HOME, DRAW, AWAY, null]
+        odds:
+          type: [number, "null"]
+          exclusiveMinimum: 1
+        implied_probability:
+          $ref: "#/components/schemas/NullableProbability"
+        no_vig_probability:
+          $ref: "#/components/schemas/NullableProbability"
+        edge:
+          type: [number, "null"]
+          exclusiveMinimum: -1
+          exclusiveMaximum: 1
+        ev:
+          type: [number, "null"]
+          minimum: -1
+        value_engine_version:
+          type: [string, "null"]
+          minLength: 1
+        source:
+          type: [string, "null"]
+          minLength: 1
+
+    FootballAnalystConfidence:
+      type: object
+      additionalProperties: false
+      description: |
+        Qualitative confidence derived only from metadata. It is not a
+        probability and never uses the magnitude of model probabilities.
+        Rule: high requires champion + live + complete identity + available
+        value. Candidate or mock or missing value or incomplete identity
+        cannot be high. Candidate plus any of those gaps is low. Candidate
+        with complete live-or-mock identity and available value is medium.
+      required: [level, basis, rule]
+      properties:
+        level:
+          type: string
+          enum: [low, medium, high]
+        basis:
+          type: string
+          minLength: 1
+        rule:
+          type: string
+          minLength: 1
+
+    FootballAnalystDataQuality:
+      type: object
+      additionalProperties: false
+      required:
+        - data_mode
+        - model_status
+        - cutoff_at
+        - freshness
+        - availability
+        - missing
+      properties:
+        data_mode:
+          $ref: "#/components/schemas/DataMode"
+        model_status:
+          $ref: "#/components/schemas/FootballModelStatus"
+        cutoff_at:
+          $ref: "#/components/schemas/Timestamp"
+        freshness:
+          anyOf:
+            - $ref: "#/components/schemas/FreshnessLevel"
+            - type: "null"
+        availability:
+          type: string
+          enum: [available, partial, unavailable]
+        missing:
+          type: array
+          items:
+            type: string
+            minLength: 1
+
+    FootballAnalystExplanation:
+      type: object
+      additionalProperties: false
+      required:
+        - summary
+        - key_factors
+        - strengths
+        - risks
+        - confidence
+        - data_quality
+        - generated_at
+        - analysis_version
+        - provider
+      properties:
+        summary:
+          type: string
+          minLength: 1
+        key_factors:
+          type: array
+          items:
+            $ref: "#/components/schemas/FootballAnalystFactor"
+        strengths:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        risks:
+          type: array
+          items:
+            type: string
+            minLength: 1
+        confidence:
+          $ref: "#/components/schemas/FootballAnalystConfidence"
+        data_quality:
+          $ref: "#/components/schemas/FootballAnalystDataQuality"
+        generated_at:
+          $ref: "#/components/schemas/Timestamp"
+        analysis_version:
+          type: string
+          enum: [ai-analyst-0.1]
+        provider:
+          type: string
+          enum: [deterministic-v0.1]
+
+    FootballAiAnalystReport:
+      type: object
+      additionalProperties: false
+      description: |
+        Explanatory report only. It does not recommend a wager and does not
+        guarantee an outcome. Every factual claim is copied from the validated
+        analyst context.
+      required:
+        - match_id
+        - home_team
+        - away_team
+        - league
+        - kickoff_at
+        - prediction
+        - value
+        - analyst
+      properties:
+        match_id:
+          $ref: "#/components/schemas/Identifier"
+        home_team:
+          type: [string, "null"]
+          minLength: 1
+        away_team:
+          type: [string, "null"]
+          minLength: 1
+        league:
+          type: string
+          minLength: 1
+        kickoff_at:
+          $ref: "#/components/schemas/Timestamp"
+        prediction:
+          $ref: "#/components/schemas/FootballAnalystPrediction"
+        value:
+          $ref: "#/components/schemas/FootballAnalystValue"
+        analyst:
+          $ref: "#/components/schemas/FootballAnalystExplanation"
+
     OddsSelection:
       type: object
       additionalProperties: false
@@ -2561,6 +2845,15 @@ components:
           properties:
             data:
               $ref: "#/components/schemas/AiPicksResult"
+
+    FootballAiAnalystEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: "#/components/schemas/FootballAiAnalystReport"
 
     PickListEnvelope:
       allOf:

@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from app.ai_analyst.service import FootballAnalystService
 from app.ai_picks.config import AiPicksThresholds
 from app.ai_picks.service import AiPicksEngine
 from app.ai_picks.source import CanonicalMatchCandidateSource
@@ -59,6 +60,7 @@ class AppContainer:
         )
         self._football_values: FootballValueService | None = None
         self._football_ai_picks: AiPicksEngine | None = None
+        self._football_ai_analyst: FootballAnalystService | None = None
 
     def football_predictions(self) -> FootballPredictionService:
         if self._football_predictions is None:
@@ -95,6 +97,16 @@ class AppContainer:
         if self._match_resolution is None:
             self._match_resolution = MatchResolutionService(self.matches, self.match_identities())
         return self._match_resolution
+
+    def football_ai_analyst(self) -> FootballAnalystService:
+        if self._football_ai_analyst is None:
+            self._football_ai_analyst = FootballAnalystService(
+                clock=self.clock,
+                identities=self.match_identities(),
+                predictions=self.football_predictions(),
+                values=self.football_values(),
+            )
+        return self._football_ai_analyst
 
     def football_ai_picks(self) -> AiPicksEngine:
         if self._football_ai_picks is None:

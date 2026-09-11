@@ -323,6 +323,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/football/ai-analyst/{match_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Explain a football 1X2 match from validated context only
+         * @description Downstream explanation of already validated prediction, identity, and
+         *     optional value-engine outputs. The analyst never chooses a bet, never
+         *     recalculates probabilities, and never invents odds, injuries, lineups,
+         *     statistics, or results. Missing inputs stay `unavailable`. Temporal
+         *     leakage, missing predictions, and missing artefacts remain structured
+         *     errors. The default provider is deterministic and requires no external
+         *     LLM. `analysis_version` is `ai-analyst-0.1` and is distinct from
+         *     `value-engine-0.1`.
+         */
+        get: operations["getFootballAiAnalyst"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/picks": {
         parameters: {
             query?: never;
@@ -733,6 +760,93 @@ export interface components {
             offset: number;
             metadata: components["schemas"]["AiPicksMetadata"];
         };
+        /** @enum {string} */
+        FootballAnalystFactorType: "model_probability" | "market_probability" | "edge" | "ev" | "data_freshness" | "model_status";
+        /** @enum {string} */
+        FootballAnalystFactorDirection: "home" | "away" | "draw" | "neutral";
+        FootballAnalystFactor: {
+            type: components["schemas"]["FootballAnalystFactorType"];
+            label: string;
+            /** @description Raw numeric value from the validated context; null when the factor is qualitative. */
+            value: number | null;
+            direction: components["schemas"]["FootballAnalystFactorDirection"] | null;
+            /** @description Internal source identifier. Never a fabricated provider name. */
+            source: string;
+        };
+        FootballAnalystPrediction: {
+            home_probability: components["schemas"]["Probability"];
+            draw_probability: components["schemas"]["Probability"];
+            away_probability: components["schemas"]["Probability"];
+            model_version: string;
+            model_status: components["schemas"]["FootballModelStatus"];
+            dataset_version: string;
+            cutoff_at: components["schemas"]["Timestamp"];
+            source: string;
+        };
+        FootballAnalystValue: {
+            /** @enum {string} */
+            availability: "available" | "unavailable";
+            /** @enum {string|null} */
+            selection: "HOME" | "DRAW" | "AWAY" | null;
+            odds: number | null;
+            implied_probability: components["schemas"]["NullableProbability"];
+            no_vig_probability: components["schemas"]["NullableProbability"];
+            edge: number | null;
+            ev: number | null;
+            value_engine_version: string | null;
+            source: string | null;
+        };
+        /**
+         * @description Qualitative confidence derived only from metadata. It is not a
+         *     probability and never uses the magnitude of model probabilities.
+         *     Rule: high requires champion + live + complete identity + available
+         *     value. Candidate or mock or missing value or incomplete identity
+         *     cannot be high. Candidate plus any of those gaps is low. Candidate
+         *     with complete live-or-mock identity and available value is medium.
+         */
+        FootballAnalystConfidence: {
+            /** @enum {string} */
+            level: "low" | "medium" | "high";
+            basis: string;
+            rule: string;
+        };
+        FootballAnalystDataQuality: {
+            data_mode: components["schemas"]["DataMode"];
+            model_status: components["schemas"]["FootballModelStatus"];
+            cutoff_at: components["schemas"]["Timestamp"];
+            freshness: components["schemas"]["FreshnessLevel"] | null;
+            /** @enum {string} */
+            availability: "available" | "partial" | "unavailable";
+            missing: string[];
+        };
+        FootballAnalystExplanation: {
+            summary: string;
+            key_factors: components["schemas"]["FootballAnalystFactor"][];
+            strengths: string[];
+            risks: string[];
+            confidence: components["schemas"]["FootballAnalystConfidence"];
+            data_quality: components["schemas"]["FootballAnalystDataQuality"];
+            generated_at: components["schemas"]["Timestamp"];
+            /** @enum {string} */
+            analysis_version: "ai-analyst-0.1";
+            /** @enum {string} */
+            provider: "deterministic-v0.1";
+        };
+        /**
+         * @description Explanatory report only. It does not recommend a wager and does not
+         *     guarantee an outcome. Every factual claim is copied from the validated
+         *     analyst context.
+         */
+        FootballAiAnalystReport: {
+            match_id: components["schemas"]["Identifier"];
+            home_team: string | null;
+            away_team: string | null;
+            league: string;
+            kickoff_at: components["schemas"]["Timestamp"];
+            prediction: components["schemas"]["FootballAnalystPrediction"];
+            value: components["schemas"]["FootballAnalystValue"];
+            analyst: components["schemas"]["FootballAnalystExplanation"];
+        };
         OddsSelection: {
             selection: string;
             label: string;
@@ -1032,6 +1146,9 @@ export interface components {
         };
         AiPicksEnvelope: components["schemas"]["EnvelopeMetadata"] & {
             data: components["schemas"]["AiPicksResult"];
+        };
+        FootballAiAnalystEnvelope: components["schemas"]["EnvelopeMetadata"] & {
+            data: components["schemas"]["FootballAiAnalystReport"];
         };
         PickListEnvelope: components["schemas"]["EnvelopeMetadata"] & {
             data: components["schemas"]["PickList"];
@@ -1616,6 +1733,46 @@ export interface operations {
                 };
             };
             400: components["responses"]["ValidationProblem"];
+            default: components["responses"]["Problem"];
+        };
+    };
+    getFootballAiAnalyst: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Exclusive-of-future PIT boundary. Omit to use kickoff (`pre_kickoff`).
+                 *     Values after kickoff are rejected as temporal leakage. Values before
+                 *     kickoff are rejected because this candidate only stores the pre-kickoff
+                 *     Elo snapshot.
+                 */
+                cutoff_at?: components["parameters"]["CutoffAt"];
+            };
+            header?: {
+                /** @description Caller-provided correlation identifier. The API generates one when absent. */
+                "X-Request-ID"?: components["parameters"]["XRequestId"];
+            };
+            path: {
+                match_id: components["parameters"]["MatchId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Fact-grounded football analyst report */
+            200: {
+                headers: {
+                    "X-Request-ID": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FootballAiAnalystEnvelope"];
+                };
+            };
+            400: components["responses"]["ValidationProblem"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Problem"];
+            422: components["responses"]["ValidationProblem"];
+            503: components["responses"]["Problem"];
             default: components["responses"]["Problem"];
         };
     };

@@ -425,6 +425,20 @@ export function isHistoricalMatchIdentity(
  * There is no sport parameter: the engine serves football only, as declared by
  * the `sport` enum in the contract.
  */
+/**
+ * Football AI Analyst (`GET /football/ai-analyst/{match_id}`).
+ *
+ * Aliases of the generated OpenAPI schemas. The UI page is not wired yet;
+ * keep these derived from the contract so a future view cannot drift.
+ */
+export type FootballAnalystFactor = Schemas["FootballAnalystFactor"];
+export type FootballAnalystPrediction = Schemas["FootballAnalystPrediction"];
+export type FootballAnalystValue = Schemas["FootballAnalystValue"];
+export type FootballAnalystConfidence = Schemas["FootballAnalystConfidence"];
+export type FootballAnalystDataQuality = Schemas["FootballAnalystDataQuality"];
+export type FootballAnalystExplanation = Schemas["FootballAnalystExplanation"];
+export type FootballAiAnalystReport = Schemas["FootballAiAnalystReport"];
+
 export interface AiPicksFilters {
   date?: string;
   league?: string;

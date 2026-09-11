@@ -26,6 +26,7 @@ Le préfixe est défini par le serveur OpenAPI `/api/v1`. Ainsi, le chemin OpenA
 | GET | `/api/v1/football/predictions/{match_id}` | probabilités 1X2 du modèle football versionné (`candidate`) |
 | GET | `/api/v1/football/value/{match_id}` | analyse PIT odds + value du marché football 1X2 |
 | GET | `/api/v1/football/ai-picks` | opportunités 1X2 filtrées et classées déterministement |
+| GET | `/api/v1/football/ai-analyst/{match_id}` | explication déterministe d'un match football 1X2 |
 | GET | `/api/v1/picks` | signaux modèle publiés |
 | GET | `/api/v1/value` | évaluations value déterministes |
 | GET | `/api/v1/performance` | santé, séries et calibration du modèle |
