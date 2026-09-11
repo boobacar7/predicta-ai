@@ -29,6 +29,9 @@ ClaimType = Literal[
     "recommendation",
 ]
 ClaimRelation = Literal["greater_than", "less_than", "equal", "greater_or_equal", "less_or_equal"]
+AnalystTone = Literal["neutral", "analytical", "concise"]
+AnalystVerbosity = Literal["short", "medium"]
+AnalystFocus = Literal["prediction", "value", "data_quality"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,11 +54,24 @@ class GroundedClaim:
 
 
 @dataclass(frozen=True, slots=True)
-class GroundedNarrative:
-    """LLM payload after schema parse. Claims are the only factual channel."""
+class StylePayload:
+    """Closed style knobs. No free text. Cannot carry facts."""
 
-    narrative: str
+    tone: AnalystTone = "neutral"
+    verbosity: AnalystVerbosity = "short"
+    focus: AnalystFocus = "prediction"
+
+
+@dataclass(frozen=True, slots=True)
+class GroundedNarrative:
+    """Parsed LLM payload. Claims are the only factual channel.
+
+    `narrative` is UNTRUSTED LLM TEXT — NEVER RENDER DIRECTLY.
+    """
+
     claims: tuple[GroundedClaim, ...]
+    style: StylePayload = StylePayload()
+    narrative: str = ""
 
 
 @dataclass(frozen=True, slots=True)

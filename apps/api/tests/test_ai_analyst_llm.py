@@ -38,7 +38,14 @@ NOW = datetime(2026, 7, 7, 16, tzinfo=UTC)
 
 
 def _payload(*, narrative: str = "", claims: list[dict[str, object]] | None = None) -> str:
-    return json.dumps({"narrative": narrative, "claims": claims or []}, ensure_ascii=False)
+    body: dict[str, object] = {
+        "style": {"tone": "neutral", "verbosity": "short", "focus": "prediction"},
+        "claims": claims or [],
+    }
+    if narrative:
+        # UNTRUSTED LLM TEXT — NEVER RENDER DIRECTLY. Kept only to prove it is ignored.
+        body["narrative"] = narrative
+    return json.dumps(body, ensure_ascii=False)
 
 
 def _scripted(payload: str | Exception, *, delay_seconds: float = 0) -> LLMAnalystProvider:
@@ -49,7 +56,7 @@ def _scripted(payload: str | Exception, *, delay_seconds: float = 0) -> LLMAnaly
 
 
 def _statements(*items: tuple[str, list[str]]) -> str:
-    """Adversarial helper: prose without structured claims must fall back."""
+    """Adversarial helper: untrusted prose without structured claims must be ignored."""
 
     text = " ".join(text for text, _ids in items)
     return _payload(narrative=text, claims=[])
@@ -96,26 +103,24 @@ def test_probability_hallucination_falls_back() -> None:
         _statements(("HOME has 80% probability.", ["prediction.home_probability"]))
     )
     explanation = provider.generate_analysis(context)
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
     assert "80" not in explanation.summary
-    assert "41,7 %" in explanation.summary
 
 
 def test_odds_hallucination_falls_back() -> None:
     provider = _scripted(_statements(("odds = 9.99", ["value.odds"])))
     explanation = provider.generate_analysis(_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
     assert "9.99" not in explanation.summary
-    assert explanation.provider == ANALYST_PROVIDER_ID
 
 
 def test_ev_hallucination_falls_back() -> None:
     provider = _scripted(_statements(("EV = +56.3", ["value.ev"])))
     explanation = provider.generate_analysis(_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
     assert "56,3" not in explanation.summary
     assert "56.3" not in explanation.summary
 
@@ -123,8 +128,8 @@ def test_ev_hallucination_falls_back() -> None:
 def test_edge_hallucination_falls_back() -> None:
     provider = _scripted(_statements(("edge = +0.990", ["value.edge"])))
     explanation = provider.generate_analysis(_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
     assert "+0.990" not in explanation.summary
 
 
@@ -133,8 +138,8 @@ def test_team_hallucination_falls_back() -> None:
         _statements(("Team C is the model favorite.", ["prediction.model_favorite"]))
     )
     explanation = provider.generate_analysis(_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
     assert "Team C" not in explanation.summary
 
 
@@ -143,32 +148,32 @@ def test_unsupported_statistic_falls_back() -> None:
         _statements(("La possession est de 62 %.", ["prediction.home_probability"]))
     )
     explanation = provider.generate_analysis(_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
     assert "possession" not in explanation.summary.casefold()
 
 
 def test_unsupported_injury_falls_back() -> None:
     provider = _scripted(_statements(("There is an injury in the squad.", [])))
     explanation = provider.generate_analysis(_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
     assert "injury" not in explanation.summary.casefold()
 
 
 def test_unsupported_lineup_falls_back() -> None:
     provider = _scripted(_statements(("The lineup is unavailable but we invent it.", [])))
     explanation = provider.generate_analysis(_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
     assert "lineup" not in explanation.summary.casefold()
 
 
 def test_unsupported_result_falls_back() -> None:
     provider = _scripted(_statements(("Team A a gagné le match.", ["identity.home_team"])))
     explanation = provider.generate_analysis(_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
     assert "a gagné le match" not in explanation.summary.casefold()
 
 
@@ -177,9 +182,8 @@ def test_invalid_evidence_id_falls_back() -> None:
         _statements(("Le modèle estime 41,7 %.", ["prediction.invented"]))
     )
     explanation = provider.generate_analysis(_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
 
 
 def test_evidence_fact_mismatch_falls_back() -> None:
@@ -192,9 +196,8 @@ def test_evidence_fact_mismatch_falls_back() -> None:
         )
     )
     explanation = provider.generate_analysis(_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
 
 
 def test_favorite_value_confusion_falls_back() -> None:
@@ -211,7 +214,7 @@ def test_favorite_value_confusion_falls_back() -> None:
         )
     )
     explanation = provider.generate_analysis(context)
-    assert provider.last_fallback_reason == "AnalystGroundingError"
+    assert provider.last_fallback_reason is None
     assert "team b is the model favorite" not in explanation.summary.casefold()
     assert context.to_value_dto().value_selection == "AWAY"
     assert context.to_prediction_dto().model_version == "football-elo-v1-candidate"
@@ -228,7 +231,7 @@ def test_candidate_model_cannot_be_promoted() -> None:
         )
     )
     explanation = provider.generate_analysis(context)
-    assert provider.last_fallback_reason == "AnalystGroundingError"
+    assert provider.last_fallback_reason is None
     assert explanation.confidence.level != "high"
     assert explanation.data_quality.model_status == "candidate"
 
@@ -278,7 +281,7 @@ def test_llm_timeout_falls_back() -> None:
 
 def test_fallback_deterministic_matches_pure_provider() -> None:
     context = _context()
-    provider = _scripted(_statements(("odds = 9.99", ["value.odds"])))
+    provider = _scripted(RuntimeError("provider down"))
     explanation = provider.generate_analysis(context)
     deterministic = DeterministicAnalystProvider().generate_analysis(context)
     assert explanation.summary == deterministic.summary
@@ -379,9 +382,9 @@ def test_home_above_70_percent_falls_back() -> None:
         _statements(("HOME possède une probabilité supérieure à 70%.", ["prediction.home_probability"]))
     )
     explanation = provider.generate_analysis(_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
+    assert "70" not in explanation.summary
 
 
 def test_home_above_70_without_percent_falls_back() -> None:
@@ -389,8 +392,8 @@ def test_home_above_70_without_percent_falls_back() -> None:
         _statements(("HOME possède une probabilité supérieure à 70", ["prediction.home_probability"]))
     )
     explanation = provider.generate_analysis(_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
     assert "70" not in explanation.summary
 
 
@@ -399,8 +402,8 @@ def test_unsupported_rounding_about_42_falls_back() -> None:
         _statements(("HOME has about 42% model probability.", ["prediction.home_probability"]))
     )
     explanation = provider.generate_analysis(_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
 
 
 def test_highest_probability_on_away_falls_back() -> None:
@@ -408,8 +411,8 @@ def test_highest_probability_on_away_falls_back() -> None:
         _statements(("AWAY has the highest model probability.", ["prediction.model_favorite", "value.value_selection"]))
     )
     explanation = provider.generate_analysis(_lincoln_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
     assert "highest model probability" not in explanation.summary.casefold()
 
 
@@ -418,8 +421,8 @@ def test_odds_evidence_cannot_support_model_probability() -> None:
         _statements(("HOME has 41.7% model probability.", ["value.odds"]))
     )
     explanation = provider.generate_analysis(_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
 
 
 def test_implied_probability_cannot_be_recycled_as_model_probability() -> None:
@@ -432,8 +435,8 @@ def test_implied_probability_cannot_be_recycled_as_model_probability() -> None:
         )
     )
     explanation = provider.generate_analysis(_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
 
 
 def test_valid_evidence_with_incompatible_fact_falls_back() -> None:
@@ -441,8 +444,8 @@ def test_valid_evidence_with_incompatible_fact_falls_back() -> None:
         _statements(("AWAY is the model favorite.", ["prediction.home_probability", "prediction.model_favorite"]))
     )
     explanation = provider.generate_analysis(_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
 
 
 def test_away_value_selection_cannot_be_model_favorite() -> None:
@@ -459,8 +462,8 @@ def test_away_value_selection_cannot_be_model_favorite() -> None:
         )
     )
     explanation = provider.generate_analysis(context)
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
 
 
 def test_home_best_value_falls_back() -> None:
@@ -468,8 +471,8 @@ def test_home_best_value_falls_back() -> None:
         _statements(("HOME is the best value.", ["value.value_selection", "prediction.model_favorite"]))
     )
     explanation = provider.generate_analysis(_lincoln_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
 
 
 def test_away_should_be_played_falls_back() -> None:
@@ -477,8 +480,8 @@ def test_away_should_be_played_falls_back() -> None:
         _statements(("AWAY should be played.", ["value.value_selection"]))
     )
     explanation = provider.generate_analysis(_lincoln_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
 
 
 def test_unknown_acronym_team_falls_back() -> None:
@@ -486,53 +489,53 @@ def test_unknown_acronym_team_falls_back() -> None:
         _statements(("PSG has 41.7% model probability.", ["prediction.home_probability"]))
     )
     explanation = provider.generate_analysis(_lincoln_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
     assert "PSG" not in explanation.summary
 
 
 def test_unknown_city_token_falls_back() -> None:
     provider = _scripted(_statements(("Madrid is the model favorite.", ["prediction.model_favorite"])))
     explanation = provider.generate_analysis(_lincoln_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
     assert "Madrid" not in explanation.summary
 
 
 def test_invented_priced_odds_fall_back() -> None:
     provider = _scripted(_statements(("HOME is priced at 3.50", ["value.odds"])))
     explanation = provider.generate_analysis(_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
     assert "3.50" not in explanation.summary
 
 
 def test_invented_injury_claim_falls_back() -> None:
     provider = _scripted(_statements(("The striker is injured.", ["identity.home_team"])))
     explanation = provider.generate_analysis(_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
 
 
 def test_invented_lineup_claim_falls_back() -> None:
     provider = _scripted(_statements(("The probable lineup is unavailable.", [])))
     explanation = provider.generate_analysis(_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
 
 
 def test_invented_result_claim_falls_back() -> None:
     provider = _scripted(_statements(("Le dernier résultat favorise HOME.", ["prediction.model_favorite"])))
     explanation = provider.generate_analysis(_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
 
 
 def test_invented_ranking_claim_falls_back() -> None:
     provider = _scripted(_statements(("Le classement indique un avantage HOME.", ["prediction.model_favorite"])))
     explanation = provider.generate_analysis(_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
 
 
 def test_mock_cannot_be_presented_as_live_market() -> None:
@@ -540,8 +543,8 @@ def test_mock_cannot_be_presented_as_live_market() -> None:
         _statements(("This analysis uses live market data.", ["metadata.data_mode"]))
     )
     explanation = provider.generate_analysis(_context())
-    assert provider.last_fallback_reason == "AnalystGroundingError"
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
     assert "live market" not in explanation.summary.casefold()
     assert explanation.data_quality.data_mode == "mock"
 
@@ -608,10 +611,11 @@ def test_llm_success_keeps_llm_summary() -> None:
     assert "41,7 %" in explanation.summary
 
 
-def test_llm_fallback_sets_deterministic_provider() -> None:
+def test_llm_ignored_prose_keeps_llm_provider() -> None:
     provider = _scripted(_statements(("HOME has 80% probability.", ["prediction.home_probability"])))
     explanation = provider.generate_analysis(_context())
-    assert explanation.provider == ANALYST_PROVIDER_ID
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
+    assert "80" not in explanation.summary
 
 
 def test_same_context_keeps_business_fields() -> None:

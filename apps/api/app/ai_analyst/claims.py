@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import re
 from decimal import Decimal, InvalidOperation
 
 from app.ai_analyst.context import AnalystContext, AnalystEvidence
-from app.ai_analyst.language import FORBIDDEN_CLAIMS, UNSUPPORTED_INVENTED_TOPICS, first_blocked_term
 from app.ai_analyst.statements import ClaimRelation, ClaimType, GroundedClaim, GroundedNarrative
 from app.odds.types import Football1x2Selection
 
@@ -33,10 +31,6 @@ SUBJECT_PROBABILITY_FIELD = {
     Football1x2Selection.DRAW: "draw_probability",
     Football1x2Selection.AWAY: "away_probability",
 }
-STRUCTURAL_LABELS = frozenset({"home", "away", "draw"})
-DIGIT_RE = re.compile(r"\d")
-
-
 class ClaimGroundingError(ValueError):
     """A structured claim is incompatible with AnalystContext / AnalystEvidence."""
 
@@ -69,22 +63,13 @@ class ClaimValidator:
 
 
 def validate_narrative_and_claims(context: AnalystContext, narrative: GroundedNarrative) -> tuple[GroundedClaim, ...]:
-    """Backend-owned validation. Prose is never a source of truth."""
+    """Backend-owned validation. `narrative.narrative` is untrusted and ignored."""
 
-    _assert_narrative_is_style(context, narrative.narrative)
-    if not narrative.narrative.strip() and not narrative.claims:
-        raise ClaimGroundingError("LLM narrator returned neither style narrative nor claims.")
     return validate_claims(context, narrative.claims)
 
 
 def validate_claims(context: AnalystContext, claims: tuple[GroundedClaim, ...]) -> tuple[GroundedClaim, ...]:
     return ClaimValidator().validate(context, claims)
-
-
-def render_grounded_narrative(context: AnalystContext, narrative: GroundedNarrative) -> str:
-    rendered_claims = [sentence for claim in narrative.claims if (sentence := _render_claim(context, claim))]
-    parts = [narrative.narrative.strip(), *rendered_claims]
-    return " ".join(part for part in parts if part)
 
 
 def resolve_subject(context: AnalystContext, subject: str | None) -> Football1x2Selection | None:
@@ -101,25 +86,6 @@ def resolve_subject(context: AnalystContext, subject: str | None) -> Football1x2
     if away and raw.casefold() == away.casefold():
         return Football1x2Selection.AWAY
     raise ClaimGroundingError(f"Subject '{subject}' is not present in AnalystContext.")
-
-
-def _assert_narrative_is_style(context: AnalystContext, text: str) -> None:
-    if not text.strip():
-        return
-    if DIGIT_RE.search(text):
-        raise ClaimGroundingError("Narrative prose contained a numeric fact; numbers belong in claims.")
-    lowered = text.casefold()
-    for label in STRUCTURAL_LABELS:
-        if re.search(rf"\b{label}\b", lowered):
-            raise ClaimGroundingError(
-                f"Narrative prose named selection '{label}'; factual selections belong in claims."
-            )
-    for name in (context.identity.home_team, context.identity.away_team, context.identity.league):
-        if name and name.casefold() in lowered:
-            raise ClaimGroundingError("Narrative prose named a context identity; identities belong in claims.")
-    blocked = first_blocked_term(text, FORBIDDEN_CLAIMS) or first_blocked_term(text, UNSUPPORTED_INVENTED_TOPICS)
-    if blocked:
-        raise ClaimGroundingError(f"Narrative prose asserted unsupported topic '{blocked}' without a claim.")
 
 
 def _validate_claim(
@@ -433,60 +399,3 @@ def _relation_holds(left: Decimal, relation: ClaimRelation, right: Decimal) -> b
     if relation == "greater_or_equal":
         return left >= right
     return left <= right
-
-
-def _selection_label(context: AnalystContext, selection: Football1x2Selection) -> str:
-    if selection is Football1x2Selection.HOME:
-        return context.identity.home_team or "l'équipe à domicile"
-    if selection is Football1x2Selection.AWAY:
-        return context.identity.away_team or "l'équipe à l'extérieur"
-    return "le match nul"
-
-
-def _format_percent(value: Decimal) -> str:
-    rendered = f"{(value * Decimal(100)):.1f}"
-    return f"{rendered.replace('.', ',')} %"
-
-
-def _format_points(value: Decimal) -> str:
-    rendered = f"{(value * Decimal(100)):.1f}"
-    signed = rendered if value < 0 else f"+{rendered}"
-    return f"{signed.replace('.', ',')} points"
-
-
-def _render_claim(context: AnalystContext, claim: GroundedClaim) -> str:
-    if claim.claim_type == "model_probability":
-        selection = resolve_subject(context, claim.subject)
-        if selection is None:
-            return ""
-        return (
-            f"Le modèle estime {_format_percent(context.prediction.probability(selection))} "
-            f"de probabilité à {_selection_label(context, selection)}."
-        )
-    if claim.claim_type == "probability_comparison":
-        return "La comparaison de probabilités modèle est cohérente avec le contexte validé."
-    if claim.claim_type == "model_favorite":
-        favorite = context.favorite_selection()
-        return f"Le favori du modèle est {favorite.value} ({_selection_label(context, favorite)})."
-    if claim.claim_type == "value_selection" and context.value_selection is not None:
-        pick = context.value_selection
-        return f"La sélection de valeur est {pick.value} ({_selection_label(context, pick)})."
-    if claim.claim_type == "odds" and context.value is not None:
-        return f"La cote PIT disponible est {context.value.odds}."
-    if claim.claim_type == "implied_probability" and context.value is not None:
-        return (
-            "La probabilité implicite brute de la cote disponible est de "
-            f"{_format_percent(context.value.implied_probability)}."
-        )
-    if claim.claim_type == "ev" and context.value is not None:
-        return f"L'espérance théorique (EV) est de {_format_points(context.value.ev)}."
-    if claim.claim_type == "edge" and context.value is not None:
-        return f"L'écart modèle-marché (edge) est de {_format_points(context.value.edge)}."
-    if claim.claim_type == "data_mode":
-        return f"Ces faits sont servis en data_mode {context.data_mode} et ne doivent pas être présentés comme live."
-    if claim.claim_type == "model_status":
-        return (
-            f"Le modèle {context.prediction.model_version} a le statut {context.prediction.model_status}, "
-            "pas un statut de production promu."
-        )
-    return ""

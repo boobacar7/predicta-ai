@@ -17,19 +17,20 @@ validated identity
   → Value Engine (optionnel)
   → AnalystContext immuable
   → AnalystEvidence (faits whitelistés, typed)
-  → LLM JSON { narrative, claims[] }
-  → GroundedNarrative / GroundedClaim[]
+  → LLM JSON { style enums, claims[] }
+  → GroundedClaim[]
   → ClaimValidator (valeurs vs AnalystContext)
   → EvidenceValidator (evidence_id + evidence.type)
+  → backend renderer (rendering.py)
   → assert_grounded
-  → render (templates backend)
   → GET /api/v1/football/ai-analyst/{match_id}
 ```
 
 Le LLM n'est pas autorisé à déclarer qu'une phrase est grounded. Il fournit
-une narration stylistique et des claims structurées. Le backend compare
-chaque claim à `AnalystContext` / `AnalystEvidence`, puis rend le texte
-factuel. La prose n'est jamais une source de vérité.
+des claims structurées et des enums de style (`tone`, `verbosity`, `focus`).
+Le backend compare chaque claim à `AnalystContext` / `AnalystEvidence`, puis
+**rend** le texte factuel. Un champ `narrative` éventuel est du texte LLM
+non fiable : il n'est jamais copié dans le DTO.
 
 Exemple : `probability_comparison` / AWAY > HOME est calculé contre
 `P(AWAY)` et `P(HOME)`. Si HOME = 41,7 % et AWAY = 29,2 %, la claim est
@@ -169,15 +170,15 @@ Quatre couches restent séparées :
    équipe absente est rejetée. Les faits sportifs (`injury`, `lineup`,
    `result`, `ranking`, `event`, `statistic`) n'ont pas d'evidence V0.1
    et sont toujours rejetés ;
-4. **narration** : le champ `narrative` du LLM est stylistique seulement
-   (pas de chiffres, pas de labels HOME/AWAY/DRAW, pas de noms d'équipes).
-   Les phrases factuelles publiées sont rendues par le backend à partir
-   des claims validées. Une prose qualitative sans fait nouveau reste
-   autorisée si elle ne contredit pas le canal claims.
+4. **rendu** : `rendering.py` produit le summary uniquement depuis les
+   claims validées et `AnalystContext`. Le style LLM est un triplet d'enums.
+   Un champ `narrative` éventuel est marqué *UNTRUSTED LLM TEXT — NEVER
+   RENDER DIRECTLY* et n'est jamais injecté dans `summary`, `factors`,
+   `strengths`, `risks` ou `confidence`.
 
 `DeterministicAnalystProvider` émet encore des `GroundedStatement` internes
-puis `render_statements`. `LLMAnalystProvider` n'extrait plus de faits
-depuis la prose : il exige des claims structurées.
+puis `render_statements`. `LLMAnalystProvider` ne copie jamais de prose LLM :
+le summary publié vient exclusivement de `rendering.py`.
 
 Les DTOs `prediction` et `value` sont reconstruits par le service depuis
 `AnalystContext`, jamais depuis le texte du provider.
@@ -193,12 +194,12 @@ Flux :
 AnalystContext
   → AnalystEvidence
   → LLMAnalystProvider (contexte sérialisé whitelisté uniquement)
-  → StructuredNarrative { narrative, claims[] }
+  → { style enums, claims[] }  # narrative ignoré
   → GroundedClaim[]
   → ClaimValidator
   → EvidenceValidator
+  → backend renderer
   → assert_grounded
-  → render
   → Analyst DTO
 ```
 

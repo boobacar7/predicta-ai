@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from app.ai_analyst.claims import ClaimGroundingError, render_grounded_narrative, validate_narrative_and_claims
+from app.ai_analyst.claims import ClaimGroundingError, validate_claims
 from app.ai_analyst.context import AnalystContext
 from app.ai_analyst.deterministic import DeterministicAnalystProvider
 from app.ai_analyst.grounding import AnalystGroundingError, assert_grounded
@@ -16,7 +16,16 @@ from app.ai_analyst.llm_client import (
     AnalystLLMResponseError,
 )
 from app.ai_analyst.models import LLM_ANALYST_PROVIDER_ID, FootballAnalystExplanation
-from app.ai_analyst.statements import ClaimRelation, ClaimType, GroundedClaim, GroundedNarrative
+from app.ai_analyst.rendering import render_analyst_summary
+from app.ai_analyst.statements import (
+    AnalystFocus,
+    AnalystTone,
+    AnalystVerbosity,
+    ClaimRelation,
+    ClaimType,
+    GroundedClaim,
+    StylePayload,
+)
 from app.core.errors import ApiError
 
 FORBIDDEN_LLM_FIELDS = frozenset(
@@ -37,6 +46,13 @@ FORBIDDEN_LLM_FIELDS = frozenset(
         "value_engine_version",
         "model_favorite",
         "value_selection",
+        "summary",
+        "factors",
+        "strengths",
+        "risks",
+        "confidence",
+        "commentary",
+        "explanation",
     }
 )
 
@@ -54,19 +70,34 @@ class LLMClaim(BaseModel):
     evidence_ids: list[str] = Field(min_length=1)
 
 
+class LLMStyle(BaseModel):
+    """Closed enums only. Free-text style is rejected by schema."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tone: AnalystTone = "neutral"
+    verbosity: AnalystVerbosity = "short"
+    focus: AnalystFocus = "prediction"
+
+
 class LLMNarration(BaseModel):
     """The only payload an LLM may return. Business fields are reconstructed later."""
 
     model_config = ConfigDict(extra="forbid")
 
-    narrative: str = ""
+    style: LLMStyle = Field(default_factory=LLMStyle)
     claims: list[LLMClaim] = Field(default_factory=list)
+    narrative: str = Field(
+        default="",
+        description="UNTRUSTED LLM TEXT — NEVER RENDER DIRECTLY.",
+    )
 
-    @model_validator(mode="after")
-    def require_narrative_or_claims(self) -> LLMNarration:
-        if not self.narrative.strip() and not self.claims:
-            raise ValueError("LLM narrator returned neither narrative nor claims.")
-        return self
+    @model_validator(mode="before")
+    @classmethod
+    def reject_empty_object(cls, data: Any) -> Any:
+        if not isinstance(data, dict) or not data:
+            raise ValueError("LLM narrator returned an empty payload.")
+        return data
 
 
 def build_narration_prompt(context: AnalystContext, *, prompt_version: str) -> str:
@@ -89,17 +120,20 @@ def build_narration_prompt(context: AnalystContext, *, prompt_version: str) -> s
         f"temperature={ANALYST_LLM_TEMPERATURE}\n"
         "You are a sports-analytics narrator. You are not a source of truth.\n"
         "Do not compute probabilities, odds, edge, EV, versions, cutoff or data_mode.\n"
-        "Use only the validated facts below. If a fact is unavailable, say it is unavailable.\n"
-        "Put every factual assertion in claims. Narrative prose must stay stylistic: "
-        "no digits, no HOME/AWAY/DRAW labels, no team or league names.\n"
+        "Do not write factual sentences. The backend renders every published fact.\n"
+        "Return JSON only with style enums and structured claims.\n"
+        "style.tone must be one of: neutral, analytical, concise.\n"
+        "style.verbosity must be one of: short, medium.\n"
+        "style.focus must be one of: prediction, value, data_quality.\n"
         "Each claim must include claim_type, subject, value or comparison, and evidence_ids.\n"
-        "The backend validates claims against AnalystContext. Unvalidated prose is discarded.\n"
+        "The backend validates claims against AnalystContext. Any narrative field is discarded.\n"
         f"data_mode={context.data_mode}. If mock, a data_mode claim must stay mock.\n"
         f"model_favorite={favorite}. value_selection={value_selection}.\n"
         "Never present value_selection as the model favorite when they differ.\n"
         "Return JSON only: "
-        '{"narrative":"...","claims":[{"claim_type":"...","subject":"HOME",'
-        '"value":0.417,"evidence_ids":["prediction.home_probability"]}]}\n'
+        '{"style":{"tone":"neutral","verbosity":"short","focus":"prediction"},'
+        '"claims":[{"claim_type":"model_favorite","subject":"HOME",'
+        '"evidence_ids":["prediction.model_favorite"]}]}\n'
         "facts="
         + json.dumps(facts, ensure_ascii=False, default=str)
     )
@@ -118,14 +152,24 @@ def parse_llm_narration(raw: str) -> LLMNarration:
         raise AnalystLLMResponseError(
             "LLM narrator attempted to define business fields: " + ", ".join(sorted(extras)) + "."
         )
+    if isinstance(payload.get("style"), str):
+        raise AnalystLLMResponseError("LLM narrator returned free-text style.")
     try:
         return LLMNarration.model_validate(payload)
     except ValidationError as exc:
         raise AnalystLLMResponseError("LLM narrator returned an invalid schema.") from exc
 
 
-def grounded_narrative_from_llm(narration: LLMNarration) -> GroundedNarrative:
-    claims = tuple(
+def style_from_llm(narration: LLMNarration) -> StylePayload:
+    return StylePayload(
+        tone=narration.style.tone,
+        verbosity=narration.style.verbosity,
+        focus=narration.style.focus,
+    )
+
+
+def claims_from_llm(narration: LLMNarration) -> tuple[GroundedClaim, ...]:
+    return tuple(
         GroundedClaim(
             claim_type=item.claim_type,
             subject=item.subject,
@@ -136,7 +180,6 @@ def grounded_narrative_from_llm(narration: LLMNarration) -> GroundedNarrative:
         )
         for item in narration.claims
     )
-    return GroundedNarrative(narrative=narration.narrative, claims=claims)
 
 
 class LLMAnalystProvider:
@@ -148,7 +191,7 @@ class LLMAnalystProvider:
         *,
         fallback: DeterministicAnalystProvider | None = None,
         timeout_seconds: float = 2.0,
-        prompt_version: str = "analyst-prompt-0.1",
+        prompt_version: str = "analyst-prompt-0.2",
     ) -> None:
         self._client = client
         self._fallback = fallback or DeterministicAnalystProvider()
@@ -182,12 +225,14 @@ class LLMAnalystProvider:
         prompt = build_narration_prompt(context, prompt_version=self._prompt_version)
         raw = self._client.narrate(context, prompt, timeout_seconds=self._timeout_seconds)
         narration = parse_llm_narration(raw)
-        grounded = grounded_narrative_from_llm(narration)
+        # UNTRUSTED LLM TEXT — NEVER RENDER DIRECTLY.
+        _ = narration.narrative
+        claims = claims_from_llm(narration)
         try:
-            validate_narrative_and_claims(context, grounded)
+            validated = validate_claims(context, claims)
         except ClaimGroundingError as exc:
             raise AnalystGroundingError(str(exc)) from exc
-        return render_grounded_narrative(context, grounded)
+        return render_analyst_summary(context, validated, style_from_llm(narration))
 
 
 def _unwrap_fence(raw: str) -> str:

@@ -36,7 +36,7 @@ class MockExplainerClient:
         del prompt, timeout_seconds
         return json.dumps(
             {
-                "narrative": "The match appears open.",
+                "style": {"tone": "neutral", "verbosity": "short", "focus": "prediction"},
                 "claims": _claims_from_context(context),
             },
             ensure_ascii=False,

@@ -219,7 +219,7 @@ def test_valid_model_probability_favorite_and_value_are_accepted() -> None:
     assert reason is None
 
 
-def test_qualitative_narrative_with_valid_claim_is_accepted() -> None:
+def test_qualitative_narrative_is_ignored_when_claim_is_valid() -> None:
     provider, reason = _provider(
         [HOME_FAVORITE_CLAIM],
         narrative="Le modèle présente un avantage pour l'équipe à domicile.",
@@ -228,12 +228,15 @@ def test_qualitative_narrative_with_valid_claim_is_accepted() -> None:
     assert reason is None
 
 
-def test_qualitative_narrative_that_names_a_selection_is_rejected() -> None:
-    provider, reason = _provider(
-        [HOME_FAVORITE_CLAIM],
-        narrative="AWAY is more likely than HOME",
+def test_contradictory_narrative_is_ignored_when_claim_is_valid() -> None:
+    provider = _scripted(
+        _payload(narrative="AWAY is more likely than HOME", claims=[HOME_FAVORITE_CLAIM])
     )
-    assert provider == ANALYST_PROVIDER_ID
+    explanation = provider.generate_analysis(_lincoln_context())
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
+    assert provider.last_fallback_reason is None
+    assert "away is more likely than home" not in explanation.summary.casefold()
+    assert "HOME" in explanation.summary
 
 
 def test_malformed_unknown_and_invalid_evidence_fall_back() -> None:
@@ -280,4 +283,6 @@ def test_runtimeerror_timeout_and_grounding_fall_back() -> None:
     timeout = _scripted(_payload(narrative="The match appears open.", claims=[HOME_FAVORITE_CLAIM]), delay_seconds=1)
     assert timeout.generate_analysis(_lincoln_context()).provider == ANALYST_PROVIDER_ID
     grounding = _scripted(_payload(narrative="HOME is around fifty", claims=[]))
-    assert grounding.generate_analysis(_lincoln_context()).provider == ANALYST_PROVIDER_ID
+    explanation = grounding.generate_analysis(_lincoln_context())
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
+    assert "fifty" not in explanation.summary.casefold()

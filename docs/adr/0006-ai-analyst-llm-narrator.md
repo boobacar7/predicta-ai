@@ -16,11 +16,13 @@ Un narrator LLM peut être ajouté sans devenir une source de vérité.
 ## Décisions
 
 1. `LLMAnalystProvider` implémente le port existant `AnalystProvider`.
-2. Le LLM retourne `{ narrative, claims[] }`. `narrative` est du style.
-   Chaque fait est une `GroundedClaim` (`claim_type`, `subject`,
-   `value` / comparaison, `evidence_ids`). Probabilités, cotes, edge, EV,
-   versions, cutoff et `data_mode` sont reconstruits depuis
-   `AnalystContext`. Le LLM ne décide pas qu'une phrase est grounded.
+2. Le LLM retourne `{ style, claims[] }`. `style` est un triplet d'enums
+   (`tone`, `verbosity`, `focus`). Chaque fait est une `GroundedClaim`.
+   Un champ `narrative` éventuel est du texte non fiable et n'est jamais
+   rendu. Probabilités, cotes, edge, EV, versions, cutoff et `data_mode`
+   sont reconstruits depuis `AnalystContext`. Le LLM ne décide pas qu'une
+   phrase est grounded. Le backend renderer (`rendering.py`) est la seule
+   source des phrases factuelles publiées.
 3. `ClaimValidator` compare les claims aux valeurs du contexte.
    `EvidenceValidator` exige un `evidence_id` connu et un
    `evidence.type` compatible (`odds` ne valide pas `model_probability`).

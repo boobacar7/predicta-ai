@@ -24,6 +24,12 @@ ATTACK_NARRATIVES = (
     "EV is high for HOME",
     "AWAY should be considered more likely",
     "HOME looks like a coin flip at 50",
+    "The visitor is the favorite",
+    "EV looks strong",
+    "psg",
+    "real madrid",
+    "ＨＯＭＥ",
+    "extérieur",
 )
 
 
@@ -33,18 +39,27 @@ def _attack(payload: dict[str, object]) -> tuple[str, str | None, str]:
     return explanation.provider, provider.last_fallback_reason, explanation.summary
 
 
-def test_adversarial_prose_without_claims_never_reaches_llm_provider() -> None:
+def test_adversarial_prose_is_ignored_even_without_claims() -> None:
     for narrative in ATTACK_NARRATIVES:
-        provider, reason, summary = _attack({"narrative": narrative, "claims": []})
-        assert provider == ANALYST_PROVIDER_ID, narrative
-        assert reason is not None, narrative
+        provider, reason, summary = _attack(
+            {
+                "style": {"tone": "neutral", "verbosity": "short", "focus": "prediction"},
+                "narrative": narrative,
+                "claims": [],
+            }
+        )
+        assert provider == LLM_ANALYST_PROVIDER_ID, narrative
+        assert reason is None, narrative
         lowered = summary.casefold()
+        assert narrative.casefold() not in lowered
         assert "away is more likely than home" not in lowered
         assert "more likely than not" not in lowered
         assert "the favorite is away" not in lowered
         assert "around 50" not in lowered
         assert "around fifty" not in lowered
         assert "high ev" not in lowered
+        assert "visitor is the favorite" not in lowered
+        assert "looks strong" not in lowered
 
 
 def test_adversarial_false_claims_never_reach_llm_provider() -> None:
@@ -102,22 +117,31 @@ def test_adversarial_false_claims_never_reach_llm_provider() -> None:
         ],
     ]
     for claims in attacks:
-        provider, reason, summary = _attack({"narrative": "The match appears open.", "claims": claims})
+        provider, reason, summary = _attack(
+            {
+                "style": {"tone": "neutral", "verbosity": "short", "focus": "prediction"},
+                "narrative": "The match appears open.",
+                "claims": claims,
+            }
+        )
         assert provider == ANALYST_PROVIDER_ID, claims
         assert reason == "AnalystGroundingError"
         assert "away is more likely than home" not in summary.casefold()
 
 
-def test_true_claims_cannot_smuggle_contradictory_prose() -> None:
+def test_true_claims_ignore_contradictory_prose() -> None:
     provider, reason, summary = _attack(
         {
+            "style": {"tone": "neutral", "verbosity": "short", "focus": "prediction"},
             "narrative": "AWAY is more likely than HOME",
             "claims": [HOME_PROBABILITY_CLAIM, HOME_FAVORITE_CLAIM],
         }
     )
-    assert provider == ANALYST_PROVIDER_ID
-    assert reason == "AnalystGroundingError"
+    assert provider == LLM_ANALYST_PROVIDER_ID
+    assert reason is None
     assert "away is more likely than home" not in summary.casefold()
+    assert "41,7 %" in summary
+    assert "HOME" in summary
 
 
 def test_valid_structured_pack_still_reaches_llm_provider() -> None:
@@ -125,3 +149,5 @@ def test_valid_structured_pack_still_reaches_llm_provider() -> None:
     explanation = provider.generate_analysis(_lincoln_context())
     assert explanation.provider == LLM_ANALYST_PROVIDER_ID
     assert provider.last_fallback_reason is None
+    assert "the match appears open" not in explanation.summary.casefold()
+    assert "Le favori du modèle est HOME" in explanation.summary
