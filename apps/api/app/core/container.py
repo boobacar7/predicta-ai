@@ -72,6 +72,7 @@ class AppContainer:
                 registry_dir=self.settings.football_registry_dir,
                 dataset_path=self.settings.football_dataset_path,
                 model_version=self.settings.football_model_version,
+                prematch_dataset_path=self.settings.football_prematch_dataset_path,
             )
         return self._football_predictions
 

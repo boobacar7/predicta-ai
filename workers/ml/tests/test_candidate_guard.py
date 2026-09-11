@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from predicta_ml.constants import CANDIDATE_MODEL_VERSION, CANDIDATE_STATUS
+from predicta_ml.constants import CANDIDATE_MODEL_VERSION, CANDIDATE_STATUS, ELO_HOME_ADVANTAGE, ELO_K
 
 ROOT = Path(__file__).resolve().parents[1]
 REPORTS = ROOT / "reports"
@@ -16,6 +16,8 @@ def test_candidate_constants_are_not_production() -> None:
     assert CANDIDATE_STATUS == "candidate"
     assert CANDIDATE_STATUS != "champion"
     assert CANDIDATE_STATUS != "production"
+    assert ELO_K == 20.0
+    assert ELO_HOME_ADVANTAGE == 80.0
 
 
 def test_committed_candidate_reports_are_not_promoted() -> None:

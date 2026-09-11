@@ -18,9 +18,11 @@ from predicta_ingestion.identity.resolver import IdentityResolver
 from predicta_ingestion.ids import stable_entity_id
 from predicta_ingestion.ml.dataset import MlDataset, build_ml_dataset
 from predicta_ingestion.ml.export import write_dataset_artifacts
+from predicta_ingestion.ml.prematch import build_prematch_features, write_prematch_artifacts
 from predicta_ingestion.ml.quality import build_quality_report
 from predicta_ingestion.persistence.load import hydrate_match_keys_from_sql, hydrate_resolver_from_sql, load_memory_sink
 from predicta_ingestion.persistence.memory import MemoryCanonicalSink, TeeCanonicalSink
+from predicta_ingestion.persistence.schema import require_odds_history_schema
 from predicta_ingestion.persistence.sql import SqlCanonicalSink
 from predicta_ingestion.pipeline import IngestionPipeline, IngestionReport
 from predicta_ingestion.pit.store import PointInTimeStore
@@ -75,6 +77,17 @@ def main(argv: list[str] | None = None) -> int:
         "--write-dataset",
         dest="write_dataset",
         default="./var/football-1x2-history.json",
+        help="Output JSON path. Parquet and quality sidecar files use the same stem.",
+    )
+    prematch = sub.add_parser(
+        "build-prematch-features",
+        help="Build unlabeled PIT features for scheduled fixtures. Does not train or promote a model.",
+    )
+    prematch.add_argument("--league", default="all", help=f"League slug, alias (MLS), or 'all'. {_LEAGUE_HELP}")
+    prematch.add_argument(
+        "--write-dataset",
+        dest="write_dataset",
+        default="./var/football-1x2-prematch.json",
         help="Output JSON path. Parquet and quality sidecar files use the same stem.",
     )
     args = parser.parse_args(argv)
@@ -158,6 +171,22 @@ def _dispatch(args: argparse.Namespace, settings: Settings) -> dict[str, object]
         payload = _dataset_summary(dataset)
         payload["dataset_paths"] = write_dataset_artifacts(dataset, args.write_dataset, store=store)
         payload["quality"] = build_quality_report(dataset, store=store)
+        return payload
+    if args.command == "build-prematch-features":
+        store = _sql_store(settings)
+        features = build_prematch_features(
+            store,
+            competition=None if args.league in {None, "", "all"} else args.league,
+        )
+        payload = {
+            "dataset_version": features.dataset_version,
+            "feature_schema_version": features.feature_schema_version,
+            "feature_origin": features.feature_origin,
+            "observation_count": features.observation_count,
+            "rejected_count": features.rejected_count,
+            "labeled": False,
+        }
+        payload["dataset_paths"] = write_prematch_artifacts(features, args.write_dataset)
         return payload
     raise RuntimeError(f"Unknown command '{args.command}'.")
 
@@ -371,6 +400,7 @@ def _build_pipeline(
     if dry_run:
         if odds:
             engine = create_engine(settings.database_url, pool_pre_ping=True, future=True)
+            require_odds_history_schema(engine)
             hydrate_match_keys_from_sql(resolver, engine)
         sink = memory
     elif history:
@@ -381,6 +411,7 @@ def _build_pipeline(
         engine = create_engine(settings.database_url, pool_pre_ping=True, future=True)
         hydrate_resolver_from_sql(resolver, engine)
         if odds:
+            require_odds_history_schema(engine)
             hydrate_match_keys_from_sql(resolver, engine)
         sink = SqlCanonicalSink(clock=clock, engine=engine)
     return IngestionPipeline(

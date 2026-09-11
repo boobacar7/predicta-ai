@@ -92,3 +92,61 @@ def reconstruct_pre_match_elo(
         ratings[home_id] = ratings[home_id] + k * (home_actual - home_expected)
         ratings[away_id] = ratings[away_id] + k * (away_score - away_expected)
     return pre_match
+
+
+def snapshot_pre_match_elo(
+    matches: Sequence[Match],
+    *,
+    initial: float = INITIAL_ELO,
+    k: float = ELO_K,
+    home_advantage: float = HOME_ADVANTAGE,
+) -> dict[str, tuple[float, float]]:
+    """Snapshot pre-match Elo for finished *and* unlabeled matches.
+
+    Finished matches still update ratings only at `available_at` with the same
+    K / home advantage as `reconstruct_pre_match_elo`. Scheduled matches are
+    snapshotted at kickoff and never contribute a score or rating update.
+    """
+    finished: list[Match] = []
+    unlabeled: list[Match] = []
+    for match in matches:
+        if not match.home_team_id or not match.away_team_id:
+            continue
+        if (
+            match.status is MatchStatus.FINISHED
+            and match.home_score is not None
+            and match.away_score is not None
+        ):
+            finished.append(match)
+        else:
+            unlabeled.append(match)
+    events: list[tuple[object, int, str, str, Match]] = []
+    for match in finished:
+        events.append((ensure_utc(match.kickoff_at), 0, match.id, "snapshot", match))
+        events.append((ensure_utc(match.provenance.available_at), 1, match.id, "update", match))
+    for match in unlabeled:
+        events.append((ensure_utc(match.kickoff_at), 0, match.id, "snapshot", match))
+    events.sort(key=lambda item: (item[0], item[1], item[2]))
+    ratings: dict[str, float] = defaultdict(lambda: initial)
+    pre_match: dict[str, tuple[float, float]] = {}
+    for _when, _order, _match_id, kind, match in events:
+        home_id = match.home_team_id or ""
+        away_id = match.away_team_id or ""
+        if kind == "snapshot":
+            pre_match[match.id] = (ratings[home_id], ratings[away_id])
+            continue
+        home_goals = match.home_score
+        away_goals = match.away_score
+        if home_goals is None or away_goals is None:
+            continue
+        home_expected = expected_score(ratings[home_id] + home_advantage, ratings[away_id])
+        away_expected = 1.0 - home_expected
+        if home_goals > away_goals:
+            home_actual, away_score = 1.0, 0.0
+        elif home_goals < away_goals:
+            home_actual, away_score = 0.0, 1.0
+        else:
+            home_actual, away_score = 0.5, 0.5
+        ratings[home_id] = ratings[home_id] + k * (home_actual - home_expected)
+        ratings[away_id] = ratings[away_id] + k * (away_score - away_expected)
+    return pre_match

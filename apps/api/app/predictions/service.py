@@ -5,7 +5,12 @@ from pathlib import Path
 
 from app.core.clock import Clock
 from app.predictions.exceptions import ArtefactNotFoundError, PitFeaturesUnavailableError
-from app.predictions.features import ParquetPitFeatureStore, PitFeatureStore
+from app.predictions.features import (
+    CompositePitFeatureStore,
+    ParquetPitFeatureStore,
+    PitFeatureStore,
+    PrematchParquetFeatureStore,
+)
 from app.predictions.models import load_football_1x2_model
 from app.predictions.provenance import prediction_envelope_data_mode
 from app.predictions.types import MARKET_1X2, SPORT_FOOTBALL, Football1x2Model
@@ -68,6 +73,7 @@ def build_football_prediction_service(
     registry_dir: Path,
     dataset_path: Path,
     model_version: str,
+    prematch_dataset_path: Path | None = None,
 ) -> FootballPredictionService:
     if not dataset_path.expanduser().resolve().is_file():
         raise PitFeaturesUnavailableError(f"PIT dataset parquet was not found: {dataset_path}")
@@ -75,8 +81,12 @@ def build_football_prediction_service(
         raise ArtefactNotFoundError(
             f"Registry artefact not found: {registry_dir / model_version / 'artefact.joblib'}"
         )
+    stores: list[PitFeatureStore] = [ParquetPitFeatureStore(dataset_path)]
+    if prematch_dataset_path is not None and prematch_dataset_path.expanduser().resolve().is_file():
+        stores.append(PrematchParquetFeatureStore(prematch_dataset_path))
+    features: PitFeatureStore = stores[0] if len(stores) == 1 else CompositePitFeatureStore(stores)
     return FootballPredictionService(
         clock=clock,
-        features=ParquetPitFeatureStore(dataset_path),
+        features=features,
         model=load_football_1x2_model(registry_dir=registry_dir, model_version=model_version),
     )

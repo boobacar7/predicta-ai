@@ -74,5 +74,6 @@ class InjuryStatus(StrEnum):
 class ResolutionMethod(StrEnum):
     EXACT_ID = "exact_id"
     HISTORICAL_ALIAS = "historical_alias"
+    EXPLICIT_ALIAS = "explicit_alias"
     NORMALIZED_NAME = "normalized_name"
     MANUAL = "manual"

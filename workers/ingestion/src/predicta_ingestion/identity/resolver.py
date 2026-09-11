@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from predicta_ingestion.canonical.enums import DataMode, EntityType, ResolutionMethod
 from predicta_ingestion.canonical.models import CanonicalBatch, League, OddsSnapshot, Provenance, Team
 from predicta_ingestion.clock import Clock
+from predicta_ingestion.identity.aliases import apply_team_name_aliases
 from predicta_ingestion.identity.historical import provider_franchise_key
 from predicta_ingestion.identity.keys import competition_slug, league_provider_key, team_name_key
 from predicta_ingestion.providers.the_odds_api import LIVE_ODDS_PROVIDER
@@ -149,10 +150,15 @@ class IdentityResolver:
         batch.odds = kept_odds
         return quarantined
 
-    def bind_match_natural_key(self, natural_key: str, canonical_id: str) -> None:
+    def bind_match_natural_key(self, natural_key: str, canonical_id: str) -> bool:
         """Restore a previously ingested match so later odds can join without guessing."""
-        if natural_key and natural_key not in self._by_match_key:
+        if not natural_key:
+            return False
+        existing = self._by_match_key.get(natural_key)
+        if existing is None:
             self._by_match_key[natural_key] = canonical_id
+            return True
+        return existing == canonical_id
 
     def hydrate(self, bindings: list[IdentityBinding]) -> None:
         """Restore previously persisted maps so later competitions reuse canonical ids."""
@@ -444,8 +450,9 @@ class IdentityResolver:
         data_mode: DataMode,
     ) -> bool:
         key = snapshot.match_natural_key
-        if key and key in self._by_match_key:
-            snapshot.match_id = self._by_match_key[key]
+        matched = self._lookup_odds_match_key(key, snapshot.provenance.provider)
+        if matched is not None:
+            snapshot.match_id, method, detail = matched
             self._record(
                 entity_type="odds_snapshot",
                 provider=snapshot.provenance.provider,
@@ -453,10 +460,10 @@ class IdentityResolver:
                 provider_name=key,
                 canonical_id=snapshot.match_id,
                 canonical_name=self._canonical_names.get(snapshot.match_id),
-                method=ResolutionMethod.EXACT_ID,
+                method=method,
                 confidence=1.0,
                 status="resolved",
-                detail="Odds snapshot linked via football|home|away|kickoff.",
+                detail=detail,
             )
             return True
         # Mock odds may exist without a Sportmonks match. Live The Odds API must not.
@@ -491,6 +498,28 @@ class IdentityResolver:
             )
         )
         return False
+
+    def _lookup_odds_match_key(
+        self,
+        key: str | None,
+        provider: str,
+    ) -> tuple[str, ResolutionMethod, str] | None:
+        if not key:
+            return None
+        exact = self._by_match_key.get(key)
+        if exact is not None:
+            return exact, ResolutionMethod.EXACT_ID, "Odds snapshot linked via football|home|away|kickoff."
+        aliased = apply_team_name_aliases(key, provider)
+        if aliased == key:
+            return None
+        mapped = self._by_match_key.get(aliased)
+        if mapped is None:
+            return None
+        return (
+            mapped,
+            ResolutionMethod.EXPLICIT_ALIAS,
+            "Odds snapshot linked via explicit provider team alias.",
+        )
 
     def _ambiguous(
         self,

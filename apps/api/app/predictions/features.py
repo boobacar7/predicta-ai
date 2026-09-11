@@ -143,3 +143,90 @@ class ParquetPitFeatureStore:
             elo_diff=float(row["elo_diff"]),
             elo_available=elo_available,
         )
+
+
+class PrematchParquetFeatureStore:
+    """Reads unlabeled scheduled PIT rows. Never invents labels or Elo."""
+
+    def __init__(self, path: Path) -> None:
+        import pyarrow.parquet as pq
+
+        resolved = path.expanduser().resolve()
+        if not resolved.is_file():
+            raise PitFeaturesUnavailableError(f"Prematch PIT parquet was not found: {resolved}")
+        frame = pq.read_table(resolved).to_pandas()
+        required = (
+            "match_id",
+            "event_at",
+            "cutoff_policy",
+            "dataset_version",
+            "data_mode",
+            "home_elo_pre",
+            "away_elo_pre",
+            "elo_diff",
+        )
+        missing = [name for name in required if name not in frame.columns]
+        if missing:
+            raise PitFeaturesUnavailableError(f"Prematch PIT parquet is missing columns: {missing}")
+        if "home_win" in frame.columns or "away_win" in frame.columns or "draw" in frame.columns:
+            raise PitFeaturesUnavailableError(
+                "Prematch PIT parquet must remain unlabeled; refuse files that contain 1X2 labels."
+            )
+        self._feature_schema_version = (
+            str(frame["feature_schema_version"].iloc[0])
+            if "feature_schema_version" in frame.columns and len(frame.index)
+            else "football-1x2-features-0.3"
+        )
+        self._index = {str(match_id): position for position, match_id in enumerate(frame["match_id"].tolist())}
+        self._frame = frame
+
+    def get_pit_features(self, match_id: str, cutoff_at: datetime | None) -> PitEloFeatures:
+        position = self._index.get(match_id)
+        if position is None:
+            raise PitFeaturesUnavailableError(f"No PIT features are available for match '{match_id}'.")
+        row = self._frame.iloc[position]
+        event_at = row["event_at"]
+        if hasattr(event_at, "to_pydatetime"):
+            event_at = event_at.to_pydatetime()
+        elo_available = int(row["elo_available"]) if "elo_available" in row.index else 1
+        parsed_event: datetime
+        if isinstance(event_at, datetime):
+            parsed_event = event_at
+        else:
+            parsed_event = parse_rfc3339(str(event_at))
+        schema_version = (
+            str(row["feature_schema_version"])
+            if "feature_schema_version" in row.index
+            else self._feature_schema_version
+        )
+        return validate_elo_snapshot(
+            match_id=str(row["match_id"]),
+            event_at=parsed_event,
+            cutoff_at=cutoff_at,
+            cutoff_policy=str(row["cutoff_policy"]),
+            dataset_version=str(row["dataset_version"]),
+            feature_schema_version=schema_version,
+            data_mode=str(row["data_mode"]),
+            home_elo_pre=float(row["home_elo_pre"]),
+            away_elo_pre=float(row["away_elo_pre"]),
+            elo_diff=float(row["elo_diff"]),
+            elo_available=elo_available,
+        )
+
+
+class CompositePitFeatureStore:
+    """History parquet first, then unlabeled pre-match overlay. Leakage errors propagate."""
+
+    def __init__(self, stores: list[PitFeatureStore]) -> None:
+        if not stores:
+            raise PitFeaturesUnavailableError("No PIT feature stores are configured.")
+        self._stores = stores
+
+    def get_pit_features(self, match_id: str, cutoff_at: datetime | None) -> PitEloFeatures:
+        last_missing: PitFeaturesUnavailableError | None = None
+        for store in self._stores:
+            try:
+                return store.get_pit_features(match_id, cutoff_at)
+            except PitFeaturesUnavailableError as exc:
+                last_missing = exc
+        raise last_missing or PitFeaturesUnavailableError(f"No PIT features are available for match '{match_id}'.")
