@@ -40,11 +40,53 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=None,
         help="Directory for the candidate registry and validation JSON.",
     )
+    oos_parser = sub.add_parser(
+        "oos-backtest",
+        help="True temporal OOS backtest of the frozen football-elo-v1-candidate. Does not retune or promote.",
+    )
+    _add_dataset_option(oos_parser)
+    oos_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=None,
+        help="Directory for provenance and OOS JSON reports (default: workers/ml/reports).",
+    )
     args = parser.parse_args(argv)
     dataset_path = _resolve_dataset(args.dataset)
     if args.command == "audit":
         report = audit_dataset(load_football_dataset(dataset_path))
         print(json.dumps(report, indent=2, sort_keys=True))
+        return 0
+    if args.command == "oos-backtest":
+        from predicta_ml.constants import default_committed_reports_dir
+        from predicta_ml.oos.runner import run_from_paths, write_reports
+
+        run = run_from_paths(dataset_path)
+        paths = write_reports(run, output_dir=args.output_dir or default_committed_reports_dir())
+        print(
+            json.dumps(
+                {
+                    "verdict": run.report["verdict"],
+                    "candidate_promoted": False,
+                    "window": run.report["window"],
+                    "prediction": {
+                        "n": run.report["prediction"]["n"],
+                        "log_loss": run.report["prediction"]["log_loss"],
+                        "brier_score": run.report["prediction"]["brier_score"],
+                        "ece": run.report["prediction"]["ece"],
+                        "accuracy": run.report["prediction"]["accuracy"],
+                    },
+                    "odds": run.report["odds"],
+                    "ai_picks": {
+                        "n_picks": run.report["ai_picks"]["n_picks"],
+                        "sample_note": run.report["ai_picks"]["sample_note"],
+                    },
+                    "paths": paths,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
         return 0
     output_dir = args.output_dir or default_output_dir()
     if args.command == "validate-elo":

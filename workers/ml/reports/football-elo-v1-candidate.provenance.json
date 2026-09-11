@@ -1,0 +1,102 @@
+{
+  "constants_checked": {
+    "dataset_version": "football-1x2-history-0.3",
+    "expected_code_version": "0.1.0+e8b76d7",
+    "expected_dataset_sha256": "0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5",
+    "feature_schema_version": "football-1x2-features-0.3"
+  },
+  "earliest_legitimate_oos": "2026-07-01T00:00:00+00:00",
+  "kind": "football-elo-v1-candidate-provenance",
+  "model": {
+    "calibration": {
+      "fit": {
+        "end_exclusive": "2026-05-01T00:00:00+00:00",
+        "rows": 985,
+        "start": "2026-01-01T00:00:00+00:00"
+      },
+      "latest_event_at_exclusive": "2026-07-01T00:00:00+00:00",
+      "method": "sigmoid",
+      "select": {
+        "end_exclusive": "2026-07-01T00:00:00+00:00",
+        "rows": 263,
+        "start": "2026-05-01T00:00:00+00:00"
+      }
+    },
+    "calibration_method": "sigmoid",
+    "code_version": "0.1.0+e8b76d7",
+    "created_at": "2026-09-10T17:43:36.436814+00:00",
+    "dataset_sha256": "0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5",
+    "dataset_version": "football-1x2-history-0.3",
+    "feature_schema_version": "football-1x2-features-0.3",
+    "freeze": {
+      "artefact_created_at": "2026-09-10T17:43:36.436814+00:00",
+      "earliest_legitimate_oos": "2026-07-01T00:00:00+00:00",
+      "note": "The artefact is temporally frozen at calibration_select end_exclusive. Matches with event_at >= that instant are the only legitimate OOS sample for this frozen candidate, including its sigmoid calibrator.",
+      "temporal_freeze_at": "2026-07-01T00:00:00+00:00"
+    },
+    "hyperparameters": {
+      "draw_base": 0.2774078149235929,
+      "draw_decay": 1.109649124607505,
+      "home_advantage": 80.0,
+      "initial": 1500.0,
+      "k": 20.0,
+      "scale": 400.0,
+      "source_elo_parameters": "dataset football-1x2-history-0.3 (k=20, initial=1500)",
+      "status": "candidate"
+    },
+    "model_version": "football-elo-v1-candidate",
+    "promoted_to_production": false,
+    "selected_model": "elo",
+    "source_path": "/Users/boubacar/Development/predicta-ai/workers/ml/reports/football-elo-v1-candidate.registry.json",
+    "status": "candidate",
+    "test": {
+      "end_exclusive": "2026-09-10T02:30:01+00:00",
+      "rows": 387,
+      "start": "2026-07-01T00:00:00+00:00"
+    },
+    "training": {
+      "end_exclusive": "2026-01-01T00:00:00+00:00",
+      "latest_available_at_note": "available_at is not a parquet column. Data-layer Elo updates use event_at + 3h; training labels satisfy event_at < train_end_exclusive.",
+      "latest_event_at_exclusive": "2026-01-01T00:00:00+00:00",
+      "rows": 4094,
+      "start": "2024-02-22T00:00:00+00:00"
+    }
+  },
+  "rejected_periods": [
+    {
+      "end_exclusive": "2026-01-01T00:00:00+00:00",
+      "name": "final_train_including_2024_windows",
+      "reason": "football-elo-v1-candidate draw transform was fit on final_train (event_at < 2026-01-01). Windows W01\u2013W03 are inside that partition and are not OOS for the frozen artefact.",
+      "start": "2024-02-22T00:00:00+00:00",
+      "temporal_split": "final_train"
+    },
+    {
+      "end_exclusive": "2025-07-01T00:00:00+00:00",
+      "name": "fold_1_validation",
+      "reason": "Walk-forward fold_1 validation. Not a held-out OOS window for the frozen artefact.",
+      "start": "2025-01-01T00:00:00+00:00",
+      "temporal_split": "fold_1_validation"
+    },
+    {
+      "end_exclusive": "2026-01-01T00:00:00+00:00",
+      "name": "fold_2_validation",
+      "reason": "Walk-forward fold_2 validation. Not a held-out OOS window for the frozen artefact.",
+      "start": "2025-07-01T00:00:00+00:00",
+      "temporal_split": "fold_2_validation"
+    },
+    {
+      "end_exclusive": "2026-05-01T00:00:00+00:00",
+      "name": "calibration_fit",
+      "reason": "Sigmoid calibrator was fit on this window. Invalid as OOS for the frozen artefact.",
+      "start": "2026-01-01T00:00:00+00:00",
+      "temporal_split": "calibration_fit"
+    },
+    {
+      "end_exclusive": "2026-07-01T00:00:00+00:00",
+      "name": "calibration_select_including_may_2026",
+      "reason": "Sigmoid calibration method was selected on this window (n=263). May 2026 historical-odds pilots are calibration_select, not OOS.",
+      "start": "2026-05-01T00:00:00+00:00",
+      "temporal_split": "calibration_select"
+    }
+  ]
+}

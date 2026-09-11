@@ -27,6 +27,10 @@ from app.odds.types import OddsSnapshot  # noqa: E402
 
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
+    if args and args[0] == "production-oos":
+        json.dump(_production_oos_payload(), sys.stdout, indent=2, sort_keys=True, default=str)
+        sys.stdout.write("\n")
+        return 0
     if args and args[0] == "persisted-weekend":
         json.dump(_persisted_weekend_payload(), sys.stdout, indent=2, sort_keys=True, default=str)
         sys.stdout.write("\n")
@@ -48,6 +52,23 @@ def main(argv: list[str] | None = None) -> int:
     json.dump(payload, sys.stdout, indent=2, sort_keys=True, default=str)
     sys.stdout.write("\n")
     return 0
+
+
+def _production_oos_payload() -> dict[str, object]:
+    from predicta_ml.constants import default_committed_reports_dir
+    from predicta_ml.oos.runner import run_from_paths, write_reports
+
+    from app.backtesting.production_oos import optional_persisted_oos_quotes, production_calculator
+
+    dataset = repository_root() / "workers" / "ingestion" / "var" / "football-1x2-history.parquet"
+    quotes = optional_persisted_oos_quotes()
+    run = run_from_paths(dataset, quotes=quotes, calculator=production_calculator())
+    paths = write_reports(run, output_dir=default_committed_reports_dir())
+    payload = dict(run.report)
+    payload["paths"] = paths
+    payload["odds_source"] = "persisted_analytical_dataset" if quotes else "none"
+    payload["new_api_credits"] = 0
+    return payload
 
 
 def _persisted_weekend_payload() -> dict[str, object]:
