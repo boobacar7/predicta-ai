@@ -6,6 +6,8 @@ from typing import Literal
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.value_engine.calculator import VALUE_ENGINE_VERSION
+
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 
 DataMode = Literal["mock", "live"]
@@ -33,7 +35,7 @@ class Settings(BaseSettings):
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
     request_id_header: str = "X-Request-ID"
     mock_now: str = "2026-09-09T18:00:00Z"
-    value_formula_version: str = "value-engine-0.1"
+    value_formula_version: str = VALUE_ENGINE_VERSION
     analyst_narrator: AnalystNarrator = "deterministic"
     analyst_llm_model: str = "mock-explainer-0.1"
     analyst_prompt_version: str = "analyst-prompt-0.1"

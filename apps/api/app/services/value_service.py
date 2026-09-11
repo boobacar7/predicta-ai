@@ -1,6 +1,6 @@
-from app.domain import value_engine as ve
 from app.schemas import MatchDetail, OddsSelection, OddsSnapshot, ValueOpportunity, ValuePreview
 from app.services.projections import to_match_summary
+from app.value_engine import calculator
 
 
 def value_preview_for_match(match: MatchDetail) -> ValuePreview | None:
@@ -30,12 +30,12 @@ def opportunities_for_match(match: MatchDetail) -> list[ValueOpportunity]:
             continue
         if selection.decimal_odds is None:
             continue
-        implied = ve.implied_probability_raw(selection.decimal_odds)
         market_odds = [item.decimal_odds for item in odds.selections if item.decimal_odds is not None]
-        no_vig = ve.no_vig_probability(selection.decimal_odds, market_odds)
-        edge_raw = ve.edge(outcome.calibrated_probability, implied)
-        edge_no_vig = ve.edge(outcome.calibrated_probability, no_vig)
-        expected = ve.expected_value(outcome.calibrated_probability, selection.decimal_odds)
+        implied = calculator.implied_probability(selection.decimal_odds)
+        no_vig = calculator.no_vig_probability(selection.decimal_odds, market_odds)
+        edge_raw = calculator.edge(outcome.calibrated_probability, implied)
+        edge_no_vig = calculator.edge(outcome.calibrated_probability, no_vig)
+        expected = calculator.expected_value(outcome.calibrated_probability, selection.decimal_odds)
         items.append(
             ValueOpportunity(
                 id=f"val_{match.id}_{outcome.selection}",
@@ -45,13 +45,13 @@ def opportunities_for_match(match: MatchDetail) -> list[ValueOpportunity]:
                 selection_label=outcome.label,
                 calibrated_probability=outcome.calibrated_probability,
                 decimal_odds=selection.decimal_odds,
-                implied_probability_raw=ve.to_float(implied),
-                no_vig_probability=ve.to_float(no_vig),
-                overround=odds.overround,
-                edge_raw=ve.to_float(edge_raw),
-                edge_no_vig=ve.to_float(edge_no_vig),
-                expected_value=ve.to_float(expected),
-                formula_version=ve.FORMULA_VERSION,
+                implied_probability_raw=float(implied),
+                no_vig_probability=float(no_vig),
+                overround=float(calculator.overround(market_odds)),
+                edge_raw=float(edge_raw),
+                edge_no_vig=float(edge_no_vig),
+                expected_value=float(expected),
+                formula_version=calculator.VALUE_ENGINE_VERSION,
                 odds_observed_at=odds.observed_at,
                 prediction_cutoff_at=prediction.cutoff_at,
                 quality=odds.quality,

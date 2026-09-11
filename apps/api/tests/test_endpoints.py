@@ -45,6 +45,8 @@ def test_picks_value_performance_analyst() -> None:
     item = next(row for row in values["items"] if row["id"].endswith("mth_northgate_harbor_home"))
     assert item["edge_raw"] == pytest.approx(item["calibrated_probability"] - item["implied_probability_raw"])
     assert item["expected_value"] == pytest.approx(item["calibrated_probability"] * item["decimal_odds"] - 1)
+    assert item["overround"] == pytest.approx(item["implied_probability_raw"] / item["no_vig_probability"])
+    assert item["formula_version"] == "value-engine-0.1"
     performance = client.get("/api/v1/performance").json()["data"]
     assert performance["summary"]["theoretical_max_drawdown"] <= 0
     session = client.post(

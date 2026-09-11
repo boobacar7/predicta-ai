@@ -205,6 +205,8 @@ def get_value(
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ) -> dict[str, object]:
+    """Catalog prototype. Football product value uses GET /football/value/{match_id}."""
+
     items = _container(request).values.list_values(sport=sport, league_id=league_id, match_date=date, status=status)
     return envelope(request, paginate(items, limit=limit, offset=offset))
 

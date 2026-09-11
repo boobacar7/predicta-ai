@@ -304,8 +304,8 @@ expected_value = (p * o) - 1
 Pour un marché exhaustif, le moteur peut calculer :
 
 ```text
-overround = sum(1 / odds_i) - 1
-no_vig_probability_i = (1 / odds_i) / sum(1 / odds_j)
+overround = sum(1 / odds_i)
+no_vig_probability_i = (1 / odds_i) / overround
 edge_no_vig = p_i - no_vig_probability_i
 ```
 

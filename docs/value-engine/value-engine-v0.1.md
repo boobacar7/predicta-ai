@@ -9,6 +9,12 @@ Service. Il ne calcule, ne corrige et ne remplace aucune probabilité du modèle
 Le moteur fournit une analyse statistique. Il ne produit ni recommandation,
 ni certitude sur un résultat, ni promesse de rendement.
 
+L'implémentation serveur unique est `apps/api/app/value_engine/calculator.py`.
+La version `value-engine-0.1` y est définie une seule fois. Les surfaces
+catalogue (`GET /value`) et football (`GET /football/value/{match_id}`)
+réutilisent ce calculateur. `overround` est la somme des probabilités
+implicites, jamais `Σ 1/odds − 1`.
+
 ## Entrées obligatoires
 
 Une évaluation exige :

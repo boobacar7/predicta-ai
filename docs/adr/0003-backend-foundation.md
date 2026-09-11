@@ -38,8 +38,10 @@ edge = model_probability - implied_probability
 expected_value = (model_probability × odds) - 1
 ```
 
-Le no-vig et l'overround sont dérivés du même snapshot. La version de formule
-est `value-engine-0.1`. Les calculs utilisent `Decimal`.
+Le no-vig et l'overround sont dérivés du même snapshot. `overround` est la
+somme des probabilités implicites brutes (`Σ 1/odds`), pas la marge
+`Σ 1/odds − 1`. La version de formule est `value-engine-0.1`, définie une
+seule fois dans `app.value_engine.calculator`. Les calculs utilisent `Decimal`.
 
 ### 4. AI Analyst sans LLM
 

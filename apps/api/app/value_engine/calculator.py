@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from decimal import Decimal, InvalidOperation
 
 from app.odds.types import Football1x2Selection, decimal_odds
@@ -30,22 +30,29 @@ def implied_probability(odds: Decimal | float | str) -> Decimal:
     return result
 
 
+def overround(odds: Sequence[Decimal | float | str]) -> Decimal:
+    """Sum of implied probabilities. This is not the bookmaker margin (sum - 1)."""
+
+    if not odds:
+        raise ValueError("Market overround requires at least one decimal odds.")
+    return _overround_from_implied(implied_probability(item) for item in odds)
+
+
+def no_vig_probability(
+    odds: Decimal | float | str,
+    market_odds: Sequence[Decimal | float | str],
+) -> Decimal:
+    return implied_probability(odds) / overround(market_odds)
+
+
 def no_vig_probabilities(
     odds_by_selection: Mapping[Football1x2Selection, Decimal],
 ) -> tuple[dict[Football1x2Selection, Decimal], Decimal]:
     if set(odds_by_selection) != set(Football1x2Selection):
         raise ValueError("No-vig calculation requires a complete football 1X2 market.")
-    raw = {
-        selection: implied_probability(odds)
-        for selection, odds in odds_by_selection.items()
-    }
-    overround = sum(raw.values(), Decimal(0))
-    if overround <= 0:
-        raise ValueError("Market overround must be positive.")
-    normalized = {
-        selection: value / overround
-        for selection, value in raw.items()
-    }
+    raw = {selection: implied_probability(odds) for selection, odds in odds_by_selection.items()}
+    market_overround = _overround_from_implied(raw.values())
+    normalized = {selection: value / market_overround for selection, value in raw.items()}
     residual = Decimal(1) - sum(normalized.values(), Decimal(0))
     if abs(residual) > NO_VIG_RESIDUAL_TOLERANCE:
         raise ArithmeticError("No-vig probabilities do not form a valid simplex.")
@@ -59,7 +66,7 @@ def no_vig_probabilities(
         raise ArithmeticError("No-vig probabilities must each lie in (0, 1).")
     if sum(simplex.values(), Decimal(0)) != Decimal(1):
         raise ArithmeticError("No-vig probabilities do not sum to 1.")
-    return simplex, overround
+    return simplex, market_overround
 
 
 def edge(model_probability: Decimal | float | str, implied: Decimal | float | str) -> Decimal:
@@ -71,3 +78,10 @@ def expected_value(
     odds: Decimal | float | str,
 ) -> Decimal:
     return probability(model_probability) * decimal_odds(odds) - Decimal(1)
+
+
+def _overround_from_implied(values: Iterable[Decimal]) -> Decimal:
+    total = sum(values, Decimal(0))
+    if total <= 0:
+        raise ValueError("Market overround must be positive.")
+    return total

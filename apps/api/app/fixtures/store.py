@@ -2,7 +2,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from app.core.clock import Clock
-from app.domain import value_engine as ve
 from app.fixtures.quality import quality, unavailable
 from app.schemas import (
     AvailabilityStatus,
@@ -33,6 +32,7 @@ from app.schemas import (
     TeamFormSide,
     UnavailableField,
 )
+from app.value_engine import calculator
 
 
 @dataclass
@@ -772,14 +772,14 @@ def _odds(
     from app.core.clock import parse_rfc3339
 
     market_odds = [row[2] for row in selections]
-    overround = ve.to_float(ve.overround(list(market_odds)))
+    overround = float(calculator.overround(market_odds))
     items = [
         OddsSelection(
             selection=selection,
             label=label,
             decimal_odds=odds,
-            implied_probability_raw=ve.to_float(ve.implied_probability_raw(odds)),
-            no_vig_probability=ve.to_float(ve.no_vig_probability(odds, list(market_odds))),
+            implied_probability_raw=float(calculator.implied_probability(odds)),
+            no_vig_probability=float(calculator.no_vig_probability(odds, market_odds)),
             quality=quality(clock, source="mock.bookmaker.atlas"),
         )
         for selection, label, odds in selections
