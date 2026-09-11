@@ -20,15 +20,11 @@ from app.ai_analyst.grounding import (
 from app.ai_analyst.llm_client import (
     ANALYST_LLM_TEMPERATURE,
     AnalystLLMClient,
-    AnalystLLMError,
     AnalystLLMResponseError,
 )
-from app.ai_analyst.models import (
-    ANALYST_PROVIDER_ID,
-    LLM_ANALYST_PROVIDER_ID,
-    FootballAnalystExplanation,
-)
+from app.ai_analyst.models import LLM_ANALYST_PROVIDER_ID, FootballAnalystExplanation
 from app.ai_analyst.statements import ClaimKind, FactualClaim, GroundedStatement, render_statements
+from app.core.errors import ApiError
 
 FORBIDDEN_LLM_FIELDS = frozenset(
     {
@@ -185,19 +181,21 @@ class LLMAnalystProvider:
 
     def generate_analysis(self, context: AnalystContext) -> FootballAnalystExplanation:
         self.last_fallback_reason = None
-        assembled = self._fallback.generate_analysis(context)
         try:
             statements = self._narrate(context)
             assert_statements_grounded(context, statements)
+            assembled = self._fallback.generate_analysis(context)
             return assembled.model_copy(
                 update={
                     "summary": render_statements(statements),
                     "provider": LLM_ANALYST_PROVIDER_ID,
                 }
             )
-        except (AnalystLLMError, AnalystGroundingError, ValidationError) as exc:
+        except ApiError:
+            raise
+        except Exception as exc:
             self.last_fallback_reason = type(exc).__name__
-            return assembled.model_copy(update={"provider": ANALYST_PROVIDER_ID})
+            return self._fallback.generate_analysis(context)
 
     def _narrate(self, context: AnalystContext) -> tuple[GroundedStatement, ...]:
         prompt = build_narration_prompt(context, prompt_version=self._prompt_version)

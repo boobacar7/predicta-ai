@@ -19,8 +19,12 @@ Le grounding V0.1 est validé : `AnalystContext` → `AnalystEvidence` →
 2. Le LLM ne retourne que `{ statements: [{ statement, evidence_ids }] }`.
    Probabilités, cotes, edge, EV, versions, cutoff et `data_mode` sont
    reconstruits depuis `AnalystContext`.
-3. Toute sortie invalide, expirée ou non grounded retombe sur
-   `DeterministicAnalystProvider`.
+3. Toute sortie invalide, expirée, non grounded, ou toute exception
+   non fatale du client/narrator retombe sur `DeterministicAnalystProvider`.
+   `assert_grounded` refuse les affirmations factuelles non supportées
+   (y compris paraphrases, magnitudes sans `%`, evidence de mauvais type,
+   inversion favori/valeur, entités hors contexte, `live` si `data_mode=mock`).
+   Le fallback ne masque pas les erreurs PIT / Prediction Service / Value Engine.
 4. Le client livré est `mock-explainer-0.1`. Aucun vendor LLM ni secret
    n'est introduit.
 5. `PREDICTA_API_ANALYST_NARRATOR` reste `deterministic` par défaut.
@@ -30,4 +34,6 @@ Le grounding V0.1 est validé : `AnalystContext` → `AnalystEvidence` →
 
 Le LLM est strictement downstream. Il ne peut pas écrire une prédiction,
 une cote, un EV ou un cutoff. `analyst.provider` peut valoir `llm-v0.1`
-uniquement lorsque la narration a passé `assert_grounded`.
+uniquement lorsque la narration a passé `assert_grounded`. Une narration
+rejetée ou un client défaillant produit `deterministic-v0.1` avec les
+mêmes champs métier reconstruits depuis `AnalystContext`.

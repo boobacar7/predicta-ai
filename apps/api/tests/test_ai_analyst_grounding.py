@@ -161,3 +161,49 @@ def test_service_rejects_summary_only_hallucination() -> None:
     )
     with pytest.raises(AnalystGroundingError, match="80"):
         service.explain("match_ai_analyst", CUTOFF)
+
+
+def test_summary_rejects_home_above_70_without_percent() -> None:
+    context = _context()
+    with pytest.raises(AnalystGroundingError):
+        assert_grounded(context, _with_summary(context, "HOME possède une probabilité supérieure à 70"))
+
+
+def test_summary_rejects_about_42_percent() -> None:
+    context = _context()
+    with pytest.raises(AnalystGroundingError):
+        assert_grounded(context, _with_summary(context, "HOME has about 42% model probability."))
+
+
+def test_summary_rejects_away_highest_probability() -> None:
+    context = _context()
+    with pytest.raises(AnalystGroundingError):
+        assert_grounded(context, _with_summary(context, "AWAY has the highest model probability."))
+
+
+def test_summary_rejects_home_best_value() -> None:
+    context = _context()
+    with pytest.raises(AnalystGroundingError):
+        assert_grounded(context, _with_summary(context, "HOME is the best value."))
+
+
+def test_summary_rejects_live_market_when_mock() -> None:
+    context = _context()
+    with pytest.raises(AnalystGroundingError, match="live"):
+        assert_grounded(context, _with_summary(context, "This analysis uses live market data."))
+
+
+def test_summary_rejects_injured_and_ranking() -> None:
+    context = _context()
+    with pytest.raises(AnalystGroundingError):
+        assert_grounded(context, _with_summary(context, "The striker is injured."))
+    with pytest.raises(AnalystGroundingError):
+        assert_grounded(context, _with_summary(context, "Le classement indique un avantage HOME."))
+
+
+def test_summary_rejects_psg_and_priced_odds() -> None:
+    context = _context()
+    with pytest.raises(AnalystGroundingError):
+        assert_grounded(context, _with_summary(context, "PSG has 41.7% model probability."))
+    with pytest.raises(AnalystGroundingError):
+        assert_grounded(context, _with_summary(context, "HOME is priced at 3.50"))

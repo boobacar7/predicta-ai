@@ -169,8 +169,21 @@ AnalystContext.evidence()
 
 Le LLM n'a pas le droit de définir `probabilities`, `odds`, `edge`, `EV`,
 `model_version`, `dataset_version`, `cutoff_at` ou `data_mode`. Toute
-sortie malformée, expirée, non grounded ou qui confond `model_favorite` et
-`value_selection` retombe sur `DeterministicAnalystProvider`.
+sortie malformée, expirée, non grounded, toute exception du client LLM,
+ou toute confusion `model_favorite` / `value_selection` retombe sur
+`DeterministicAnalystProvider`.
+
+`assert_grounded` est la boundary de sécurité du narrator : une affirmation
+numérique, comparative, d'entité, de blessure, de composition, de résultat,
+de classement ou de `data_mode` doit être supportée par `AnalystEvidence`.
+Une evidence d'un autre type (cote vs probabilité modèle, implicite vs
+probabilité modèle) est refusée. Le LLM ne devient jamais source of truth.
+
+Les erreurs du chemin narratif (`RuntimeError` client, timeout, JSON
+invalide, `AnalystGroundingError`) sont contenues dans `LLMAnalystProvider`
+et produisent un DTO déterministe complet. Les erreurs de source of truth
+(Prediction Service, Value Engine, PIT, identité introuvable) ne sont pas
+masquées.
 
 Le client livré est `mock-explainer-0.1` : un narrator déterministe qui
 parle le schéma LLM, sans vendor externe ni secret. Aucune dépendance LLM

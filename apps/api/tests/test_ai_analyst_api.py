@@ -206,3 +206,46 @@ def test_llm_narrator_stays_behind_the_same_http_boundary() -> None:
     serialized = response.text.casefold()
     assert not any(term in serialized for term in FORBIDDEN)
     _validate("FootballAiAnalystEnvelope", body)
+
+
+def test_llm_narrator_cannot_invert_lincoln_favorite_and_value() -> None:
+    client = make_client(analyst_narrator="llm", analyst_llm_model="mock-explainer-0.1")
+    data = client.get(f"/api/v1/football/ai-analyst/{MATCH_ID}").json()["data"]
+    assert data["home_team"] == "Lincoln Red Imps"
+    assert data["away_team"] == "Inter Club d'Escaldes"
+    assert data["model_favorite"] == "HOME"
+    assert data["value"]["value_selection"] == "AWAY"
+    assert data["model_favorite"] != data["value"]["value_selection"]
+    summary = data["analyst"]["summary"].casefold()
+    assert "away is the model favorite" not in summary
+    assert "home is the best value" not in summary
+
+
+def test_llm_narrator_respects_pit_microseconds() -> None:
+    client = make_client(analyst_narrator="llm", analyst_llm_model="mock-explainer-0.1")
+    _assert_problem(
+        client.get(
+            f"/api/v1/football/ai-analyst/{MATCH_ID}",
+            params={"cutoff_at": "2026-07-07T15:59:59.999999Z"},
+            headers={"X-Request-ID": "req_llm_pit_before"},
+        ),
+        status=422,
+        type_uri="/problems/pit-features-unavailable",
+    )
+    exact = client.get(
+        f"/api/v1/football/ai-analyst/{MATCH_ID}",
+        params={"cutoff_at": KICKOFF},
+        headers={"X-Request-ID": "req_llm_pit_exact"},
+    )
+    assert exact.status_code == 200
+    assert exact.json()["data"]["prediction"]["cutoff_at"] == KICKOFF
+    assert exact.json()["data_mode"] == "mock"
+    _assert_problem(
+        client.get(
+            f"/api/v1/football/ai-analyst/{MATCH_ID}",
+            params={"cutoff_at": "2026-07-07T16:00:00.000001Z"},
+            headers={"X-Request-ID": "req_llm_pit_after"},
+        ),
+        status=409,
+        type_uri="/problems/temporal-leakage",
+    )
