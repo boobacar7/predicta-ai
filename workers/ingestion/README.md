@@ -122,6 +122,22 @@ coup d'envoi, max 8 requêtes). Le run QA s'exécute **sans** `--dry-run` :
 python -m predicta_ingestion persist-historical-odds-pilot
 ```
 
+Élargissement borné (PL + Ligue 1, fenêtres mai 2026 + 28 août–6 sept. 2026,
+réutilise le weekend 21–24 août, max 40 requêtes). Estimer les crédits avant
+l'appel live :
+
+```bash
+python -m predicta_ingestion expand-historical-odds-pilot --estimate-only
+python -m predicta_ingestion expand-historical-odds-pilot
+```
+
+Le scoring 0 crédit :
+
+```bash
+cd apps/api
+python -m app.backtesting persisted-expanded
+```
+
 Ce n'est **pas** un backfill. Détail : [odds-provider.md](../../docs/data/odds-provider.md),
 [historical-odds-pilot.md](../../docs/qa/historical-odds-pilot.md) et
 [historical-odds-value-ai-picks-pilot.md](../../docs/qa/historical-odds-value-ai-picks-pilot.md).

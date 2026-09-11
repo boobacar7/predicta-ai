@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -91,11 +92,26 @@ def weekend_catalog_from_parquet(
     *,
     names: dict[str, tuple[str, str]] | None = None,
 ) -> tuple[CatalogMatch, ...]:
+    return catalog_from_parquet(
+        dataset_path,
+        window_start=LIVE_WEEKEND_START,
+        window_end=LIVE_WEEKEND_END,
+        names=names,
+    )
+
+
+def catalog_from_parquet(
+    dataset_path: Path,
+    *,
+    window_start: datetime,
+    window_end: datetime,
+    names: dict[str, tuple[str, str]] | None = None,
+) -> tuple[CatalogMatch, ...]:
     dataset = load_football_dataset(dataset_path)
     frame = dataset.frame
     window = frame[
-        (frame["event_at"] >= LIVE_WEEKEND_START)
-        & (frame["event_at"] < LIVE_WEEKEND_END)
+        (frame["event_at"] >= window_start)
+        & (frame["event_at"] < window_end)
         & (frame["competition"].astype(str).isin(LIVE_COMPETITIONS))
     ].sort_values(["event_at", "match_id"])
     catalog: list[CatalogMatch] = []
@@ -189,9 +205,14 @@ def _evaluate_persisted(
     snapshots: tuple[OddsSnapshot, ...],
     predictions: FootballPredictionService,
     clock: Clock,
+    *,
+    identity_exclusions: dict[str, str] | None = None,
+    picks_limit: int = 200,
+    kind: str = "persisted_live_weekend",
 ) -> dict[str, Any]:
-    eligible_catalog = tuple(item for item in catalog if item.match_id not in WEEKEND_IDENTITY_EXCLUSIONS)
-    scoring_snapshots = tuple(item for item in snapshots if item.match_id not in WEEKEND_IDENTITY_EXCLUSIONS)
+    exclusions = identity_exclusions if identity_exclusions is not None else WEEKEND_IDENTITY_EXCLUSIONS
+    eligible_catalog = tuple(item for item in catalog if item.match_id not in exclusions)
+    scoring_snapshots = tuple(item for item in snapshots if item.match_id not in exclusions)
     services = build_persisted_services(
         eligible_catalog,
         scoring_snapshots,
@@ -207,13 +228,15 @@ def _evaluate_persisted(
     pit_ok = True
     rows: list[dict[str, Any]] = []
     scored = list(eligible_catalog)
+    applied_exclusions = 0
     for match in catalog:
-        identity_exclusion = WEEKEND_IDENTITY_EXCLUSIONS.get(match.match_id)
+        identity_exclusion = exclusions.get(match.match_id)
         if identity_exclusion is not None:
-            kind = "isolated_team" if identity_exclusion.startswith("isolated_team") else "inverted_home_away"
+            applied_exclusions += 1
+            kind_name = "isolated_team" if identity_exclusion.startswith("isolated_team") else "inverted_home_away"
             quality.add(
                 QualityExclusion(
-                    kind=kind,  # type: ignore[arg-type]
+                    kind=kind_name,  # type: ignore[arg-type]
                     detail=identity_exclusion,
                     match_id=match.match_id,
                 )
@@ -240,7 +263,14 @@ def _evaluate_persisted(
         rows.append(_match_row(match, analysis, identity_exclusion=None))
 
     picks = services.picks.list_picks(
-        AiPicksQuery(match_date=None, league=None, limit=200, offset=0, minimum_edge=None, minimum_ev=None)
+        AiPicksQuery(
+            match_date=None,
+            league=None,
+            limit=picks_limit,
+            offset=0,
+            minimum_edge=None,
+            minimum_ev=None,
+        )
     )
     settled_picks = _settle_picks(picks.items, by_id)
     matched_with_value = [item for item in scored if item.match_id in analyses]
@@ -267,7 +297,7 @@ def _evaluate_persisted(
     }
     n_picks = pick_metrics["n"]
     return {
-        "kind": "persisted_live_weekend",
+        "kind": kind,
         "model_version": CANDIDATE_MODEL_VERSION,
         "model_status": CANDIDATE_STATUS,
         "value_engine_version": VALUE_ENGINE_VERSION,
@@ -284,7 +314,7 @@ def _evaluate_persisted(
         "dataset": {
             "matches": len(catalog),
             "identity_matched": len(scored),
-            "identity_rejected": len(WEEKEND_IDENTITY_EXCLUSIONS),
+            "identity_rejected": applied_exclusions,
             "predictions": len(scored),
             "matches_with_odds": len(analyses),
             "value_eligible": len(matched_with_value),

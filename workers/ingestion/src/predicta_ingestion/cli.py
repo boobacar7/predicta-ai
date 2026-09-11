@@ -14,6 +14,12 @@ from predicta_ingestion.canonical.enums import ResourceType, SportCode
 from predicta_ingestion.clock import Clock, parse_rfc3339
 from predicta_ingestion.config import Settings, get_settings, load_local_env
 from predicta_ingestion.errors import ValidationError
+from predicta_ingestion.expand_historical_odds import (
+    MAX_EXPAND_REQUESTS,
+    ExpandHistoricalOddsReport,
+    estimate_expand_run,
+    run_expand_historical_odds_pilot,
+)
 from predicta_ingestion.historical_odds import (
     DEFAULT_AS_OF_AFTER,
     DEFAULT_AS_OF_BEFORE,
@@ -125,6 +131,24 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Fetch, validate and normalize without writing PostgreSQL or the raw store.",
     )
+    expand = sub.add_parser(
+        "expand-historical-odds-pilot",
+        help=(
+            "Persist additional bounded Premier League + Ligue 1 historical odds "
+            f"(max {MAX_EXPAND_REQUESTS} requests, 1 snapshot/league/day). "
+            "Reuses the Aug 21-24 2026 weekend. Not a backfill."
+        ),
+    )
+    expand.add_argument(
+        "--estimate-only",
+        action="store_true",
+        help="Plan slots and credits from PostgreSQL without calling The Odds API.",
+    )
+    expand.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Fetch, validate and normalize without writing PostgreSQL or the raw store.",
+    )
     dataset = sub.add_parser(
         "build-ml-dataset",
         help="Build a point-in-time 1X2 dataset from ingested PostgreSQL rows. Does not train a model.",
@@ -219,6 +243,13 @@ def _dispatch(args: argparse.Namespace, settings: Settings) -> dict[str, object]
             dry_run=bool(getattr(args, "dry_run", False)),
         )
         return persist_report.to_dict()
+    if args.command == "expand-historical-odds-pilot":
+        expand_report = expand_historical_odds_pilot(
+            settings=settings,
+            dry_run=bool(getattr(args, "dry_run", False)),
+            estimate_only=bool(getattr(args, "estimate_only", False)),
+        )
+        return expand_report.to_dict()
     if args.command == "ingest-history":
         history, dataset = run_history(
             settings=settings,
@@ -395,6 +426,61 @@ def persist_historical_odds_pilot(
     )
     if not dry_run:
         _record_persist_run(active_pipeline, clock, report)
+    return report
+
+
+def expand_historical_odds_pilot(
+    *,
+    settings: Settings,
+    dry_run: bool = False,
+    estimate_only: bool = False,
+    provider: TheOddsApiProvider | None = None,
+    pipeline: IngestionPipeline | None = None,
+) -> ExpandHistoricalOddsReport:
+    engine = create_engine(settings.database_url, pool_pre_ping=True, future=True)
+    require_odds_history_schema(engine)
+    estimate = estimate_expand_run(engine=engine)
+    if estimate_only:
+        clock = Clock()
+        memory_pipeline = pipeline or _build_persist_pipeline(
+            settings,
+            clock,
+            dry_run=True,
+            engine=engine,
+            target_ids=target_match_ids(estimate.fetch_matches),
+        )
+        placeholder = provider or TheOddsApiProvider(
+            enable_live=False,
+            api_key="",
+            clock=clock,
+            transport=HttpxTransport(),
+        )
+        return run_expand_historical_odds_pilot(
+            provider=placeholder,
+            pipeline=memory_pipeline,
+            estimate=estimate,
+            secret=settings.the_odds_api_key or None,
+            estimate_only=True,
+        )
+    _assert_odds_ready(settings)
+    clock = Clock()
+    odds_provider = provider or _odds_provider(settings, clock)
+    active_pipeline = pipeline or _build_persist_pipeline(
+        settings,
+        clock,
+        dry_run=dry_run,
+        engine=engine,
+        target_ids=target_match_ids(estimate.fetch_matches),
+    )
+    report = run_expand_historical_odds_pilot(
+        provider=odds_provider,
+        pipeline=active_pipeline,
+        estimate=estimate,
+        secret=settings.the_odds_api_key or None,
+        estimate_only=False,
+    )
+    if not dry_run and report.persist is not None:
+        _record_persist_run(active_pipeline, clock, report.persist)
     return report
 
 

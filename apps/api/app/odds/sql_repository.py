@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -87,6 +88,37 @@ class SqlOddsRepository:
             )
             .options(selectinload(OddsSnapshotRow.selections))
             .order_by(
+                OddsSnapshotRow.available_at,
+                OddsSnapshotRow.collected_at,
+                OddsSnapshotRow.id,
+            )
+        )
+        if source is not None:
+            statement = statement.where(OddsSnapshotRow.source == source)
+        if data_mode is not None:
+            statement = statement.where(OddsSnapshotRow.data_mode == data_mode)
+        with self._session_factory() as session:
+            return tuple(self._to_domain(row) for row in session.scalars(statement))
+
+    def history_many(
+        self,
+        match_ids: Sequence[str],
+        market: str,
+        *,
+        source: str | None = None,
+        data_mode: DataMode | None = None,
+    ) -> tuple[OddsSnapshot, ...]:
+        if not match_ids:
+            return ()
+        statement = (
+            select(OddsSnapshotRow)
+            .where(
+                OddsSnapshotRow.match_id.in_(list(match_ids)),
+                OddsSnapshotRow.market == market,
+            )
+            .options(selectinload(OddsSnapshotRow.selections))
+            .order_by(
+                OddsSnapshotRow.match_id,
                 OddsSnapshotRow.available_at,
                 OddsSnapshotRow.collected_at,
                 OddsSnapshotRow.id,

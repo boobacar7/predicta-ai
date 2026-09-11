@@ -235,11 +235,12 @@ def assert_persist_scope(
     slots: tuple[PersistSlot, ...],
     *,
     max_requests: int,
+    request_cap: int = MAX_PERSIST_REQUESTS,
 ) -> None:
-    if max_requests > MAX_PERSIST_REQUESTS:
+    if max_requests > request_cap:
         raise ValidationError(
             "persist_cap",
-            f"Historical odds persist runner refuses more than {MAX_PERSIST_REQUESTS} requests.",
+            f"Historical odds persist runner refuses more than {request_cap} requests.",
         )
     leagues = {item.league for item in slots}
     unknown = sorted(leagues - set(PILOT_LEAGUES))
@@ -300,7 +301,12 @@ def assert_strict_weekend_window(matches: tuple[PilotMatch, ...]) -> None:
             )
 
 
-def load_weekend_matches_from_sql(engine: Engine) -> tuple[PilotMatch, ...]:
+def load_matches_from_sql(
+    engine: Engine,
+    *,
+    window_start: datetime,
+    window_end: datetime,
+) -> tuple[PilotMatch, ...]:
     query = text(
         """
         SELECT m.id, m.kickoff_at, m.home_team_id, m.away_team_id,
@@ -323,12 +329,12 @@ def load_weekend_matches_from_sql(engine: Engine) -> tuple[PilotMatch, ...]:
     with engine.connect() as connection:
         rows = connection.execute(
             query,
-            {"window_start": PERSIST_WINDOW_START, "window_end": PERSIST_WINDOW_END},
+            {"window_start": window_start, "window_end": window_end},
         ).mappings()
         for row in rows:
             kickoff = row["kickoff_at"]
             if kickoff.tzinfo is None:
-                kickoff = kickoff.replace(tzinfo=PERSIST_WINDOW_START.tzinfo)
+                kickoff = kickoff.replace(tzinfo=window_start.tzinfo)
             league_name = str(row["league_name"])
             slug_raw = str(row["league_slug"] or "")
             slug = normalize_league_slug(slug_raw) if slug_raw else normalize_league_slug(league_name.lower())
@@ -347,6 +353,14 @@ def load_weekend_matches_from_sql(engine: Engine) -> tuple[PilotMatch, ...]:
     return tuple(matches)
 
 
+def load_weekend_matches_from_sql(engine: Engine) -> tuple[PilotMatch, ...]:
+    return load_matches_from_sql(
+        engine,
+        window_start=PERSIST_WINDOW_START,
+        window_end=PERSIST_WINDOW_END,
+    )
+
+
 def run_persist_historical_odds_pilot(
     *,
     provider: TheOddsApiProvider,
@@ -356,11 +370,16 @@ def run_persist_historical_odds_pilot(
     max_requests: int = MAX_PERSIST_REQUESTS,
     strict_window: bool = True,
     secret: str | None = None,
+    window_start: datetime | None = None,
+    window_end: datetime | None = None,
+    request_cap: int = MAX_PERSIST_REQUESTS,
 ) -> PersistHistoricalOddsReport:
+    start = window_start or PERSIST_WINDOW_START
+    end = window_end or PERSIST_WINDOW_END
     if strict_window:
         assert_strict_weekend_window(matches)
     planned = slots or plan_persist_slots(matches)
-    assert_persist_scope(planned, max_requests=max_requests)
+    assert_persist_scope(planned, max_requests=max_requests, request_cap=request_cap)
     fetches: list[HistoricalFetch] = []
     ingestion: list[dict[str, object]] = []
     quarantined: list[QuarantineItem] = []
@@ -419,7 +438,12 @@ def run_persist_historical_odds_pilot(
                     "historical_interpolation",
                     "Provider returned a snapshot after the requested date; interpolation is forbidden.",
                 )
-        observed = _observed_events(payload, league=slot.league)
+        observed = _observed_events(
+            payload,
+            league=slot.league,
+            window_start=start,
+            window_end=end,
+        )
         observed_events.extend(observed)
         report = pipeline.ingest_envelopes(
             envelope.provider,
@@ -460,8 +484,8 @@ def run_persist_historical_odds_pilot(
         skipped = list(sink.skipped_match_ids)
     return PersistHistoricalOddsReport(
         leagues=PILOT_LEAGUES,
-        window_start=PERSIST_WINDOW_START,
-        window_end=PERSIST_WINDOW_END,
+        window_start=start,
+        window_end=end,
         slots=planned,
         fetches=fetches,
         identity=identity,
@@ -556,7 +580,13 @@ def _fetch_record(
     )
 
 
-def _observed_events(payload: dict[str, Any], *, league: str) -> list[ObservedEvent]:
+def _observed_events(
+    payload: dict[str, Any],
+    *,
+    league: str,
+    window_start: datetime = PERSIST_WINDOW_START,
+    window_end: datetime = PERSIST_WINDOW_END,
+) -> list[ObservedEvent]:
     data = payload.get("data")
     if not isinstance(data, list):
         return []
@@ -572,7 +602,7 @@ def _observed_events(payload: dict[str, Any], *, league: str) -> list[ObservedEv
                 away_team=str(event.get("away_team") or ""),
                 commence_at=commence,
                 league=league,
-                in_window=PERSIST_WINDOW_START <= commence < PERSIST_WINDOW_END,
+                in_window=window_start <= commence < window_end,
             )
         )
     return events

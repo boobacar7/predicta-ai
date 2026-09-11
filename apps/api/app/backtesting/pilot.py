@@ -73,6 +73,19 @@ WEEKEND_IDENTITY_EXCLUSIONS = {
     "mth_football-sportmonks-19715629": "isolated_team: Paris / Paris FC / PSG kept distinct",
     "mth_football-sportmonks-19715631": "inverted_home_away: PSG/Rennes vs Rennes/PSG",
 }
+ISOLATED_PARIS_TEAM_ID = "tm_football-sportmonks-4508"
+
+
+def catalog_identity_exclusions(catalog: tuple[CatalogMatch, ...]) -> dict[str, str]:
+    """Paris FC isolation plus the labeled Rennes/PSG weekend exclusion. No HOME/AWAY flip."""
+
+    exclusions = dict(WEEKEND_IDENTITY_EXCLUSIONS)
+    for match in catalog:
+        if match.home_team_id == ISOLATED_PARIS_TEAM_ID or match.away_team_id == ISOLATED_PARIS_TEAM_ID:
+            exclusions[match.match_id] = "isolated_team: Paris / Paris FC / PSG kept distinct"
+    return exclusions
+
+
 SELECTIONS = (
     Football1x2Selection.HOME,
     Football1x2Selection.DRAW,
