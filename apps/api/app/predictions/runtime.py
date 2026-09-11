@@ -16,3 +16,13 @@ def ensure_ml_on_path() -> Path:
     if location not in sys.path:
         sys.path.insert(0, location)
     return src
+
+
+def ensure_ingestion_on_path() -> Path:
+    """Make ``predicta_ingestion`` importable for historical matching. No network."""
+
+    src = repository_root() / "workers" / "ingestion" / "src"
+    location = str(src)
+    if location not in sys.path:
+        sys.path.insert(0, location)
+    return src
