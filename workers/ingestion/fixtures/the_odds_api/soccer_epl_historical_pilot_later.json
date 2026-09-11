@@ -1,0 +1,82 @@
+{
+  "timestamp": "2026-08-16T15:00:00Z",
+  "previous_timestamp": "2026-08-16T14:55:00Z",
+  "next_timestamp": "2026-08-16T15:05:00Z",
+  "data": [
+    {
+      "id": "epl_helix_meridian_20260816",
+      "sport_key": "soccer_epl",
+      "sport_title": "EPL",
+      "commence_time": "2026-08-16T14:00:00Z",
+      "home_team": "Helix FC",
+      "away_team": "Meridian Athletic",
+      "bookmakers": [
+        {
+          "key": "pinnacle",
+          "title": "Pinnacle",
+          "last_update": "2026-08-16T14:55:00Z",
+          "markets": [
+            {
+              "key": "h2h",
+              "outcomes": [
+                { "name": "Helix FC", "price": 1.55 },
+                { "name": "Draw", "price": 4.10 },
+                { "name": "Meridian Athletic", "price": 5.80 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "epl_bournemouth_brentford_20260816",
+      "sport_key": "soccer_epl",
+      "sport_title": "EPL",
+      "commence_time": "2026-08-16T14:00:00Z",
+      "home_team": "Bournemouth",
+      "away_team": "Brentford",
+      "bookmakers": [
+        {
+          "key": "pinnacle",
+          "title": "Pinnacle",
+          "last_update": "2026-08-16T14:56:00Z",
+          "markets": [
+            {
+              "key": "h2h",
+              "outcomes": [
+                { "name": "Bournemouth", "price": 1.95 },
+                { "name": "Draw", "price": 3.50 },
+                { "name": "Brentford", "price": 4.00 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "epl_unknown_borough_20260816",
+      "sport_key": "soccer_epl",
+      "sport_title": "EPL",
+      "commence_time": "2026-08-16T14:00:00Z",
+      "home_team": "Unknown Borough",
+      "away_team": "Helix FC",
+      "bookmakers": [
+        {
+          "key": "pinnacle",
+          "title": "Pinnacle",
+          "last_update": "2026-08-16T14:57:00Z",
+          "markets": [
+            {
+              "key": "h2h",
+              "outcomes": [
+                { "name": "Unknown Borough", "price": 6.00 },
+                { "name": "Draw", "price": 4.40 },
+                { "name": "Helix FC", "price": 1.48 }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -13,6 +13,15 @@ from predicta_ingestion.canonical.enums import ResourceType, SportCode
 from predicta_ingestion.clock import Clock, parse_rfc3339
 from predicta_ingestion.config import Settings, get_settings, load_local_env
 from predicta_ingestion.errors import ValidationError
+from predicta_ingestion.historical_odds import (
+    DEFAULT_AS_OF_AFTER,
+    DEFAULT_AS_OF_BEFORE,
+    DEFAULT_PIT_CUTOFF,
+    MAX_PILOT_REQUESTS,
+    PILOT_LEAGUES,
+    HistoricalOddsPilotReport,
+    run_historical_odds_pilot,
+)
 from predicta_ingestion.history import HistoryIngestReport, ingest_history, memory_sink
 from predicta_ingestion.identity.resolver import IdentityResolver
 from predicta_ingestion.ids import stable_entity_id
@@ -63,6 +72,33 @@ def main(argv: list[str] | None = None) -> int:
         "--as-of",
         dest="as_of",
         help="UTC RFC 3339 timestamp for the historical odds snapshot. Omit for current pre-match odds.",
+    )
+    pilot = sub.add_parser(
+        "historical-odds-pilot",
+        help="Bounded Premier League + Ligue 1 historical odds pilot (max 4 requests). Not a backfill.",
+    )
+    pilot.add_argument(
+        "--as-of-before",
+        dest="as_of_before",
+        default=DEFAULT_AS_OF_BEFORE.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        help="First historical snapshot date (UTC RFC 3339). Default: 2026-08-16T11:00:00Z.",
+    )
+    pilot.add_argument(
+        "--as-of-after",
+        dest="as_of_after",
+        default=DEFAULT_AS_OF_AFTER.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        help="Second historical snapshot date (UTC RFC 3339). Default: 2026-08-16T15:00:00Z.",
+    )
+    pilot.add_argument(
+        "--pit-cutoff",
+        dest="pit_cutoff",
+        default=DEFAULT_PIT_CUTOFF.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        help="PIT cutoff T. Default: 2026-08-16T14:00:00Z.",
+    )
+    pilot.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Fetch, validate and normalize without writing PostgreSQL or the raw store.",
     )
     dataset = sub.add_parser(
         "build-ml-dataset",
@@ -143,6 +179,15 @@ def _dispatch(args: argparse.Namespace, settings: Settings) -> dict[str, object]
             dry_run=args.dry_run,
         )
         return _report_payload(report)
+    if args.command == "historical-odds-pilot":
+        pilot_report = historical_odds_pilot(
+            settings=settings,
+            as_of_before=args.as_of_before,
+            as_of_after=args.as_of_after,
+            pit_cutoff=getattr(args, "pit_cutoff", None),
+            dry_run=bool(getattr(args, "dry_run", False)),
+        )
+        return pilot_report.to_dict()
     if args.command == "ingest-history":
         history, dataset = run_history(
             settings=settings,
@@ -250,6 +295,32 @@ def ingest_odds(
         resource=ResourceType.ODDS,
     )
     return report
+
+
+def historical_odds_pilot(
+    *,
+    settings: Settings,
+    as_of_before: str,
+    as_of_after: str,
+    pit_cutoff: str | None = None,
+    dry_run: bool = False,
+    provider: TheOddsApiProvider | None = None,
+    pipeline: IngestionPipeline | None = None,
+) -> HistoricalOddsPilotReport:
+    _assert_odds_ready(settings)
+    clock = Clock()
+    odds_provider = provider or _odds_provider(settings, clock)
+    active_pipeline = pipeline or _build_pipeline(settings, clock, dry_run=dry_run, history=False, odds=True)
+    return run_historical_odds_pilot(
+        provider=odds_provider,
+        pipeline=active_pipeline,
+        as_of_before=parse_rfc3339(as_of_before),
+        as_of_after=parse_rfc3339(as_of_after),
+        leagues=PILOT_LEAGUES,
+        max_requests=MAX_PILOT_REQUESTS,
+        pit_cutoff=parse_rfc3339(pit_cutoff) if pit_cutoff else DEFAULT_PIT_CUTOFF,
+        secret=settings.the_odds_api_key or None,
+    )
 
 
 def run_history(

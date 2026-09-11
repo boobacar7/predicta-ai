@@ -22,6 +22,9 @@ class OddsScriptedTransport:
         self.historical_body = "soccer_epl_historical.json"
         self.invalid_json_once = False
         self.rate_limit_remaining = 0
+        self.requests_used = 100
+        self.requests_remaining = 400
+        self.requests_last = 10
 
     def get(self, url: str, *, headers: dict[str, str], timeout: float) -> HttpResponse:
         del timeout
@@ -43,21 +46,39 @@ class OddsScriptedTransport:
         query = parse_qs(parsed.query)
         if "/historical/" in parsed.path:
             date = (query.get("date") or [""])[0]
-            body_name = self.historical_body
-            if "2026-09-08T16:05" in date:
-                body_name = "soccer_epl_historical_later.json"
-            body = load_odds_fixture(body_name)
+            body = load_odds_fixture(_historical_fixture(parsed.path, date, self.historical_body))
+            self.requests_used += self.requests_last
+            self.requests_remaining = max(0, self.requests_remaining - self.requests_last)
+            last = str(self.requests_last)
         elif self.current_body == "incomplete_and_missing.json":
             body = load_odds_fixture(self.current_body)
+            last = "1"
         else:
             body = load_odds_fixture(self.current_body)
+            last = "1"
         return HttpResponse(
             status_code=200,
             body=body,
             headers={
-                "x-requests-remaining": "499",
-                "x-requests-used": "1",
-                "x-requests-last": "1",
+                "x-requests-remaining": str(self.requests_remaining),
+                "x-requests-used": str(self.requests_used),
+                "x-requests-last": last,
             },
             url=url,
         )
+
+
+def _historical_fixture(path: str, date: str, default_body: str) -> str:
+    if "soccer_france_ligue_one" in path:
+        if "2026-08-16T15:00" in date:
+            return "soccer_ligue1_historical_pilot_later.json"
+        if "2026-08-16T11:00" in date:
+            return "soccer_ligue1_historical_pilot.json"
+        return "soccer_ligue1_historical_pilot.json"
+    if "2026-08-16T15:00" in date:
+        return "soccer_epl_historical_pilot_later.json"
+    if "2026-08-16T11:00" in date:
+        return "soccer_epl_historical_pilot.json"
+    if "2026-09-08T16:05" in date:
+        return "soccer_epl_historical_later.json"
+    return default_body

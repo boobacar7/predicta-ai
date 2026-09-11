@@ -64,6 +64,9 @@ Documenté, **plans payants uniquement** :
 
 CLI : `ingest-odds --as-of 2026-09-08T15:55:00Z`.
 
+Pilote borné (pas un backfill) : `historical-odds-pilot` — Premier League + Ligue 1,
+2 timestamps, **maximum 4 requêtes**. QA : [historical-odds-pilot.md](../qa/historical-odds-pilot.md).
+
 Sans `--as-of`, l'adapter appelle l'endpoint courant
 `GET /v4/sports/{sport}/odds` (upcoming / in-play, **pas** les matchs terminés).
 

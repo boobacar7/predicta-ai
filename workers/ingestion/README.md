@@ -107,7 +107,16 @@ python -m predicta_ingestion ingest-odds --league all --as-of 2026-09-08T15:55:0
 
 `--as-of` utilise l'endpoint historical documenté (plans payants, 10 crédits par
 région et marché). Sans `--as-of`, l'endpoint courant `h2h` / région `eu`.
-Aucun appel live dans la CI. Détail : [odds-provider.md](../../docs/data/odds-provider.md).
+Aucun appel live dans la CI.
+
+Pilote historique borné (Premier League + Ligue 1, 2 timestamps, max 4 requêtes) :
+
+```bash
+python -m predicta_ingestion historical-odds-pilot --dry-run
+```
+
+Ce n'est **pas** un backfill. Détail : [odds-provider.md](../../docs/data/odds-provider.md)
+et [historical-odds-pilot.md](../../docs/qa/historical-odds-pilot.md).
 
 Les matchs Sportmonks doivent déjà exister pour lier les cotes. Le worker ne
 calcule ni EV, ni edge, ni no-vig.
