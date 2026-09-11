@@ -369,6 +369,9 @@ def _build_pipeline(
     resolver = IdentityResolver(clock)
     sink: MemoryCanonicalSink | SqlCanonicalSink | TeeCanonicalSink
     if dry_run:
+        if odds:
+            engine = create_engine(settings.database_url, pool_pre_ping=True, future=True)
+            hydrate_match_keys_from_sql(resolver, engine)
         sink = memory
     elif history:
         engine = create_engine(settings.database_url, pool_pre_ping=True, future=True)
@@ -437,6 +440,9 @@ def _redact_cli(message: str) -> str:
 
 
 def _report_payload(report: IngestionReport) -> dict[str, object]:
+    reasons: dict[str, int] = {}
+    for item in report.quarantined:
+        reasons[item.reason_code] = reasons.get(item.reason_code, 0) + 1
     return {
         "provider": report.provider,
         "resource": report.resource.value,
@@ -446,6 +452,15 @@ def _report_payload(report: IngestionReport) -> dict[str, object]:
         "records_accepted": report.records_accepted,
         "duplicates": report.duplicates,
         "quarantined": [item.reason_code for item in report.quarantined],
+        "quarantine_reasons": reasons,
+        "quarantine_details": [
+            {
+                "reason_code": item.reason_code,
+                "detail": item.detail,
+                "provider_entity_id": item.provider_entity_id,
+            }
+            for item in report.quarantined
+        ],
     }
 
 

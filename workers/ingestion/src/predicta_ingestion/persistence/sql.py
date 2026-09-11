@@ -311,13 +311,14 @@ class SqlCanonicalSink:
                 :id, :provider_id, :match_id, :market, :bookmaker, :provider, :observed_at,
                 :available_at, :collected_at, :source, :freshness, :data_mode, :raw_payload_id,
                 :overround, :created_at
-            WHERE EXISTS (SELECT 1 FROM matches WHERE id = :match_id)
+            WHERE EXISTS (SELECT 1 FROM matches WHERE id = :existing_match_id)
             ON CONFLICT (id) DO NOTHING
             """,
             {
                 "id": snapshot.id,
                 "provider_id": provenance.provider_id,
                 "match_id": snapshot.match_id,
+                "existing_match_id": snapshot.match_id,
                 "market": snapshot.market,
                 "bookmaker": snapshot.bookmaker,
                 "provider": provenance.provider,
@@ -340,11 +341,12 @@ class SqlCanonicalSink:
                     implied_probability_raw, no_vig_probability
                 )
                 SELECT :snapshot_id, :selection, :label, :decimal_odds, :implied, :no_vig
-                WHERE EXISTS (SELECT 1 FROM odds_snapshots WHERE id = :snapshot_id)
+                WHERE EXISTS (SELECT 1 FROM odds_snapshots WHERE id = :existing_snapshot_id)
                 ON CONFLICT (snapshot_id, selection) DO NOTHING
                 """,
                 {
                     "snapshot_id": snapshot.id,
+                    "existing_snapshot_id": snapshot.id,
                     "selection": selection.selection,
                     "label": selection.label,
                     "decimal_odds": selection.decimal_odds,

@@ -7,6 +7,7 @@ from predicta_ingestion.canonical.models import CanonicalBatch, League, OddsSnap
 from predicta_ingestion.clock import Clock
 from predicta_ingestion.identity.historical import provider_franchise_key
 from predicta_ingestion.identity.keys import competition_slug, league_provider_key, team_name_key
+from predicta_ingestion.providers.the_odds_api import LIVE_ODDS_PROVIDER
 from predicta_ingestion.quality.quarantine import QuarantineItem
 
 
@@ -141,8 +142,11 @@ class IdentityResolver:
             )
             if match.natural_key and match.natural_key not in self._by_match_key:
                 self._by_match_key[match.natural_key] = match.id
+        kept_odds: list[OddsSnapshot] = []
         for snapshot in batch.odds:
-            self._resolve_odds_match(snapshot)
+            if self._resolve_odds_match(snapshot, quarantined, data_mode):
+                kept_odds.append(snapshot)
+        batch.odds = kept_odds
         return quarantined
 
     def bind_match_natural_key(self, natural_key: str, canonical_id: str) -> None:
@@ -433,10 +437,60 @@ class IdentityResolver:
             if injury.team_id in rewritten:
                 injury.team_id = rewritten[injury.team_id]
 
-    def _resolve_odds_match(self, snapshot: OddsSnapshot) -> None:
+    def _resolve_odds_match(
+        self,
+        snapshot: OddsSnapshot,
+        quarantined: list[QuarantineItem],
+        data_mode: DataMode,
+    ) -> bool:
         key = snapshot.match_natural_key
         if key and key in self._by_match_key:
             snapshot.match_id = self._by_match_key[key]
+            self._record(
+                entity_type="odds_snapshot",
+                provider=snapshot.provenance.provider,
+                provider_entity_id=snapshot.provenance.provider_id,
+                provider_name=key,
+                canonical_id=snapshot.match_id,
+                canonical_name=self._canonical_names.get(snapshot.match_id),
+                method=ResolutionMethod.EXACT_ID,
+                confidence=1.0,
+                status="resolved",
+                detail="Odds snapshot linked via football|home|away|kickoff.",
+            )
+            return True
+        # Mock odds may exist without a Sportmonks match. Live The Odds API must not.
+        if snapshot.provenance.provider != LIVE_ODDS_PROVIDER:
+            return True
+        detail = (
+            f"No Sportmonks match for natural key '{key}'. "
+            "Odds events never create canonical matches."
+        )
+        self._record(
+            entity_type="odds_snapshot",
+            provider=snapshot.provenance.provider,
+            provider_entity_id=snapshot.provenance.provider_id,
+            provider_name=key,
+            canonical_id=None,
+            canonical_name=None,
+            method=None,
+            confidence=None,
+            status="quarantined",
+            detail=detail,
+        )
+        quarantined.append(
+            QuarantineItem(
+                reason_code="unmatched_odds_event",
+                detail=detail,
+                provider=snapshot.provenance.provider,
+                entity_type=EntityType.ODDS_SNAPSHOT.value,
+                provider_entity_id=snapshot.provenance.provider_id,
+                data_mode=data_mode,
+                raw_payload_id=snapshot.provenance.raw_payload_id,
+                created_at=self._clock.now(),
+            )
+        )
+        return False
 
     def _ambiguous(
         self,

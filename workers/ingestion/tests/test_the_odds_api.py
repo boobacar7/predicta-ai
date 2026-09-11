@@ -61,6 +61,14 @@ def _live_pipeline(clock: Clock, live_settings: Settings, tmp_path) -> Ingestion
     )
 
 
+def _bind_fixture_match(pipeline: IngestionPipeline, canonical_id: str = "mth_football-sportmonks-helix") -> str:
+    pipeline._resolver.bind_match_natural_key(
+        "football|helix-fc|meridian-athletic|2026-09-08T18:00:00+00:00",
+        canonical_id,
+    )
+    return canonical_id
+
+
 def test_live_disabled_does_not_call_network(clock: Clock) -> None:
     transport = OddsScriptedTransport()
     provider = _provider(clock, transport, enable_live=False)
@@ -143,6 +151,7 @@ def test_invalid_json_is_unavailable(clock: Clock) -> None:
 def test_mapping_h2h_to_canonical_1x2(clock: Clock, live_settings: Settings, tmp_path) -> None:
     transport = OddsScriptedTransport()
     pipeline = _live_pipeline(clock, live_settings, tmp_path)
+    _bind_fixture_match(pipeline)
     pipeline.run(_provider(clock, transport), ProviderRequest(resource=ResourceType.ODDS, league="premier-league"))
     snapshots = list(pipeline._sink.odds.values())
     assert snapshots
@@ -172,6 +181,7 @@ def test_incomplete_market_and_missing_bookmaker_are_not_filled(
     transport = OddsScriptedTransport()
     transport.current_body = "incomplete_and_missing.json"
     pipeline = _live_pipeline(clock, live_settings, tmp_path)
+    _bind_fixture_match(pipeline)
     report = pipeline.run(
         _provider(clock, transport), ProviderRequest(resource=ResourceType.ODDS, league="premier-league")
     )
@@ -184,6 +194,7 @@ def test_incomplete_market_and_missing_bookmaker_are_not_filled(
 def test_identical_fetches_are_idempotent(clock: Clock, live_settings: Settings, tmp_path) -> None:
     transport = OddsScriptedTransport()
     pipeline = _live_pipeline(clock, live_settings, tmp_path)
+    _bind_fixture_match(pipeline)
     request = ProviderRequest(resource=ResourceType.ODDS, league="premier-league")
     provider = _provider(clock, transport)
     pipeline.run(provider, request)
@@ -195,6 +206,7 @@ def test_identical_fetches_are_idempotent(clock: Clock, live_settings: Settings,
 def test_price_change_appends_new_snapshot(clock: Clock, live_settings: Settings, tmp_path) -> None:
     transport = OddsScriptedTransport()
     pipeline = _live_pipeline(clock, live_settings, tmp_path)
+    _bind_fixture_match(pipeline)
     provider = _provider(clock, transport)
     pipeline.run(
         provider,
@@ -224,6 +236,7 @@ def test_pit_hides_post_cutoff_and_keeps_earlier_snapshot(
 ) -> None:
     transport = OddsScriptedTransport()
     pipeline = _live_pipeline(clock, live_settings, tmp_path)
+    canonical_id = _bind_fixture_match(pipeline)
     provider = _provider(clock, transport)
     pipeline.run(
         provider,
@@ -242,6 +255,7 @@ def test_pit_hides_post_cutoff_and_keeps_earlier_snapshot(
         ),
     )
     snapshot = next(iter(pipeline._sink.odds.values()))
+    assert snapshot.match_id == canonical_id
     store = PointInTimeStore(pipeline._sink)
     cutoff = datetime(2026, 9, 8, 16, 0, tzinfo=UTC)
     selected = store.odds_as_of(snapshot.match_id, cutoff)
@@ -271,6 +285,22 @@ def test_live_odds_link_to_football_match_via_natural_key(
     )
     snapshot = next(item for item in live_pipeline._sink.odds.values() if item.bookmaker == "pinnacle")
     assert snapshot.match_id == match.id
+
+
+def test_unmatched_live_odds_are_quarantined_not_persisted(
+    clock: Clock, live_settings: Settings, tmp_path
+) -> None:
+    pipeline = _live_pipeline(clock, live_settings, tmp_path)
+    report = pipeline.run(
+        _provider(clock, OddsScriptedTransport()),
+        ProviderRequest(resource=ResourceType.ODDS, league="premier-league"),
+    )
+    assert pipeline._sink.odds == {}
+    unmatched = [item for item in report.quarantined if item.reason_code == "unmatched_odds_event"]
+    assert unmatched
+    assert "No Sportmonks match" in unmatched[0].detail
+    assert "helix-fc" in unmatched[0].detail
+    assert "meridian-athletic" in unmatched[0].detail
 
 
 def test_mock_provider_never_used_when_live_errors(clock: Clock, live_settings: Settings, tmp_path) -> None:
@@ -327,6 +357,7 @@ def test_sql_odds_insert_is_append_only_without_value_metrics(clock: Clock) -> N
     sql.persist(CanonicalBatch(odds=[snapshot]))
     joined = "\n".join(item[0] for item in statements)
     assert "INSERT INTO odds_snapshots" in joined
+    assert "WHERE EXISTS (SELECT 1 FROM matches WHERE id = :existing_match_id)" in joined
     assert "ON CONFLICT (id) DO NOTHING" in joined
     assert "INSERT INTO odds_selections" in joined
     assert all(params.get("overround") is None for _sql, params in statements if "overround" in params)
