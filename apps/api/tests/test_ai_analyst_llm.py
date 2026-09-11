@@ -37,6 +37,10 @@ from tests.test_ai_analyst_grounding import CUTOFF, _context
 NOW = datetime(2026, 7, 7, 16, tzinfo=UTC)
 
 
+def _payload(*, narrative: str = "", claims: list[dict[str, object]] | None = None) -> str:
+    return json.dumps({"narrative": narrative, "claims": claims or []}, ensure_ascii=False)
+
+
 def _scripted(payload: str | Exception, *, delay_seconds: float = 0) -> LLMAnalystProvider:
     return LLMAnalystProvider(
         ScriptedLLMClient(payload, delay_seconds=delay_seconds),
@@ -45,18 +49,28 @@ def _scripted(payload: str | Exception, *, delay_seconds: float = 0) -> LLMAnaly
 
 
 def _statements(*items: tuple[str, list[str]]) -> str:
-    return json.dumps(
-        {"statements": [{"statement": text, "evidence_ids": ids} for text, ids in items]},
-        ensure_ascii=False,
-    )
+    """Adversarial helper: prose without structured claims must fall back."""
+
+    text = " ".join(text for text, _ids in items)
+    return _payload(narrative=text, claims=[])
 
 
 def _valid_home_statement() -> str:
-    return _statements(
-        (
-            "Le modèle estime 41,7 % de probabilité modélisée pour Team A.",
-            ["prediction.home_probability", "identity.home_team", "prediction.model_favorite"],
-        )
+    return _payload(
+        narrative="The match appears open.",
+        claims=[
+            {
+                "claim_type": "model_probability",
+                "subject": "HOME",
+                "value": 0.417,
+                "evidence_ids": ["prediction.home_probability"],
+            },
+            {
+                "claim_type": "model_favorite",
+                "subject": "HOME",
+                "evidence_ids": ["prediction.model_favorite"],
+            },
+        ],
     )
 
 

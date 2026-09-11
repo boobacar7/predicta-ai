@@ -19,6 +19,30 @@ from app.value_engine.models import FootballValueAnalysis
 
 EvidenceCategory = Literal["identity", "prediction", "value", "metadata"]
 EvidenceAvailability = Literal["available", "unavailable"]
+EVIDENCE_TYPE_BY_FIELD = {
+    "home_team": "team",
+    "away_team": "team",
+    "league": "league",
+    "kickoff_at": "kickoff",
+    "match_id": "identity",
+    "home_probability": "model_probability",
+    "draw_probability": "model_probability",
+    "away_probability": "model_probability",
+    "model_favorite": "model_favorite",
+    "model_version": "model_version",
+    "model_status": "model_status",
+    "dataset_version": "dataset_version",
+    "odds": "odds",
+    "implied_probability": "implied_probability",
+    "no_vig_probability": "no_vig_probability",
+    "edge": "edge",
+    "ev": "ev",
+    "value_selection": "value_selection",
+    "selection": "selection",
+    "odds_age_seconds": "odds",
+    "value_engine_version": "value_engine_version",
+    "data_mode": "data_mode",
+}
 
 FRESH_ODDS_SECONDS = 12 * 3600
 ACCEPTABLE_ODDS_SECONDS = 24 * 3600
@@ -90,6 +114,10 @@ class AnalystEvidence:
     source: str
     availability: EvidenceAvailability
     cutoff_at: datetime | None = None
+
+    @property
+    def evidence_type(self) -> str:
+        return EVIDENCE_TYPE_BY_FIELD.get(self.source_field, self.category)
 
 
 @dataclass(frozen=True, slots=True)

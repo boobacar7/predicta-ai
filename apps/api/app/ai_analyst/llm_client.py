@@ -4,7 +4,6 @@ import json
 from typing import Protocol
 
 from app.ai_analyst.context import AnalystContext
-from app.ai_analyst.deterministic import DeterministicAnalystProvider
 
 MOCK_EXPLAINER_MODEL = "mock-explainer-0.1"
 ANALYST_LLM_TEMPERATURE = 0
@@ -35,30 +34,83 @@ class MockExplainerClient:
 
     def narrate(self, context: AnalystContext, prompt: str, *, timeout_seconds: float) -> str:
         del prompt, timeout_seconds
-        statements = [
-            {"statement": item.statement, "evidence_ids": list(item.evidence_ids)}
-            for item in DeterministicAnalystProvider().grounded_summary(context)
-        ]
-        if context.data_mode == "mock":
-            statements.append(
+        return json.dumps(
+            {
+                "narrative": "The match appears open.",
+                "claims": _claims_from_context(context),
+            },
+            ensure_ascii=False,
+        )
+
+
+def _claims_from_context(context: AnalystContext) -> list[dict[str, object]]:
+    favorite = context.favorite_selection()
+    field = {
+        "HOME": "prediction.home_probability",
+        "DRAW": "prediction.draw_probability",
+        "AWAY": "prediction.away_probability",
+    }[favorite.value]
+    claims: list[dict[str, object]] = [
+        {
+            "claim_type": "model_probability",
+            "subject": favorite.value,
+            "value": float(context.prediction.probability(favorite)),
+            "evidence_ids": [field],
+        },
+        {
+            "claim_type": "model_favorite",
+            "subject": favorite.value,
+            "evidence_ids": ["prediction.model_favorite"],
+        },
+        {
+            "claim_type": "data_mode",
+            "value": context.data_mode,
+            "evidence_ids": ["metadata.data_mode"],
+        },
+        {
+            "claim_type": "model_status",
+            "value": context.prediction.model_status,
+            "evidence_ids": ["prediction.model_status"],
+        },
+    ]
+    if context.value is not None:
+        claims.extend(
+            [
                 {
-                    "statement": (
-                        "Ces faits sont servis en data_mode mock et ne doivent pas être présentés comme live."
-                    ),
-                    "evidence_ids": ["metadata.data_mode"],
+                    "claim_type": "implied_probability",
+                    "subject": context.value.selection.value,
+                    "value": float(context.value.implied_probability),
+                    "evidence_ids": ["value.implied_probability"],
+                },
+                {
+                    "claim_type": "odds",
+                    "subject": context.value.selection.value,
+                    "value": float(context.value.odds),
+                    "evidence_ids": ["value.odds"],
+                },
+                {
+                    "claim_type": "edge",
+                    "subject": context.value.selection.value,
+                    "value": float(context.value.edge),
+                    "evidence_ids": ["value.edge"],
+                },
+                {
+                    "claim_type": "ev",
+                    "subject": context.value.selection.value,
+                    "value": float(context.value.ev),
+                    "evidence_ids": ["value.ev"],
+                },
+            ]
+        )
+        if context.value_selection is not None:
+            claims.append(
+                {
+                    "claim_type": "value_selection",
+                    "subject": context.value_selection.value,
+                    "evidence_ids": ["value.value_selection"],
                 }
             )
-        if context.prediction.model_status == "candidate":
-            statements.append(
-                {
-                    "statement": (
-                        f"Le modèle {context.prediction.model_version} a le statut candidate, "
-                        "pas un statut de production promu."
-                    ),
-                    "evidence_ids": ["prediction.model_status", "prediction.model_version"],
-                }
-            )
-        return json.dumps({"statements": statements}, ensure_ascii=False)
+    return claims
 
 
 class ScriptedLLMClient:

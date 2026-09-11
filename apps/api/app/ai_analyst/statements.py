@@ -9,21 +9,26 @@ ClaimType = Literal[
     "league",
     "kickoff",
     "model_probability",
+    "probability_comparison",
+    "model_favorite",
     "odds",
     "implied_probability",
     "no_vig_probability",
     "edge",
     "ev",
-    "model_favorite",
     "value_selection",
+    "value_comparison",
     "data_mode",
+    "model_status",
     "statistic",
     "injury",
     "lineup",
     "result",
     "event",
+    "ranking",
     "recommendation",
 ]
+ClaimRelation = Literal["greater_than", "less_than", "equal", "greater_or_equal", "less_or_equal"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,12 +40,22 @@ class FactualClaim:
 
 @dataclass(frozen=True, slots=True)
 class GroundedClaim:
-    """Internal factual assertion extracted from narrative. Never serialized to HTTP."""
+    """Internal factual assertion. Never serialized to HTTP. Never taken from prose."""
 
     claim_type: ClaimType
-    subject: str | None
-    value: str | float | None
+    subject: str | None = None
+    value: str | float | bool | None = None
+    compare_to: str | float | None = None
+    relation: ClaimRelation | None = None
     evidence_ids: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class GroundedNarrative:
+    """LLM payload after schema parse. Claims are the only factual channel."""
+
+    narrative: str
+    claims: tuple[GroundedClaim, ...]
 
 
 @dataclass(frozen=True, slots=True)

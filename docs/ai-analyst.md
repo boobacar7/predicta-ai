@@ -16,23 +16,29 @@ validated identity
   → Prediction Service
   → Value Engine (optionnel)
   → AnalystContext immuable
-  → AnalystEvidence (faits whitelistés)
-  → LLM JSON { statements, evidence_ids }
-  → GroundedClaim interne (claim_type + subject + value)
-  → validation claim / evidence
+  → AnalystEvidence (faits whitelistés, typed)
+  → LLM JSON { narrative, claims[] }
+  → GroundedNarrative / GroundedClaim[]
+  → ClaimValidator (valeurs vs AnalystContext)
+  → EvidenceValidator (evidence_id + evidence.type)
   → assert_grounded
-  → narration rendue
+  → render (templates backend)
   → GET /api/v1/football/ai-analyst/{match_id}
 ```
 
-Le texte narratif n'est jamais une source de vérité. Seules les claims
-typées, reliées à des `evidence_ids`, peuvent affirmer un fait. Une claim
-n'est valide que si `claim_type`, le sujet, la valeur et l'evidence sont
-compatibles. Exemple : `HOME / model_probability / 50%` est rejeté si
-l'evidence HOME vaut 41,7 %, y compris sous forme « above seventy » ou
-« soixante-dix ». Une evidence de cote ou d'implicite ne justifie pas une
-claim de probabilité modèle. `GroundedClaim` reste interne : le DTO HTTP
-ne change pas.
+Le LLM n'est pas autorisé à déclarer qu'une phrase est grounded. Il fournit
+une narration stylistique et des claims structurées. Le backend compare
+chaque claim à `AnalystContext` / `AnalystEvidence`, puis rend le texte
+factuel. La prose n'est jamais une source de vérité.
+
+Exemple : `probability_comparison` / AWAY > HOME est calculé contre
+`P(AWAY)` et `P(HOME)`. Si HOME = 41,7 % et AWAY = 29,2 %, la claim est
+fausse : la narration LLM entière est rejetée. « AWAY is more likely than
+HOME » dans le texte n'est pas analysé comme preuve.
+
+Une evidence `type=odds` ou `implied_probability` ne peut pas valider une
+claim `model_probability`. `GroundedClaim` / `GroundedNarrative` restent
+internes : le DTO HTTP ne change pas.
 
 `DeterministicAnalystProvider` reste le narrator par défaut
 (`PREDICTA_API_ANALYST_NARRATOR=deterministic`) et ne nécessite aucune clé
@@ -146,23 +152,32 @@ structurelle, probabilités, métadonnées modèle, value optionnelle,
 - `availability`
 - `cutoff_at` lorsqu'il s'applique
 
+Chaque `AnalystEvidence` a un `evidence_type` dérivé du champ source
+(`model_probability`, `odds`, `ev`, `identity`, `data_mode`, …).
+
 Quatre couches restent séparées :
 
-1. **faits** issus du contexte (`AnalystEvidence`) : identité, probabilités,
-   cotes, edge, EV, versions, cutoff, `data_mode` ;
-2. **evidence** : whitelist immuable. Un `evidence_id` inconnu est refusé ;
-3. **narration** : `GroundedStatement.statement` est une interprétation.
-   `factual_claims` doivent reproduire un champ evidence disponible.
-   Le texte rendu (`summary`, forces, risques, `confidence.basis`) est
-   rescanné : tout nombre, cote, EV, équipe ou date non présents dans le
-   contexte est rejeté. La prose qualitative sans fait nouveau reste
-   autorisée ;
-4. **frontière provider** : le provider raconte le contexte. Il ne possède
-   aucune donnée. `DeterministicAnalystProvider` émet des
-   `GroundedStatement` puis `render_statements`.
-   `LLMAnalystProvider` fait de même : il ne retourne que des statements
-   liés à des `evidence_ids`. Les claims numériques sont reconstruits
-   depuis `AnalystEvidence`, jamais depuis le LLM.
+1. **faits** issus du contexte (`AnalystContext` → `AnalystEvidence`) :
+   identité, probabilités, cotes, edge, EV, versions, cutoff, `data_mode` ;
+2. **evidence** : whitelist immuable. Un `evidence_id` inconnu, une
+   evidence indisponible, ou un `evidence.type` incompatible avec
+   `claim_type` est refusé ;
+3. **claims** : `GroundedClaim` porte `claim_type`, `subject`,
+   `value` / `compare_to` / `relation`, et `evidence_ids`.
+   `ClaimValidator` compare la structure aux valeurs du contexte.
+   HOME, AWAY et DRAW sont résolus vers les équipes du contexte ; une
+   équipe absente est rejetée. Les faits sportifs (`injury`, `lineup`,
+   `result`, `ranking`, `event`, `statistic`) n'ont pas d'evidence V0.1
+   et sont toujours rejetés ;
+4. **narration** : le champ `narrative` du LLM est stylistique seulement
+   (pas de chiffres, pas de labels HOME/AWAY/DRAW, pas de noms d'équipes).
+   Les phrases factuelles publiées sont rendues par le backend à partir
+   des claims validées. Une prose qualitative sans fait nouveau reste
+   autorisée si elle ne contredit pas le canal claims.
+
+`DeterministicAnalystProvider` émet encore des `GroundedStatement` internes
+puis `render_statements`. `LLMAnalystProvider` n'extrait plus de faits
+depuis la prose : il exige des claims structurées.
 
 Les DTOs `prediction` et `value` sont reconstruits par le service depuis
 `AnalystContext`, jamais depuis le texte du provider.
@@ -175,15 +190,16 @@ reçoit uniquement le contexte validé. **LLM output ≠ source of truth.**
 Flux :
 
 ```text
-AnalystContext.evidence()
-  → prompt (faits whitelistés uniquement)
-  → LLM JSON { statements: [{ statement, evidence_ids }] }
-  → parse / schema extra=forbid
-  → extraction GroundedClaim (narration ≠ fait)
-  → claim_type + subject + value vs evidence
-  → assert_statements_grounded
-  → summary rendu
-  → DTO reconstruit depuis AnalystContext
+AnalystContext
+  → AnalystEvidence
+  → LLMAnalystProvider (contexte sérialisé whitelisté uniquement)
+  → StructuredNarrative { narrative, claims[] }
+  → GroundedClaim[]
+  → ClaimValidator
+  → EvidenceValidator
+  → assert_grounded
+  → render
+  → Analyst DTO
 ```
 
 Toute erreur du chemin narrator (JSON malformé, schema, evidence inconnue,
@@ -221,7 +237,9 @@ Le LLM ne peut jamais modifier :
 Le service reconstruit `prediction` et `value` depuis le contexte, puis
 appelle `assert_grounded`. Un facteur, une `FactualClaim` ou un texte hors
 evidence est refusé. Exemple : contexte HOME 41,7 % et résumé « HOME 80 % »
-→ rejet, puis fallback déterministe.
+→ rejet, puis fallback déterministe. De même : claim HOME > 0,5 alors que
+HOME = 41,7 % ; claim `model_favorite=AWAY` alors que le favori est HOME ;
+claim EV « high » alors que EV HOME = −16,7 %.
 
 ## Sécurité anti-hallucination
 

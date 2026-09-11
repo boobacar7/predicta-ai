@@ -3,17 +3,11 @@ from __future__ import annotations
 import re
 from decimal import Decimal
 
-from app.ai_analyst.claims import (
-    ClaimGroundingError,
-    extract_claims,
-    mentioned_selections,
-    split_sentences,
-    validate_claims,
-)
 from app.ai_analyst.context import AnalystContext, AnalystEvidence
-from app.ai_analyst.language import FORBIDDEN_CLAIMS, UNSUPPORTED_INVENTED_TOPICS
+from app.ai_analyst.language import FORBIDDEN_CLAIMS, UNSUPPORTED_INVENTED_TOPICS, first_blocked_term
 from app.ai_analyst.models import FootballAnalystExplanation
 from app.ai_analyst.statements import FactualClaim, GroundedStatement
+from app.odds.types import Football1x2Selection
 
 VALUE_ONLY_FACTORS = frozenset({"market_probability", "edge", "ev", "data_freshness"})
 PERCENT_RE = re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:%|％|percent\b)", re.IGNORECASE)
@@ -168,6 +162,32 @@ FUNCTION_WORDS = frozenset(
 )
 
 
+_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
+
+
+def split_sentences(text: str) -> list[str]:
+    stripped = text.strip()
+    if not stripped:
+        return []
+    return [part.strip() for part in _SENTENCE_SPLIT_RE.split(stripped) if part.strip()]
+
+
+def mentioned_selections(context: AnalystContext, sentence: str) -> set[Football1x2Selection]:
+    lowered = sentence.casefold()
+    mentioned: set[Football1x2Selection] = set()
+    if re.search(r"\bhome\b|\bdomicile\b", lowered):
+        mentioned.add(Football1x2Selection.HOME)
+    if re.search(r"\baway\b|\bextérieur\b|\bvisitor\b|\bvisiteur\b", lowered):
+        mentioned.add(Football1x2Selection.AWAY)
+    if re.search(r"\bdraw\b|\bmatch nul\b", lowered):
+        mentioned.add(Football1x2Selection.DRAW)
+    if context.identity.home_team and context.identity.home_team.casefold() in lowered:
+        mentioned.add(Football1x2Selection.HOME)
+    if context.identity.away_team and context.identity.away_team.casefold() in lowered:
+        mentioned.add(Football1x2Selection.AWAY)
+    return mentioned
+
+
 class AnalystGroundingError(ValueError):
     """Provider output referenced a fact that is not in AnalystContext."""
 
@@ -245,31 +265,25 @@ def _assert_text_grounded(
     evidence_ids: tuple[str, ...] = (),
 ) -> None:
     scanned = _mask_grounded_literals(context, text)
+    del cited_fields, evidence_ids
     forbidden = _forbidden_term(scanned)
     if forbidden is not None:
         raise AnalystGroundingError(f"Analyst text contains forbidden language: {forbidden}.")
     invented = _unsupported_topic(scanned)
     if invented is not None:
         raise AnalystGroundingError(f"Analyst text invents unsupported topic: {invented}.")
-    try:
-        validate_claims(
-            context,
-            extract_claims(text, context, evidence_ids, masked_text=scanned),
-            cited_fields or set(),
-        )
-    except ClaimGroundingError as exc:
-        raise AnalystGroundingError(str(exc)) from exc
     _assert_favorite_not_confused(context, scanned)
     _assert_candidate_not_promoted(context, scanned)
     _assert_data_mode_not_contradicted(context, scanned)
     allowed_percents = _allowed_percents(context)
     model_percents = _model_percents(context)
-    for raw in PERCENT_RE.findall(scanned):
-        value = _to_decimal(raw)
-        if value not in allowed_percents:
-            raise AnalystGroundingError(f"Percent claim {raw}% is not present in AnalystContext.")
-        if _has_model_probability_language(scanned) and value not in model_percents:
-            raise AnalystGroundingError(f"Model-probability percent {raw}% is not a model probability.")
+    for sentence in split_sentences(scanned):
+        for raw in PERCENT_RE.findall(sentence):
+            value = _to_decimal(raw)
+            if value not in allowed_percents:
+                raise AnalystGroundingError(f"Percent claim {raw}% is not present in AnalystContext.")
+            if _has_model_probability_language(sentence) and value not in model_percents:
+                raise AnalystGroundingError(f"Model-probability percent {raw}% is not a model probability.")
     if context.value is None:
         if ODDS_RE.search(scanned):
             raise AnalystGroundingError("Odds were asserted while unavailable in AnalystContext.")
@@ -369,16 +383,7 @@ def _cited_percents(cited_fields: set[str], context: AnalystContext) -> set[Deci
 
 
 def _unsupported_topic(text: str) -> str | None:
-    lowered = text.casefold()
-    for term in UNSUPPORTED_INVENTED_TOPICS:
-        needle = term.casefold()
-        if " " in needle:
-            if needle in lowered:
-                return term
-            continue
-        if re.search(rf"\b{re.escape(needle)}\b", lowered):
-            return term
-    return None
+    return first_blocked_term(text, UNSUPPORTED_INVENTED_TOPICS)
 
 
 def _assert_favorite_not_confused(context: AnalystContext, text: str) -> None:
@@ -431,15 +436,7 @@ def _assert_data_mode_not_contradicted(context: AnalystContext, text: str) -> No
 
 
 def _forbidden_term(text: str) -> str | None:
-    lowered = text.casefold()
-    for term in FORBIDDEN_CLAIMS:
-        if " " in term or "%" in term:
-            if term in lowered:
-                return term
-            continue
-        if re.search(rf"\b{re.escape(term)}\b", lowered):
-            return term
-    return None
+    return first_blocked_term(text, FORBIDDEN_CLAIMS)
 
 
 def _has_model_probability_language(text: str) -> bool:

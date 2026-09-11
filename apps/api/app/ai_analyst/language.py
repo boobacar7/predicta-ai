@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 FORBIDDEN_CLAIMS = (
     "garanti",
     "guarantee",
@@ -12,6 +14,7 @@ FORBIDDEN_CLAIMS = (
     "blessé",
     "injury",
     "injured",
+    "hurt",
     "composition",
     "lineup",
     "line-up",
@@ -47,6 +50,7 @@ UNSUPPORTED_INVENTED_TOPICS = (
     "blessé",
     "injury",
     "injured",
+    "hurt",
     "composition",
     "lineup",
     "line-up",
@@ -64,3 +68,18 @@ UNSUPPORTED_INVENTED_TOPICS = (
     "probable lineup",
     "composition probable",
 )
+
+
+def first_blocked_term(text: str, terms: tuple[str, ...]) -> str | None:
+    """Word-boundary topic scan. Not a paraphrase engine for probabilities."""
+
+    lowered = text.casefold()
+    for term in terms:
+        needle = term.casefold()
+        if " " in needle or "%" in needle:
+            if needle in lowered:
+                return term
+            continue
+        if re.search(rf"\b{re.escape(needle)}\b", lowered):
+            return term
+    return None

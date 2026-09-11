@@ -27,11 +27,43 @@ from tests.test_ai_analyst_engine import (
     _identity,
 )
 from tests.test_ai_analyst_grounding import CUTOFF
-from tests.test_ai_analyst_llm import _lincoln_context, _scripted, _statements, _valid_home_statement
+from tests.test_ai_analyst_llm import _lincoln_context, _payload, _scripted, _statements, _valid_home_statement
 
 MATCH_ID = "mth_football-sportmonks-19719892"
 KICKOFF = "2026-07-07T16:00:00Z"
 HOME_EVIDENCE = ["prediction.home_probability", "identity.home_team", "prediction.model_favorite"]
+HOME_PROBABILITY_CLAIM = {
+    "claim_type": "model_probability",
+    "subject": "HOME",
+    "value": 0.417,
+    "evidence_ids": ["prediction.home_probability"],
+}
+HOME_FAVORITE_CLAIM = {
+    "claim_type": "model_favorite",
+    "subject": "HOME",
+    "evidence_ids": ["prediction.model_favorite"],
+}
+AWAY_VALUE_CLAIM = {
+    "claim_type": "value_selection",
+    "subject": "AWAY",
+    "evidence_ids": ["value.value_selection"],
+}
+ODDS_CLAIM = {"claim_type": "odds", "subject": "HOME", "value": 2.0, "evidence_ids": ["value.odds"]}
+EV_CLAIM = {"claim_type": "ev", "subject": "HOME", "value": -0.167, "evidence_ids": ["value.ev"]}
+DATA_MODE_CLAIM = {"claim_type": "data_mode", "value": "mock", "evidence_ids": ["metadata.data_mode"]}
+ACCEPT_CLAIMS: dict[str, list[dict[str, object]]] = {
+    "F01-08": [HOME_FAVORITE_CLAIM],
+    "F01-11": [AWAY_VALUE_CLAIM],
+    "F01-13": [HOME_PROBABILITY_CLAIM],
+    "NUM-01": [HOME_PROBABILITY_CLAIM],
+    "NUM-02": [HOME_PROBABILITY_CLAIM],
+    "NUM-03": [HOME_PROBABILITY_CLAIM],
+    "ENT-12": [HOME_PROBABILITY_CLAIM, HOME_FAVORITE_CLAIM],
+    "VF-10": [AWAY_VALUE_CLAIM],
+    "ODD-07": [ODDS_CLAIM],
+    "ODD-08": [EV_CLAIM],
+    "DM-06": [DATA_MODE_CLAIM],
+}
 
 
 def _probe(**overrides: object) -> AnalystContext:
@@ -64,9 +96,25 @@ def _probe(**overrides: object) -> AnalystContext:
 
 
 def _run(statement: str, evidence: list[str], context: AnalystContext | None = None) -> tuple[str, str | None]:
-    provider = _scripted(_statements((statement, evidence)))
+    del evidence
+    payload = _payload(narrative=statement, claims=[])
+    provider = _scripted(payload)
     explanation = provider.generate_analysis(context or _lincoln_context())
     return explanation.provider, provider.last_fallback_reason
+
+
+def _run_case(
+    case_id: str,
+    statement: str,
+    evidence: list[str],
+    context: AnalystContext | None = None,
+) -> tuple[str, str | None]:
+    claims = ACCEPT_CLAIMS.get(case_id)
+    if claims is not None:
+        provider = _scripted(_payload(narrative="The match appears open.", claims=claims))
+        explanation = provider.generate_analysis(context or _lincoln_context())
+        return explanation.provider, provider.last_fallback_reason
+    return _run(statement, evidence, context)
 
 
 PROVIDER_ATTACKS: list[tuple[str, str, list[str], str]] = [
@@ -175,7 +223,7 @@ PROVIDER_ATTACKS: list[tuple[str, str, list[str], str]] = [
 
 @pytest.mark.parametrize(("case_id", "statement", "evidence", "expected"), PROVIDER_ATTACKS)
 def test_redteam_provider_attacks(case_id: str, statement: str, evidence: list[str], expected: str) -> None:
-    provider_id, reason = _run(statement, evidence)
+    provider_id, reason = _run_case(case_id, statement, evidence)
     assert provider_id == expected, f"{case_id}: {statement} -> {provider_id} ({reason})"
     if expected == ANALYST_PROVIDER_ID:
         assert reason is not None, f"{case_id} should fall back"
@@ -230,8 +278,9 @@ def test_fail_06_runtimeerror_dto_is_complete() -> None:
 
 def test_idn_identity_numbers_are_not_recycled_as_odds() -> None:
     context = _probe(home_team="Home FC 3.50")
-    provider_id, _reason = _run("Home FC 3.50 has 41.7% model probability", HOME_EVIDENCE, context)
-    assert provider_id == LLM_ANALYST_PROVIDER_ID
+    provider = _scripted(_payload(narrative="The match appears open.", claims=[HOME_PROBABILITY_CLAIM]))
+    explanation = provider.generate_analysis(context)
+    assert explanation.provider == LLM_ANALYST_PROVIDER_ID
     fallback, _reason = _run("HOME is priced at 3.50", ["value.odds"], context)
     assert fallback == ANALYST_PROVIDER_ID
 
@@ -353,15 +402,13 @@ def test_iso_temporal_leakage_is_not_masked() -> None:
 
 
 def test_required_qualitative_and_factual_claims() -> None:
-    accept, reason = _run("HOME has 41.7% model probability", HOME_EVIDENCE)
+    accept, reason = _run_case("F01-13", "HOME has 41.7% model probability", HOME_EVIDENCE)
     assert accept == LLM_ANALYST_PROVIDER_ID
     assert reason is None
-    qualitative = _scripted(
-        _statements(("The match appears open and uncertainty remains high.", []))
-    )
+    qualitative = _scripted(_payload(narrative="The match appears open.", claims=[]))
     explanation = qualitative.generate_analysis(_lincoln_context())
     assert explanation.provider == LLM_ANALYST_PROVIDER_ID
-    most_likely, reason = _run("HOME is most likely", ["prediction.model_favorite"])
+    most_likely, reason = _run_case("F01-08", "HOME is most likely", ["prediction.model_favorite"])
     assert most_likely == LLM_ANALYST_PROVIDER_ID
     paris, reason = _run("Paris SG has 41.7% model probability", HOME_EVIDENCE)
     assert paris == ANALYST_PROVIDER_ID
