@@ -266,6 +266,25 @@ describe("historical match identity", () => {
   });
 });
 
+describe("football AI analyst", () => {
+  it("publishes the Lincoln case with a distinct favorite and value selection", async () => {
+    const result = await source().getFootballAiAnalyst("mth_football-sportmonks-19719892");
+
+    expect(result.data_mode).toBe("mock");
+    expect(result.data.model_favorite).toBe("HOME");
+    expect(result.data.value.value_selection).toBe("AWAY");
+    expect(result.data.value.ev).toBe(-0.167);
+    expect(result.data.prediction.model_status).toBe("candidate");
+  });
+
+  it("returns a 404 problem when the report does not exist", async () => {
+    await expect(source().getFootballAiAnalyst("mth_unknown")).rejects.toMatchObject({
+      kind: "not_found",
+      status: 404,
+    });
+  });
+});
+
 describe("value catalogue filters", () => {
   it("honours league_id and date on GET /value, the parameters the contract actually has", async () => {
     const tennis = await source().getValue({ league_id: "lg_grand_court" });

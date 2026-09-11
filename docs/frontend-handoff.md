@@ -124,8 +124,21 @@ Résolus par [`contracts/openapi.yaml`](../contracts/openapi.yaml) :
 depuis `contracts/openapi.yaml`. Le reste de `api.ts` reste manuscrit
 tant que la migration OpenAPI n'est pas totale.
 
-`GET /api/v1/football/ai-analyst/{match_id}` est le contrat backend de
-l'analyste football. Aucune page n'est branchée dans cette passe.
+`GET /api/v1/football/ai-analyst/{match_id}` alimente `/ai-analyst`.
+`AiAnalystView` lit `FootballAiAnalystReport` via
+`getFootballAiAnalyst`. `model_favorite` et `value.value_selection` sont
+affichés dans deux blocs distincts : « Favori du modèle » et « Valeur
+détectée ». Le second n'est jamais présenté comme un pick.
+
+Ressource : `football_ai_analyst`. HTTP :
+
+```
+NEXT_PUBLIC_PREDICTA_HTTP_RESOURCES=football_ai_analyst
+NEXT_PUBLIC_PREDICTA_API_BASE_URL=http://localhost:8000/api/v1
+```
+
+Le défaut reste mock. L'UI affiche « Mock data » uniquement lorsque
+`data_mode === "mock"`.
 
 ### Identité de match — consommé depuis `c31a367`
 
@@ -157,9 +170,18 @@ lorsque l'enveloppe le dit.
 pas de paramètre équivalent : ils restent un affinage local, étiqueté
 comme tel. Inventer `min_edge` sur cette route serait un contrat fantôme.
 
-Limites restantes :
+## Thèmes
 
-- AI Analyst : session mock déterministe, aucun appel LLM.
+Dark est le défaut. Light est une alternative persistée dans
+`localStorage` (`predicta-theme`). Le toggle (soleil / lune) est dans le
+header. Les composants consomment les tokens sémantiques de
+`globals.css` (`--background`, `--foreground`, `--card`, `--ai`,
+`--value`, `--warning`, `--risk`, …). Les graphiques lisent ces tokens
+via `useChartColors`. Le thème ne change aucune donnée métier.
+
+## Limites restantes
+
+- AI Analyst : provider déterministe, aucun LLM externe.
 - Profil : placeholder, phase 10.
 - Univers AI Picks V0.1 : un match candidat côté backend.
 

@@ -79,6 +79,10 @@ export class DataSourceError extends Error {
 
   /** Whether retrying the identical request could plausibly succeed. */
   get retryable(): boolean {
+    if (this.status !== undefined && this.status >= 400 && this.status < 500 && this.status !== 408) {
+      return false;
+    }
+
     return RETRYABLE_KINDS.has(this.kind);
   }
 }

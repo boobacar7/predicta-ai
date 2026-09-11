@@ -60,6 +60,8 @@ export function createDataSource({
     getPlayer: (id) => from("players").getPlayer(id),
     getAnalystSession: (matchId, question) =>
       from("analyst").getAnalystSession(matchId, question),
+    getFootballAiAnalyst: (matchId, cutoffAt) =>
+      from("football_ai_analyst").getFootballAiAnalyst(matchId, cutoffAt),
   };
 }
 

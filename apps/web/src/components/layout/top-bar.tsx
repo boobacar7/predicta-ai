@@ -1,6 +1,7 @@
 "use client";
 
 import { SportFilter } from "@/components/domain/filters";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
   DropdownContent,
@@ -31,7 +32,10 @@ export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
         </Button>
         <SportFilter value={sport} onChange={setSport} />
       </div>
-      {showScenarioPicker ? <ScenarioPicker /> : null}
+      <div className="flex shrink-0 items-center gap-1">
+        <ThemeToggle />
+        {showScenarioPicker ? <ScenarioPicker /> : null}
+      </div>
     </div>
   );
 }

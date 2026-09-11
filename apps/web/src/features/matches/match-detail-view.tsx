@@ -161,7 +161,7 @@ function MatchDetailContent({ match }: { match: MatchDetail }) {
         </section>
       ) : null}
 
-      <Link href="/analyst" className="inline-block text-sm text-ai-strong hover:underline">
+      <Link href={`/ai-analyst?match_id=${match.id}`} className="inline-block text-sm text-ai-strong hover:underline">
         Ouvrir dans l&apos;AI Analyst
       </Link>
     </div>

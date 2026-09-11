@@ -133,4 +133,10 @@ export const queryKeys = {
     session: (scenario: MockScenario, matchId: string, question?: string) =>
       [...root(scenario), "analyst", "session", matchId, question ?? ""] as const,
   },
+
+  footballAiAnalyst: {
+    all: (scenario: MockScenario) => [...root(scenario), "football-ai-analyst"] as const,
+    detail: (scenario: MockScenario, matchId: string, cutoffAt?: string) =>
+      [...root(scenario), "football-ai-analyst", "detail", matchId, cutoffAt ?? ""] as const,
+  },
 } as const;

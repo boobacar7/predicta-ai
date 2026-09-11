@@ -59,9 +59,9 @@ export const navSections: NavSection[] = [
         icon: "activity",
       },
       {
-        href: "/analyst",
+        href: "/ai-analyst",
         label: "AI Analyst",
-        description: "Explications à partir de faits sourcés",
+        description: "Explication football 1X2 à partir du contexte validé",
         icon: "message",
       },
     ],
@@ -129,6 +129,12 @@ export const pageMeta: Record<string, { title: string; eyebrow: string; descript
     title: "Performance",
     eyebrow: "Modèles",
     description: "Log loss, Brier, calibration et ROI théorique de backtest.",
+  },
+  "/ai-analyst": {
+    title: "AI Analyst",
+    eyebrow: "Football Intelligence",
+    description:
+      "Rapport explicatif construit uniquement à partir du contexte validé. Ce n'est pas une recommandation.",
   },
   "/analyst": {
     title: "AI Analyst",

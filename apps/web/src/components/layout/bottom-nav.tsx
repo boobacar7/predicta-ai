@@ -10,7 +10,7 @@ const items = [
   { href: "/matches", label: "Matchs", icon: "calendar" as const },
   { href: "/ai-picks", label: "Picks", icon: "spark" as const },
   { href: "/value-finder", label: "Value", icon: "diamond" as const },
-  { href: "/analyst", label: "Analyst", icon: "message" as const },
+  { href: "/ai-analyst", label: "Analyst", icon: "message" as const },
 ];
 
 export function BottomNav() {

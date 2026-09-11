@@ -85,3 +85,24 @@ describe("AI Picks routing", () => {
     expect(result.data.metadata.ai_picks_version).toBe("ai-picks-0.1");
   });
 });
+
+describe("AI Analyst routing", () => {
+  it("routes GET /football/ai-analyst independently from the legacy session", async () => {
+    const source = createDataSource({ resourceModes: modes({ football_ai_analyst: "http" }) });
+
+    const analyst = await source.getFootballAiAnalyst("mth_1").catch((error: unknown) => error);
+    const session = await source.getAnalystSession("mth_northgate_harbor");
+
+    expect(analyst).toBeInstanceOf(Error);
+    expect(session.data_mode).toBe("mock");
+  });
+
+  it("serves the football analyst from fixtures by default", async () => {
+    const source = createDataSource({ resourceModes: modes() });
+    const result = await source.getFootballAiAnalyst("mth_football-sportmonks-19719892");
+
+    expect(result.data_mode).toBe("mock");
+    expect(result.data.model_favorite).toBe("HOME");
+    expect(result.data.value.value_selection).toBe("AWAY");
+  });
+});

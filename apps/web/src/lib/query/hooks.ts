@@ -158,6 +158,16 @@ export function usePlayer(id: string) {
   });
 }
 
+export function useFootballAiAnalyst(matchId: string, cutoffAt?: string) {
+  const { source, scenario } = useSource();
+
+  return useQuery({
+    queryKey: queryKeys.footballAiAnalyst.detail(scenario, matchId, cutoffAt),
+    queryFn: () => source.getFootballAiAnalyst(matchId, cutoffAt),
+    enabled: Boolean(matchId),
+  });
+}
+
 export function useAnalystSession(matchId: string, question?: string) {
   const { source, scenario } = useSource();
 

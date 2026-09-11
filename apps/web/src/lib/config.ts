@@ -20,6 +20,7 @@ export const DATA_RESOURCES = [
   "matches",
   "picks",
   "football_ai_picks",
+  "football_ai_analyst",
   "value",
   "performance",
   "teams",

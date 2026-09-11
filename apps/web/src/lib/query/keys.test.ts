@@ -99,3 +99,19 @@ describe("AI Picks keys", () => {
     expect(success.slice(0, 3)).toEqual([...queryKeys.footballAiPicks.all("success")]);
   });
 });
+
+describe("AI Analyst keys", () => {
+  it("separates match ids and optional cutoffs", () => {
+    const lincoln = queryKeys.footballAiAnalyst.detail("success", "mth_football-sportmonks-19719892");
+    const other = queryKeys.footballAiAnalyst.detail("success", "mth_other");
+    const cutoff = queryKeys.footballAiAnalyst.detail(
+      "success",
+      "mth_football-sportmonks-19719892",
+      "2026-07-07T16:00:00Z",
+    );
+
+    expect(lincoln).not.toEqual(other);
+    expect(lincoln).not.toEqual(cutoff);
+    expect(lincoln.slice(0, 3)).toEqual([...queryKeys.footballAiAnalyst.all("success")]);
+  });
+});

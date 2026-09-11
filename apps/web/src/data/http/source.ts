@@ -3,6 +3,7 @@ import type {
   AiPicksFilters,
   AiPicksResult,
   AnalystSession,
+  FootballAiAnalystReport,
   CatalogFilters,
   DashboardSnapshot,
   League,
@@ -102,6 +103,13 @@ export class HttpDataSource implements DataSource {
       match_id: matchId,
       question: question ?? null,
     });
+  }
+
+  getFootballAiAnalyst(matchId: string, cutoffAt?: string) {
+    return this.client.get<FootballAiAnalystReport>(
+      `/football/ai-analyst/${encodeURIComponent(matchId)}`,
+      { cutoff_at: cutoffAt },
+    );
   }
 }
 

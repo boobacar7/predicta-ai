@@ -1,6 +1,9 @@
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { MockScenarioProvider } from "@/data/mock/scenario-context";
 import { FiltersProvider } from "@/lib/filters/context";
+import { ThemeProvider } from "@/lib/theme/theme-provider";
+import type { Theme } from "@/lib/theme/theme";
+import { resetThemeStore, setThemeStore } from "@/lib/theme/theme-store";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, type RenderOptions, type RenderResult } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
@@ -18,6 +21,7 @@ import type { SportFilterValue } from "@/lib/filters/context";
 export interface RenderWithProvidersOptions extends Omit<RenderOptions, "wrapper"> {
   sport?: SportFilterValue;
   scenario?: MockScenario;
+  theme?: Theme;
 }
 
 export function createTestQueryClient(): QueryClient {
@@ -30,18 +34,22 @@ export function createTestQueryClient(): QueryClient {
 
 export function renderWithProviders(
   ui: ReactElement,
-  { sport = "all", scenario = "success", ...options }: RenderWithProvidersOptions = {},
+  { sport = "all", scenario = "success", theme = "dark", ...options }: RenderWithProvidersOptions = {},
 ): RenderResult & { queryClient: QueryClient } {
+  resetThemeStore();
+  setThemeStore(theme, false);
   const queryClient = createTestQueryClient();
 
   function Wrapper({ children }: { children: ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <FiltersProvider initialSport={sport}>
-            <MockScenarioProvider initialScenario={scenario}>{children}</MockScenarioProvider>
-          </FiltersProvider>
-        </TooltipProvider>
+        <ThemeProvider initialTheme={theme} persist={false}>
+          <TooltipProvider>
+            <FiltersProvider initialSport={sport}>
+              <MockScenarioProvider initialScenario={scenario}>{children}</MockScenarioProvider>
+            </FiltersProvider>
+          </TooltipProvider>
+        </ThemeProvider>
       </QueryClientProvider>
     );
   }

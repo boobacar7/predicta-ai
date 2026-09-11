@@ -4,6 +4,7 @@ import type {
   ConfidenceLevel,
   Football1x2Selection,
   FootballModelStatus,
+  FreshnessLevel,
   MatchStatus,
   SportCode,
 } from "@/types/api";
@@ -25,6 +26,12 @@ export const matchStatusLabels: Record<MatchStatus, string> = {
   live: "En cours",
   finished: "Terminé",
   postponed: "Reporté",
+};
+
+export const freshnessLabels: Record<FreshnessLevel, string> = {
+  fresh: "Fraîche",
+  acceptable: "Acceptable",
+  stale: "Ancienne",
 };
 
 export const availabilityLabels: Record<AvailabilityStatus, string> = {

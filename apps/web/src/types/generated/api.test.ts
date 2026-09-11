@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 
 type GeneratedAiPick = components["schemas"]["AiPick"];
 type GeneratedIdentity = components["schemas"]["HistoricalMatchIdentity"];
+type GeneratedAnalyst = components["schemas"]["FootballAiAnalystReport"];
 
 describe("generated OpenAPI types", () => {
   it("publishes nullable team labels and a required kickoff on AiPick", () => {
@@ -58,5 +59,13 @@ describe("generated OpenAPI types", () => {
     } as const satisfies GeneratedAiPick;
 
     expect(pick.home_team).toBe("Lincoln Red Imps");
+  });
+
+  it("keeps model_favorite distinct from value_selection on the analyst report", () => {
+    expectTypeOf<GeneratedAnalyst["model_favorite"]>().toEqualTypeOf<"HOME" | "DRAW" | "AWAY">();
+    expectTypeOf<GeneratedAnalyst["value"]["value_selection"]>().toEqualTypeOf<
+      "HOME" | "DRAW" | "AWAY" | null
+    >();
+    expectTypeOf<GeneratedAnalyst["home_team"]>().toEqualTypeOf<string | null>();
   });
 });

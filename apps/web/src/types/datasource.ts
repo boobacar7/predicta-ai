@@ -2,6 +2,7 @@ import type {
   AiPicksFilters,
   AiPicksResult,
   AnalystSession,
+  FootballAiAnalystReport,
   CatalogFilters,
   DashboardSnapshot,
   Envelope,
@@ -75,6 +76,17 @@ export interface DataSource {
   getPlayer(id: string): Promise<Envelope<PlayerDetail>>;
 
   getAnalystSession(matchId: string, question?: string): Promise<Envelope<AnalystSession>>;
+
+  /**
+   * `GET /football/ai-analyst/{match_id}`.
+   *
+   * Optional `cutoff_at` is forwarded as a query parameter. The report is
+   * explanatory only: it never chooses a wager.
+   */
+  getFootballAiAnalyst(
+    matchId: string,
+    cutoffAt?: string,
+  ): Promise<Envelope<FootballAiAnalystReport>>;
 }
 
 /** Read method names, used to route each resource independently. */

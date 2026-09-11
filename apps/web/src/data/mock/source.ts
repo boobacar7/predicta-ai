@@ -1,3 +1,4 @@
+import { getAnalystReportFixture } from "@/data/mock/ai-analyst";
 import {
   aiPickExclusions,
   aiPicks,
@@ -346,6 +347,59 @@ export class MockDataSource implements DataSource {
     return envelope(data);
   }
 
+  async getFootballAiAnalyst(matchId: string, cutoffAt?: string) {
+    await this.begin();
+
+    if (this.scenario === "empty") {
+      throw new DataSourceError({
+        kind: "not_found",
+        status: 404,
+        message: "Aucune analyse n'est publiée pour ce match.",
+        problem: {
+          type: "/problems/not-found",
+          title: "Not Found",
+          status: 404,
+          detail: "Aucune analyse n'est publiée pour ce match.",
+          request_id: "req_mock_ui_prototype",
+        },
+      });
+    }
+
+    if (matchId === "mth_analyst_conflict") {
+      throw problemError(409, "/problems/temporal-leakage", "Temporal leakage", "Le cutoff demandé est postérieur au point-in-time validé.");
+    }
+
+    if (matchId === "mth_analyst_unprocessable") {
+      throw problemError(422, "/problems/pit-features-unavailable", "PIT features unavailable", "Les features point-in-time sont absentes pour ce cutoff.");
+    }
+
+    if (matchId === "mth_analyst_unavailable") {
+      throw problemError(503, "/problems/model-artefact-not-found", "Model artefact not found", "L'artefact du modèle n'est pas disponible.");
+    }
+
+    if (cutoffAt === "not-a-timestamp") {
+      throw problemError(400, "/problems/validation", "Validation Error", "cutoff_at n'est pas un horodatage RFC 3339.");
+    }
+
+    const report = getAnalystReportFixture(matchId);
+    if (!report) {
+      throw new DataSourceError({
+        kind: "not_found",
+        status: 404,
+        message: "Analyse introuvable dans les fixtures mock.",
+        problem: {
+          type: "/problems/not-found",
+          title: "Not Found",
+          status: 404,
+          detail: "Analyse introuvable dans les fixtures mock.",
+          request_id: "req_mock_ui_prototype",
+        },
+      });
+    }
+
+    return envelope(report);
+  }
+
   async getAnalystSession(matchId: string, question?: string) {
     await this.begin();
 
@@ -385,6 +439,22 @@ function belowThreshold(pick: AiPick, minimumEv: number) {
       ? "Expected value is below the requested minimum."
       : "Edge is below the requested minimum.",
   } as const;
+}
+
+function problemError(status: number, type: string, title: string, detail: string): DataSourceError {
+  return new DataSourceError({
+    kind: status === 404 ? "not_found" : "server",
+    status,
+    message: detail,
+    requestId: "req_mock_ui_prototype",
+    problem: {
+      type,
+      title,
+      status,
+      detail,
+      request_id: "req_mock_ui_prototype",
+    },
+  });
 }
 
 function notFound(entity: string): DataSourceError {
