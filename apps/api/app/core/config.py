@@ -11,6 +11,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[4]
 DataMode = Literal["mock", "live"]
 RepositoryKind = Literal["mock", "sql"]
 AppEnv = Literal["development", "test", "staging", "production"]
+AnalystNarrator = Literal["deterministic", "llm"]
 
 
 class Settings(BaseSettings):
@@ -33,8 +34,10 @@ class Settings(BaseSettings):
     request_id_header: str = "X-Request-ID"
     mock_now: str = "2026-09-09T18:00:00Z"
     value_formula_version: str = "value-engine-0.1"
+    analyst_narrator: AnalystNarrator = "deterministic"
     analyst_llm_model: str = "mock-explainer-0.1"
     analyst_prompt_version: str = "analyst-prompt-0.1"
+    analyst_llm_timeout_seconds: float = Field(default=2.0, gt=0, le=30)
     football_model_version: str = "football-elo-v1-candidate"
     football_registry_dir: Path = _REPO_ROOT / "workers" / "ml" / "var" / "registry"
     football_dataset_path: Path = _REPO_ROOT / "workers" / "ingestion" / "var" / "football-1x2-history.parquet"

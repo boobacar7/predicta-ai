@@ -23,10 +23,10 @@ validated identity
   → GET /api/v1/football/ai-analyst/{match_id}
 ```
 
-Le LLM, s'il est branché plus tard, reste strictement downstream du contexte.
-`DeterministicAnalystProvider` est le provider par défaut et ne nécessite
-aucune clé externe. Un futur `LLMAnalystProvider` ne pourra produire qu'une
-narration grounded : il ne devient jamais source of truth.
+`DeterministicAnalystProvider` reste le narrator par défaut
+(`PREDICTA_API_ANALYST_NARRATOR=deterministic`) et ne nécessite aucune clé
+externe. `LLMAnalystProvider` est un narrator optionnel derrière le même
+port `AnalystProvider`. Il ne devient jamais source of truth.
 
 ## Contrat
 
@@ -140,19 +140,45 @@ Quatre couches restent séparées :
    autorisée ;
 4. **frontière provider** : le provider raconte le contexte. Il ne possède
    aucune donnée. `DeterministicAnalystProvider` émet des
-   `GroundedStatement` puis `render_statements`. Un futur
-   `LLMAnalystProvider` devra faire de même.
+   `GroundedStatement` puis `render_statements`.
+   `LLMAnalystProvider` fait de même : il ne retourne que des statements
+   liés à des `evidence_ids`. Les claims numériques sont reconstruits
+   depuis `AnalystEvidence`, jamais depuis le LLM.
 
 Les DTOs `prediction` et `value` sont reconstruits par le service depuis
 `AnalystContext`, jamais depuis le texte du provider.
 
-## Futur provider LLM
+## Provider LLM (narrator)
 
-`AnalystProvider` est le port. Un provider LLM pourra implémenter
-`generate_analysis(context)` plus tard. Il recevra uniquement le contexte
-validé. **LLM output ≠ source of truth.**
+`AnalystProvider` est le port. `LLMAnalystProvider.generate_analysis(context)`
+reçoit uniquement le contexte validé. **LLM output ≠ source of truth.**
 
-Le LLM ne pourra jamais modifier :
+Flux :
+
+```text
+AnalystContext.evidence()
+  → prompt (faits whitelistés uniquement)
+  → LLM JSON { statements: [{ statement, evidence_ids }] }
+  → parse / schema extra=forbid
+  → evidence_ids + claims
+  → assert_statements_grounded
+  → summary
+  → assert_grounded
+  → DTO
+```
+
+Le LLM n'a pas le droit de définir `probabilities`, `odds`, `edge`, `EV`,
+`model_version`, `dataset_version`, `cutoff_at` ou `data_mode`. Toute
+sortie malformée, expirée, non grounded ou qui confond `model_favorite` et
+`value_selection` retombe sur `DeterministicAnalystProvider`.
+
+Le client livré est `mock-explainer-0.1` : un narrator déterministe qui
+parle le schéma LLM, sans vendor externe ni secret. Aucune dépendance LLM
+n'est ajoutée. Le frontend continue d'appeler
+`GET /api/v1/football/ai-analyst/{match_id}` ; le backend reste la seule
+boundary.
+
+Le LLM ne peut jamais modifier :
 
 - probabilités
 - cotes
@@ -163,11 +189,13 @@ Le LLM ne pourra jamais modifier :
 - `cutoff_at`
 - `data_mode`
 - le résultat Value Engine
+- `HistoricalMatchIdentity`
+- le cutoff PIT
 
 Le service reconstruit `prediction` et `value` depuis le contexte, puis
 appelle `assert_grounded`. Un facteur, une `FactualClaim` ou un texte hors
 evidence est refusé. Exemple : contexte HOME 41,7 % et résumé « HOME 80 % »
-→ rejet. Aucune dépendance LLM n'est ajoutée dans V0.1.
+→ rejet, puis fallback déterministe.
 
 ## Sécurité anti-hallucination
 

@@ -4,9 +4,10 @@ import re
 from decimal import Decimal
 
 from app.ai_analyst.context import AnalystContext, AnalystEvidence
-from app.ai_analyst.language import FORBIDDEN_CLAIMS
+from app.ai_analyst.language import FORBIDDEN_CLAIMS, UNSUPPORTED_INVENTED_TOPICS
 from app.ai_analyst.models import FootballAnalystExplanation
 from app.ai_analyst.statements import FactualClaim, GroundedStatement
+from app.odds.types import Football1x2Selection
 
 VALUE_ONLY_FACTORS = frozenset({"market_probability", "edge", "ev", "data_freshness"})
 PERCENT_RE = re.compile(r"(\d+(?:[.,]\d+)?)\s*%")
@@ -86,6 +87,11 @@ def _assert_text_grounded(context: AnalystContext, text: str) -> None:
     forbidden = _forbidden_term(text)
     if forbidden is not None:
         raise AnalystGroundingError(f"Analyst text contains forbidden language: {forbidden}.")
+    invented = _unsupported_topic(text)
+    if invented is not None:
+        raise AnalystGroundingError(f"Analyst text invents unsupported topic: {invented}.")
+    _assert_favorite_not_confused(context, text)
+    _assert_candidate_not_promoted(context, text)
     allowed_percents = _allowed_percents(context)
     for raw in PERCENT_RE.findall(text):
         if _to_decimal(raw) not in allowed_percents:
@@ -118,6 +124,56 @@ def _assert_text_grounded(context: AnalystContext, text: str) -> None:
     for raw in ISO_DATE_RE.findall(text):
         if raw[:10] not in allowed_days:
             raise AnalystGroundingError(f"Date '{raw}' is not present in AnalystContext.")
+
+
+def _unsupported_topic(text: str) -> str | None:
+    lowered = text.casefold()
+    for term in UNSUPPORTED_INVENTED_TOPICS:
+        needle = term.casefold()
+        if " " in needle:
+            if needle in lowered:
+                return term
+            continue
+        if re.search(rf"\b{re.escape(needle)}\b", lowered):
+            return term
+    return None
+
+
+def _assert_favorite_not_confused(context: AnalystContext, text: str) -> None:
+    if context.value_selection is None or context.value_selection is context.favorite_selection():
+        return
+    value_labels = [context.value_selection.value]
+    if context.value_selection is Football1x2Selection.HOME and context.identity.home_team:
+        value_labels.append(context.identity.home_team)
+    elif context.value_selection is Football1x2Selection.AWAY and context.identity.away_team:
+        value_labels.append(context.identity.away_team)
+    elif context.value_selection is Football1x2Selection.DRAW:
+        value_labels.extend(["draw", "nul", "match nul"])
+    favorite_markers = (
+        "favori du modèle",
+        "favorite du modèle",
+        "model favorite",
+        "favori modèle",
+        "issue favorite",
+    )
+    negation = ("n'est pas", "n’est pas", "pas le favori", "not the model favorite")
+    for sentence in re.split(r"[.!?]", text):
+        lowered = sentence.casefold()
+        if not any(marker in lowered for marker in favorite_markers):
+            continue
+        if any(flag in lowered for flag in negation):
+            continue
+        if any(label.casefold() in lowered for label in value_labels):
+            raise AnalystGroundingError("Narrative presents value_selection as the model favorite.")
+
+
+def _assert_candidate_not_promoted(context: AnalystContext, text: str) -> None:
+    if context.prediction.model_status != "candidate":
+        return
+    lowered = text.casefold()
+    promoted = ("modèle champion", "champion model", "modèle est un champion")
+    if any(term in lowered for term in promoted) and "pas un champion" not in lowered:
+        raise AnalystGroundingError("Narrative promotes a candidate model to champion.")
 
 
 def _forbidden_term(text: str) -> str | None:

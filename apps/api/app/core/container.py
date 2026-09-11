@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from app.ai_analyst.factory import build_analyst_provider
 from app.ai_analyst.service import FootballAnalystService
 from app.ai_picks.config import AiPicksThresholds
 from app.ai_picks.service import AiPicksEngine
@@ -105,6 +106,7 @@ class AppContainer:
                 identities=self.match_identities(),
                 predictions=self.football_predictions(),
                 values=self.football_values(),
+                provider=build_analyst_provider(self.settings),
             )
         return self._football_ai_analyst
 

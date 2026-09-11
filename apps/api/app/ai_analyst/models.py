@@ -11,6 +11,8 @@ from app.schemas import ApiModel, FootballModelStatus, FreshnessLevel
 
 ANALYST_VERSION: Final[Literal["ai-analyst-0.1"]] = "ai-analyst-0.1"
 ANALYST_PROVIDER_ID: Final[Literal["deterministic-v0.1"]] = "deterministic-v0.1"
+LLM_ANALYST_PROVIDER_ID: Final[Literal["llm-v0.1"]] = "llm-v0.1"
+AnalystNarratorId = Literal["deterministic-v0.1", "llm-v0.1"]
 PREDICTION_SOURCE = "football-prediction-service"
 VALUE_SOURCE = "value-engine-0.1"
 IDENTITY_SOURCE = "match-identity-repository"
@@ -100,7 +102,7 @@ class FootballAnalystExplanation(ApiModel):
     data_quality: FootballAnalystDataQuality
     generated_at: datetime
     analysis_version: Literal["ai-analyst-0.1"] = ANALYST_VERSION
-    provider: Literal["deterministic-v0.1"] = ANALYST_PROVIDER_ID
+    provider: AnalystNarratorId = ANALYST_PROVIDER_ID
 
     @field_serializer("generated_at")
     def _generated(self, value: datetime) -> str:

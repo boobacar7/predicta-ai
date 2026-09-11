@@ -181,7 +181,9 @@ via `useChartColors`. Le thème ne change aucune donnée métier.
 
 ## Limites restantes
 
-- AI Analyst : provider déterministe, aucun LLM externe.
+- AI Analyst : même endpoint HTTP ; narrator déterministe par défaut.
+  Un LLM optionnel (`analyst.provider=llm-v0.1`) ne produit que la
+  narration, derrière le backend.
 - Profil : placeholder, phase 10.
 - Univers AI Picks V0.1 : un match candidat côté backend.
 

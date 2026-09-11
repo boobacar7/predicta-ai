@@ -1890,7 +1890,11 @@ components:
           enum: [ai-analyst-0.1]
         provider:
           type: string
-          enum: [deterministic-v0.1]
+          enum: [deterministic-v0.1, llm-v0.1]
+          description: |
+            Narrator identifier. llm-v0.1 means the summary was produced by the
+            LLM narrator after grounding. Business fields are always rebuilt
+            from AnalystContext, never from the LLM.
 
     FootballAiAnalystReport:
       type: object

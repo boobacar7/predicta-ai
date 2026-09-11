@@ -180,3 +180,29 @@ def test_football_ai_analyst_respects_pit_microseconds() -> None:
 def test_openapi_declares_football_ai_analyst() -> None:
     spec = yaml.safe_load(CONTRACT.read_text())
     assert "/football/ai-analyst/{match_id}" in spec["paths"]
+    assert spec["components"]["schemas"]["FootballAnalystExplanation"]["properties"]["provider"]["enum"] == [
+        "deterministic-v0.1",
+        "llm-v0.1",
+    ]
+
+
+def test_llm_narrator_stays_behind_the_same_http_boundary() -> None:
+    client = make_client(analyst_narrator="llm", analyst_llm_model="mock-explainer-0.1")
+    response = client.get(
+        f"/api/v1/football/ai-analyst/{MATCH_ID}",
+        headers={"X-Request-ID": "req_ai_analyst_llm"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    data = body["data"]
+    assert body["data_mode"] == "mock"
+    assert data["analyst"]["provider"] == "llm-v0.1"
+    assert data["analyst"]["data_quality"]["data_mode"] == "mock"
+    assert data["prediction"]["model_version"] == "football-elo-v1-candidate"
+    assert data["prediction"]["cutoff_at"] == KICKOFF
+    assert data["model_favorite"] == "HOME"
+    assert data["value"]["value_selection"] == "AWAY"
+    assert "mock" in data["analyst"]["summary"].casefold()
+    serialized = response.text.casefold()
+    assert not any(term in serialized for term in FORBIDDEN)
+    _validate("FootballAiAnalystEnvelope", body)

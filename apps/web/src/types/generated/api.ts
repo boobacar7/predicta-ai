@@ -842,8 +842,13 @@ export interface components {
             generated_at: components["schemas"]["Timestamp"];
             /** @enum {string} */
             analysis_version: "ai-analyst-0.1";
-            /** @enum {string} */
-            provider: "deterministic-v0.1";
+            /**
+             * @description Narrator identifier. llm-v0.1 means the summary was produced by the
+             *     LLM narrator after grounding. Business fields are always rebuilt
+             *     from AnalystContext, never from the LLM.
+             * @enum {string}
+             */
+            provider: "deterministic-v0.1" | "llm-v0.1";
         };
         /**
          * @description Explanatory report only. It does not recommend a wager and does not
