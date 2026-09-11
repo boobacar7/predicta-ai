@@ -26,7 +26,7 @@ Le préfixe est défini par le serveur OpenAPI `/api/v1`. Ainsi, le chemin OpenA
 | GET | `/api/v1/football/predictions/{match_id}` | probabilités 1X2 du modèle football versionné (`candidate`) |
 | GET | `/api/v1/football/value/{match_id}` | analyse PIT odds + value du marché football 1X2 |
 | GET | `/api/v1/football/ai-picks` | opportunités 1X2 filtrées et classées déterministement |
-| GET | `/api/v1/football/ai-analyst/{match_id}` | explication déterministe d'un match football 1X2 |
+| GET | `/api/v1/football/ai-analyst/{match_id}` | explication déterministe d'un match football 1X2 (`model_favorite` ≠ `value_selection`) |
 | GET | `/api/v1/picks` | signaux modèle publiés |
 | GET | `/api/v1/value` | évaluations value déterministes |
 | GET | `/api/v1/performance` | santé, séries et calibration du modèle |
@@ -51,6 +51,12 @@ implicites brutes et no-vig, puis `edge` et `ev`. Elle expose les versions du
 modèle, du dataset, du schéma de features et du moteur, ainsi que la source des
 cotes et le `data_mode`. Voir
 [`value-engine-v0.1.md`](value-engine/value-engine-v0.1.md).
+
+`GET /football/ai-analyst/{match_id}` explique ce contexte. `model_favorite`
+est l'issue de plus haute probabilité modèle. `value.selection` porte les
+métriques Value Engine de cette issue. `value.value_selection` nomme
+l'issue au plus haut EV théorique. Ce n'est pas une recommandation. Voir
+[`ai-analyst.md`](ai-analyst.md).
 
 ## Enveloppe
 

@@ -4,8 +4,15 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Protocol
 
-from app.ai_analyst.context import AnalystContext, AnalystIdentity, AnalystPrediction, value_for_selection
+from app.ai_analyst.context import (
+    AnalystContext,
+    AnalystIdentity,
+    AnalystPrediction,
+    highest_ev_selection,
+    value_for_selection,
+)
 from app.ai_analyst.deterministic import DeterministicAnalystProvider
+from app.ai_analyst.grounding import assert_grounded
 from app.ai_analyst.models import FootballAiAnalystReport
 from app.ai_analyst.provider import AnalystProvider
 from app.core.clock import Clock
@@ -73,25 +80,31 @@ class FootballAnalystService:
         )
         value_analysis = self._optional_value(match_id, prediction.cutoff_at)
         value = None
+        best_ev = None
         if value_analysis is not None:
             self._validate_value_cutoff(identity, prediction, value_analysis)
             value = value_for_selection(value_analysis, analyst_prediction.favorite_selection())
+            best_ev = highest_ev_selection(value_analysis)
         context = AnalystContext(
             identity=context_identity,
             prediction=analyst_prediction,
             value=value,
             generated_at=self._clock.now(),
             data_mode=self._resolved_data_mode(identity, value_analysis),
+            value_selection=best_ev,
         )
+        explanation = self._provider.generate_analysis(context)
+        assert_grounded(context, explanation)
         return FootballAiAnalystReport(
             match_id=identity.match_id,
             home_team=identity.home_team,
             away_team=identity.away_team,
             league=identity.league,
             kickoff_at=identity.kickoff_at,
+            model_favorite=context.favorite_selection().value,
             prediction=context.to_prediction_dto(),
             value=context.to_value_dto(),
-            analyst=self._provider.generate_analysis(context),
+            analyst=explanation,
         )
 
     def _optional_value(self, match_id: str, cutoff_at: datetime) -> FootballValueAnalysis | None:

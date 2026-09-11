@@ -1748,6 +1748,7 @@ components:
       required:
         - availability
         - selection
+        - value_selection
         - odds
         - implied_probability
         - no_vig_probability
@@ -1762,6 +1763,18 @@ components:
         selection:
           type: [string, "null"]
           enum: [HOME, DRAW, AWAY, null]
+          description: |
+            Outcome whose odds, implied probability, edge and EV are copied
+            here. Always the model favorite (highest model probability,
+            HOME/DRAW/AWAY tie-break). Distinct from `value_selection`.
+            Not a recommendation.
+        value_selection:
+          type: [string, "null"]
+          enum: [HOME, DRAW, AWAY, null]
+          description: |
+            Outcome with the highest theoretical EV in the Value Engine
+            result. Informational only. Distinct from `model_favorite`.
+            Not a recommendation, pick, or wager.
         odds:
           type: [number, "null"]
           exclusiveMinimum: 1
@@ -1790,9 +1803,9 @@ components:
         Qualitative confidence derived only from metadata. It is not a
         probability and never uses the magnitude of model probabilities.
         Rule: high requires champion + live + complete identity + available
-        value. Candidate or mock or missing value or incomplete identity
-        cannot be high. Candidate plus any of those gaps is low. Candidate
-        with complete live-or-mock identity and available value is medium.
+        value. Candidate with complete identity and available value is
+        medium, including mock. Candidate never emits high. Incomplete
+        identity, missing value, or another metadata gap is low.
       required: [level, basis, rule]
       properties:
         level:
@@ -1892,6 +1905,7 @@ components:
         - away_team
         - league
         - kickoff_at
+        - model_favorite
         - prediction
         - value
         - analyst
@@ -1909,6 +1923,13 @@ components:
           minLength: 1
         kickoff_at:
           $ref: "#/components/schemas/Timestamp"
+        model_favorite:
+          type: string
+          enum: [HOME, DRAW, AWAY]
+          description: |
+            Outcome with the highest model probability. HOME/DRAW/AWAY
+            tie-break. Distinct from `value.value_selection`. Not a
+            recommendation.
         prediction:
           $ref: "#/components/schemas/FootballAnalystPrediction"
         value:

@@ -16,8 +16,9 @@ VALUE_SOURCE = "value-engine-0.1"
 IDENTITY_SOURCE = "match-identity-repository"
 CONFIDENCE_RULE = (
     "high requires champion + live + complete identity + available value; "
-    "candidate with complete identity and available value is medium; "
-    "any of candidate+gap, mock, missing value, or incomplete identity is low; "
+    "candidate with complete identity and available value is medium, including mock; "
+    "candidate never emits high; "
+    "any of incomplete identity, missing value, or other metadata gap is low; "
     "probability magnitude is never used."
 )
 
@@ -61,6 +62,7 @@ class FootballAnalystPrediction(ApiModel):
 class FootballAnalystValue(ApiModel):
     availability: AnalystAvailability
     selection: Literal["HOME", "DRAW", "AWAY"] | None = None
+    value_selection: Literal["HOME", "DRAW", "AWAY"] | None = None
     odds: float | None = Field(default=None, gt=1)
     implied_probability: float | None = Field(default=None, gt=0, lt=1)
     no_vig_probability: float | None = Field(default=None, gt=0, lt=1)
@@ -111,6 +113,7 @@ class FootballAiAnalystReport(ApiModel):
     away_team: str | None = Field(default=None, min_length=1)
     league: str = Field(min_length=1)
     kickoff_at: datetime
+    model_favorite: Literal["HOME", "DRAW", "AWAY"]
     prediction: FootballAnalystPrediction
     value: FootballAnalystValue
     analyst: FootballAnalystExplanation

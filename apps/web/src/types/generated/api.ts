@@ -786,8 +786,21 @@ export interface components {
         FootballAnalystValue: {
             /** @enum {string} */
             availability: "available" | "unavailable";
-            /** @enum {string|null} */
+            /**
+             * @description Outcome whose odds, implied probability, edge and EV are copied
+             *     here. Always the model favorite (highest model probability,
+             *     HOME/DRAW/AWAY tie-break). Distinct from `value_selection`.
+             *     Not a recommendation.
+             * @enum {string|null}
+             */
             selection: "HOME" | "DRAW" | "AWAY" | null;
+            /**
+             * @description Outcome with the highest theoretical EV in the Value Engine
+             *     result. Informational only. Distinct from `model_favorite`.
+             *     Not a recommendation, pick, or wager.
+             * @enum {string|null}
+             */
+            value_selection: "HOME" | "DRAW" | "AWAY" | null;
             odds: number | null;
             implied_probability: components["schemas"]["NullableProbability"];
             no_vig_probability: components["schemas"]["NullableProbability"];
@@ -800,9 +813,9 @@ export interface components {
          * @description Qualitative confidence derived only from metadata. It is not a
          *     probability and never uses the magnitude of model probabilities.
          *     Rule: high requires champion + live + complete identity + available
-         *     value. Candidate or mock or missing value or incomplete identity
-         *     cannot be high. Candidate plus any of those gaps is low. Candidate
-         *     with complete live-or-mock identity and available value is medium.
+         *     value. Candidate with complete identity and available value is
+         *     medium, including mock. Candidate never emits high. Incomplete
+         *     identity, missing value, or another metadata gap is low.
          */
         FootballAnalystConfidence: {
             /** @enum {string} */
@@ -843,6 +856,13 @@ export interface components {
             away_team: string | null;
             league: string;
             kickoff_at: components["schemas"]["Timestamp"];
+            /**
+             * @description Outcome with the highest model probability. HOME/DRAW/AWAY
+             *     tie-break. Distinct from `value.value_selection`. Not a
+             *     recommendation.
+             * @enum {string}
+             */
+            model_favorite: "HOME" | "DRAW" | "AWAY";
             prediction: components["schemas"]["FootballAnalystPrediction"];
             value: components["schemas"]["FootballAnalystValue"];
             analyst: components["schemas"]["FootballAnalystExplanation"];

@@ -17,6 +17,9 @@ from app.schemas import FootballModelStatus, FreshnessLevel
 from app.value_engine.calculator import VALUE_ENGINE_VERSION
 from app.value_engine.models import FootballValueAnalysis
 
+EvidenceCategory = Literal["identity", "prediction", "value", "metadata"]
+EvidenceAvailability = Literal["available", "unavailable"]
+
 FRESH_ODDS_SECONDS = 12 * 3600
 ACCEPTABLE_ODDS_SECONDS = 24 * 3600
 SELECTION_TIEBREAK = (
@@ -77,6 +80,19 @@ class AnalystValue:
 
 
 @dataclass(frozen=True, slots=True)
+class AnalystEvidence:
+    """One grounded fact. LLM output is never a source of truth."""
+
+    evidence_id: str
+    category: EvidenceCategory
+    source_field: str
+    value: str | float | None
+    source: str
+    availability: EvidenceAvailability
+    cutoff_at: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class AnalystContext:
     """Immutable whitelist of facts the provider may mention."""
 
@@ -85,6 +101,7 @@ class AnalystContext:
     value: AnalystValue | None
     generated_at: datetime
     data_mode: DataMode
+    value_selection: Football1x2Selection | None = None
 
     def favorite_selection(self) -> Football1x2Selection:
         return self.prediction.favorite_selection()
@@ -141,6 +158,7 @@ class AnalystContext:
         return FootballAnalystValue(
             availability="available",
             selection=self.value.selection.value,
+            value_selection=self.value_selection.value if self.value_selection is not None else None,
             odds=float(self.value.odds),
             implied_probability=float(self.value.implied_probability),
             no_vig_probability=float(self.value.no_vig_probability),
@@ -149,6 +167,170 @@ class AnalystContext:
             value_engine_version=self.value.value_engine_version,
             source=self.value.source,
         )
+
+    def evidence(self) -> tuple[AnalystEvidence, ...]:
+        """Bounded facts a provider may mention. Narrative is not evidence."""
+
+        identity = self.identity
+        prediction = self.prediction
+        cutoff = prediction.cutoff_at
+        rows: list[tuple[str, EvidenceCategory, str, str | float | None, str, datetime | None]] = [
+            ("identity.match_id", "identity", "match_id", identity.match_id, identity.source, None),
+            ("identity.home_team", "identity", "home_team", identity.home_team, identity.source, None),
+            ("identity.away_team", "identity", "away_team", identity.away_team, identity.source, None),
+            ("identity.league", "identity", "league", identity.league, identity.source, None),
+            (
+                "identity.kickoff_at",
+                "identity",
+                "kickoff_at",
+                identity.kickoff_at.isoformat(),
+                identity.source,
+                cutoff,
+            ),
+            (
+                "prediction.home_probability",
+                "prediction",
+                "home_probability",
+                float(prediction.home_probability),
+                prediction.source,
+                cutoff,
+            ),
+            (
+                "prediction.draw_probability",
+                "prediction",
+                "draw_probability",
+                float(prediction.draw_probability),
+                prediction.source,
+                cutoff,
+            ),
+            (
+                "prediction.away_probability",
+                "prediction",
+                "away_probability",
+                float(prediction.away_probability),
+                prediction.source,
+                cutoff,
+            ),
+            (
+                "prediction.model_favorite",
+                "prediction",
+                "model_favorite",
+                self.favorite_selection().value,
+                prediction.source,
+                cutoff,
+            ),
+            (
+                "prediction.model_version",
+                "prediction",
+                "model_version",
+                prediction.model_version,
+                prediction.source,
+                cutoff,
+            ),
+            (
+                "prediction.model_status",
+                "prediction",
+                "model_status",
+                prediction.model_status,
+                prediction.source,
+                cutoff,
+            ),
+            (
+                "prediction.dataset_version",
+                "prediction",
+                "dataset_version",
+                prediction.dataset_version,
+                prediction.source,
+                cutoff,
+            ),
+            ("metadata.data_mode", "metadata", "data_mode", self.data_mode, IDENTITY_SOURCE, cutoff),
+        ]
+        if self.value is None:
+            rows.extend(
+                [
+                    ("value.odds", "value", "odds", None, VALUE_SOURCE, cutoff),
+                    ("value.edge", "value", "edge", None, VALUE_SOURCE, cutoff),
+                    ("value.ev", "value", "ev", None, VALUE_SOURCE, cutoff),
+                    ("value.value_selection", "value", "value_selection", None, VALUE_SOURCE, cutoff),
+                ]
+            )
+        else:
+            value = self.value
+            best_ev = self.value_selection.value if self.value_selection is not None else None
+            rows.extend(
+                [
+                    ("value.selection", "value", "selection", value.selection.value, value.source, cutoff),
+                    ("value.value_selection", "value", "value_selection", best_ev, value.source, cutoff),
+                    ("value.odds", "value", "odds", float(value.odds), value.source, cutoff),
+                    (
+                        "value.implied_probability",
+                        "value",
+                        "implied_probability",
+                        float(value.implied_probability),
+                        value.source,
+                        cutoff,
+                    ),
+                    (
+                        "value.no_vig_probability",
+                        "value",
+                        "no_vig_probability",
+                        float(value.no_vig_probability),
+                        value.source,
+                        cutoff,
+                    ),
+                    ("value.edge", "value", "edge", float(value.edge), value.source, cutoff),
+                    ("value.ev", "value", "ev", float(value.ev), value.source, cutoff),
+                    (
+                        "value.odds_age_seconds",
+                        "value",
+                        "odds_age_seconds",
+                        self.odds_age_seconds(),
+                        value.odds_source,
+                        cutoff,
+                    ),
+                    (
+                        "value.value_engine_version",
+                        "value",
+                        "value_engine_version",
+                        value.value_engine_version,
+                        value.source,
+                        cutoff,
+                    ),
+                ]
+            )
+        return tuple(_fact(*row) for row in rows)
+
+
+def _fact(
+    evidence_id: str,
+    category: EvidenceCategory,
+    source_field: str,
+    value: str | float | None,
+    source: str,
+    cutoff_at: datetime | None = None,
+) -> AnalystEvidence:
+    available = value is not None
+    return AnalystEvidence(
+        evidence_id=evidence_id,
+        category=category,
+        source_field=source_field,
+        value=value,
+        source=source,
+        availability="available" if available else "unavailable",
+        cutoff_at=cutoff_at,
+    )
+
+
+def highest_ev_selection(analysis: FootballValueAnalysis) -> Football1x2Selection:
+    evs = {
+        Football1x2Selection.HOME: Decimal(str(analysis.value.home.ev)),
+        Football1x2Selection.DRAW: Decimal(str(analysis.value.draw.ev)),
+        Football1x2Selection.AWAY: Decimal(str(analysis.value.away.ev)),
+    }
+    return sorted(
+        SELECTION_TIEBREAK,
+        key=lambda selection: (-evs[selection], SELECTION_TIEBREAK.index(selection)),
+    )[0]
 
 
 def value_for_selection(analysis: FootballValueAnalysis, selection: Football1x2Selection) -> AnalystValue:

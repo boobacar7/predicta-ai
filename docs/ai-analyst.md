@@ -34,17 +34,30 @@ La réponse enveloppe standard porte `data_mode`, `generated_at` et
 `request_id`. `data` contient :
 
 - identité : `match_id`, `home_team`, `away_team`, `league`, `kickoff_at` ;
+- `model_favorite` : issue de plus haute probabilité modèle ;
 - `prediction` : probabilités 1X2, versions, statut, cutoff ;
-- `value` : sélection expliquée, cote, probabilités implicites, edge, EV,
-  ou `availability=unavailable` ;
+- `value` : métriques de l'issue expliquée, plus `value_selection` ;
 - `analyst` : résumé, facteurs, forces, risques, confiance, qualité,
   `analysis_version=ai-analyst-0.1`.
 
 `home_team` et `away_team` sont requis mais nullables. Un nom absent n'est
 jamais remplacé.
 
-La sélection value expliquée est l'issue de plus haute probabilité modèle,
-avec un tie-break `HOME`, `DRAW`, `AWAY`. Ce n'est pas une recommandation.
+## Model favorite et value selection
+
+Deux concepts distincts :
+
+- `model_favorite` : issue à plus haute probabilité modèle, tie-break
+  `HOME`, `DRAW`, `AWAY`. C'est l'issue expliquée.
+- `value.selection` : même issue. Les champs `odds`, `implied_probability`,
+  `edge` et `ev` portent **uniquement** sur ce favori modèle.
+- `value.value_selection` : issue au plus haut EV théorique du résultat
+  Value Engine, même tie-break. Informationnelle seulement.
+
+Ces champs ne sont ni un pick, ni un pari, ni une recommandation. Un EV
+positif sur `value_selection` n'autorise aucun langage de mise.
+
+Le Value Engine n'est pas modifié. L'analyste n'est pas un moteur de picks.
 
 ## Provenance
 
@@ -79,12 +92,14 @@ qualitatif et déterministe :
 
 1. `high` seulement si modèle champion, `data_mode=live`, identité complète
    et value disponible ;
-2. `medium` si modèle candidat, identité complète et value disponible ;
-3. `low` dans tous les autres cas (candidat + lacune, mock, value absente,
-   identité partielle).
+2. `medium` si modèle candidat, identité complète et value disponible,
+   y compris lorsque `data_mode=mock` ;
+3. `low` si l'identité est incomplète, si la value est absente, ou s'il
+   existe une autre lacune de métadonnées.
 
-La magnitude des probabilités n'entre jamais dans cette règle. Avec le
-candidat actuel, `high` n'est pas émis.
+Un modèle `candidate` n'émet jamais `high`, quelle que soit la magnitude
+des probabilités. Cette règle, le champ `confidence.rule`, OpenAPI et le
+comportement HTTP sont identiques.
 
 ## Provider déterministe
 
@@ -93,12 +108,44 @@ pure : pas d'horloge, pas d'I/O, pas d'aléa. Deux appels sur le même
 contexte produisent le même objet. `generated_at` est copié du contexte,
 lui-même fixé par l'horloge injectable du service.
 
+## AnalystContext et AnalystEvidence
+
+`AnalystContext` est la whitelist immuable passée au provider : identité
+structurelle, probabilités, métadonnées modèle, value optionnelle,
+`generated_at`, `data_mode`.
+
+`context.evidence()` expose ces faits comme `AnalystEvidence` :
+
+- `evidence_id`, `category`, `source_field`, `value`
+- `source` / provenance
+- `availability`
+- `cutoff_at` lorsqu'il s'applique
+
+Trois couches restent séparées :
+
+1. faits issus du contexte (`AnalystEvidence`) ;
+2. interprétation narrative (`summary`, facteurs, forces, risques) ;
+3. données indisponibles (`availability=unavailable`, `missing`).
+
 ## Futur provider LLM
 
 `AnalystProvider` est le port. Un provider LLM pourra implémenter
 `generate_analysis(context)` plus tard. Il recevra uniquement le contexte
-validé, devra citer ces faits, et devra échouer plutôt que combler une
-lacune. Aucune dépendance LLM n'est ajoutée dans V0.1.
+validé. **LLM output ≠ source of truth.**
+
+Le LLM ne pourra jamais modifier :
+
+- probabilités
+- cotes
+- edge / EV
+- `model_version`
+- `cutoff_at`
+- `data_mode`
+- le résultat Value Engine
+
+Le service reconstruit `prediction` et `value` depuis le contexte, puis
+appelle `assert_grounded`. Un facteur ou un texte hors evidence est refusé.
+Aucune dépendance LLM n'est ajoutée dans V0.1.
 
 ## Sécurité anti-hallucination
 

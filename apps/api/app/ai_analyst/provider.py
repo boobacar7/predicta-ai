@@ -7,6 +7,12 @@ from app.ai_analyst.models import FootballAnalystExplanation
 
 
 class AnalystProvider(Protocol):
-    """Downstream explanation port. Implementations must not fetch extra facts."""
+    """Downstream explanation port.
+
+    Implementations receive only AnalystContext. LLM output is never a source
+    of truth: probabilities, odds, edge, EV, versions, cutoff and data_mode
+    stay owned by the service. A provider may narrate context.evidence() and
+    must fail rather than invent a missing fact.
+    """
 
     def generate_analysis(self, context: AnalystContext) -> FootballAnalystExplanation: ...

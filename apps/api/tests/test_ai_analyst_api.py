@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import yaml
+from app.ai_analyst.models import CONFIDENCE_RULE
 from httpx import Response
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
@@ -62,12 +63,19 @@ def test_football_ai_analyst_complete_mock_context() -> None:
     assert data["prediction"]["model_version"] == "football-elo-v1-candidate"
     assert data["prediction"]["dataset_version"] == "football-1x2-history-0.3"
     assert data["prediction"]["cutoff_at"] == KICKOFF
+    assert data["model_favorite"] == "HOME"
     assert data["value"]["availability"] == "available"
+    assert data["value"]["selection"] == "HOME"
+    assert data["value"]["value_selection"] == "AWAY"
+    assert data["model_favorite"] != data["value"]["value_selection"]
     assert data["value"]["value_engine_version"] == "value-engine-0.1"
     assert data["analyst"]["analysis_version"] == "ai-analyst-0.1"
     assert data["analyst"]["provider"] == "deterministic-v0.1"
+    assert data["analyst"]["confidence"]["level"] == "medium"
+    assert data["analyst"]["confidence"]["rule"] == CONFIDENCE_RULE
     assert data["analyst"]["data_quality"]["data_mode"] == "mock"
     assert data["analyst"]["data_quality"]["model_status"] == "candidate"
+    assert data["analyst"]["confidence"]["level"] != "high"
     serialized = response.text.casefold()
     assert not any(term in serialized for term in FORBIDDEN)
     _validate("FootballAiAnalystEnvelope", body)
