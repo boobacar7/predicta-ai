@@ -55,13 +55,19 @@ describe("MatchCard", () => {
     expect(screen.getByText(/Prédiction indisponible/)).toBeInTheDocument();
   });
 
-  it("shows the model version alongside a probability, never a bare number", () => {
+  /**
+   * Catalogue football matches still carry a prototype model version. That
+   * version must be labelled as prototype, never shown as a live engine output.
+   */
+  it("labels a catalogue fb-ens prediction as prototype instead of a live probability", () => {
     const withPrediction = findMatch((match) => match.prediction_preview !== null);
     render(<MatchCard match={withPrediction} />);
 
+    expect(screen.getByText("Prototype")).toBeInTheDocument();
     expect(
       screen.getByText(new RegExp(withPrediction.prediction_preview!.model_version)),
     ).toBeInTheDocument();
+    expect(screen.queryByText(/Tête/)).not.toBeInTheDocument();
   });
 
   it("uses no wording that promises an outcome", () => {

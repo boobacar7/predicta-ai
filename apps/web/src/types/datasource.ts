@@ -3,6 +3,8 @@ import type {
   AiPicksResult,
   AnalystSession,
   FootballAiAnalystReport,
+  FootballModelPrediction,
+  FootballValueAnalysis,
   CatalogFilters,
   DashboardSnapshot,
   Envelope,
@@ -67,6 +69,28 @@ export interface DataSource {
    */
   getFootballAiPicks(filters?: AiPicksFilters): Promise<Envelope<AiPicksResult>>;
 
+  /**
+   * `GET /football/predictions/{match_id}`.
+   *
+   * Candidate 1X2 probabilities. The UI must not infer a favorite from them.
+   */
+  getFootballPrediction(
+    matchId: string,
+    cutoffAt?: string,
+  ): Promise<Envelope<FootballModelPrediction>>;
+
+  /**
+   * `GET /football/value/{match_id}`.
+   *
+   * Canonical Value Engine analysis. There is no list route: the engine
+   * evaluates one match at a time. Distinct from legacy `GET /value`.
+   */
+  getFootballValue(matchId: string, cutoffAt?: string): Promise<Envelope<FootballValueAnalysis>>;
+
+  /**
+   * Legacy `GET /value` catalogue. Not the football Value Engine.
+   * Kept so the prototype resource can still be routed independently.
+   */
   getValue(filters?: MatchFilters): Promise<Envelope<ListResult<ValueOpportunity>>>;
   getPerformance(): Promise<Envelope<PerformanceReport>>;
 

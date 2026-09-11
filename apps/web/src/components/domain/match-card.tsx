@@ -3,6 +3,7 @@ import { ProbabilityBar } from "@/components/domain/probability-bar";
 import { TeamLogo } from "@/components/domain/team-logo";
 import { ValueBadge } from "@/components/domain/value-badge";
 import { Badge } from "@/components/ui/badge";
+import { isCataloguePrototypeModel } from "@/lib/football/catalogue";
 import { formatClock, formatKickoff } from "@/lib/format/dates";
 import { matchStatusLabels, sportLabels } from "@/lib/format/labels";
 import { formatProbability, formatScore } from "@/lib/format/numbers";
@@ -12,6 +13,7 @@ import Link from "next/link";
 export function MatchCard({ match }: { match: MatchSummary }) {
   const live = match.status === "live";
   const outcomes = match.prediction_preview?.outcomes ?? [];
+  const prototype = isCataloguePrototypeModel(match.prediction_preview?.model_version);
 
   return (
     <Link
@@ -45,7 +47,15 @@ export function MatchCard({ match }: { match: MatchSummary }) {
       </div>
 
       <div className="mt-5 space-y-3">
-        {match.prediction_preview ? (
+        {prototype ? (
+          <div className="space-y-2">
+            <Badge tone="muted">Prototype</Badge>
+            <p className="text-sm text-muted">
+              Catalogue de navigation. {match.prediction_preview?.model_version} n&apos;est pas le
+              moteur football.
+            </p>
+          </div>
+        ) : match.prediction_preview ? (
           <>
             <div className="flex flex-wrap items-center gap-2">
               <AIConfidence level={match.prediction_preview.confidence} />
@@ -59,7 +69,7 @@ export function MatchCard({ match }: { match: MatchSummary }) {
         ) : (
           <p className="text-sm text-muted">Prédiction indisponible pour ce match.</p>
         )}
-        {match.value_preview ? <ValueBadge preview={match.value_preview} /> : null}
+        {prototype ? null : match.value_preview ? <ValueBadge preview={match.value_preview} /> : null}
       </div>
     </Link>
   );

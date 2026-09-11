@@ -9,7 +9,13 @@ import { hydrateThemeFromStorage, resetThemeStore, setThemeStore } from "@/lib/t
 import { renderWithProviders } from "@/test/render";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ replace: vi.fn() }),
+  usePathname: () => "/value-finder",
+}));
 
 describe("theme persistence", () => {
   beforeEach(() => {
@@ -114,13 +120,14 @@ describe("theme independence from business data", () => {
   });
 
   it("keeps Value Finder figures identical in dark and light", async () => {
-    renderWithProviders(<ValueFinderView />, { theme: "dark" });
-    expect(await screen.findByText("Northgate FC · Harbor Athletic")).toBeInTheDocument();
-    const darkEdge = screen.getAllByText(/\+3,1/).length;
+    const dark = renderWithProviders(<ValueFinderView />, { theme: "dark" });
+    await screen.findByText("Information de valeur");
+    const darkEv = (await screen.findAllByText(/\+56,3/)).length;
+    dark.unmount();
 
     renderWithProviders(<ValueFinderView />, { theme: "light" });
-    expect(await screen.findByText("Northgate FC · Harbor Athletic")).toBeInTheDocument();
-    expect(screen.getAllByText(/\+3,1/)).toHaveLength(darkEdge);
+    await screen.findByText("Information de valeur");
+    expect(await screen.findAllByText(/\+56,3/)).toHaveLength(darkEv);
   });
 
   it("opens AI Picks dialogs in both themes without changing published figures", async () => {

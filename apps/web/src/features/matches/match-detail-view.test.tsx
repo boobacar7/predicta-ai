@@ -14,8 +14,9 @@ describe("MatchDetailView historical identity", () => {
     expect(screen.getByText("Inter Club d'Escaldes")).toBeInTheDocument();
     expect(screen.getByText("tm_football-sportmonks-10068")).toBeInTheDocument();
 
-    // The payload is structural: those sections must not be invented.
-    expect(screen.queryByText("Probabilités calibrées")).not.toBeInTheDocument();
+    expect(await screen.findByText("Prédiction moteur")).toBeInTheDocument();
+    expect(screen.getAllByText("41,7 %").length).toBeGreaterThan(0);
+    expect(screen.getByText("Information de valeur")).toBeInTheDocument();
     expect(screen.queryByText("Chronologie")).not.toBeInTheDocument();
     expect(screen.getByText(/identité structurelle archivée/)).toBeInTheDocument();
     const analystLink = screen.getByRole("link", { name: /Ouvrir dans l'AI Analyst/ });

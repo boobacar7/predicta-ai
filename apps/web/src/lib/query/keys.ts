@@ -139,4 +139,16 @@ export const queryKeys = {
     detail: (scenario: MockScenario, matchId: string, cutoffAt?: string) =>
       [...root(scenario), "football-ai-analyst", "detail", matchId, cutoffAt ?? ""] as const,
   },
+
+  footballPredictions: {
+    all: (scenario: MockScenario) => [...root(scenario), "football-predictions"] as const,
+    detail: (scenario: MockScenario, matchId: string, cutoffAt?: string) =>
+      [...root(scenario), "football-predictions", "detail", matchId, cutoffAt ?? ""] as const,
+  },
+
+  footballValue: {
+    all: (scenario: MockScenario) => [...root(scenario), "football-value"] as const,
+    detail: (scenario: MockScenario, matchId: string, cutoffAt?: string) =>
+      [...root(scenario), "football-value", "detail", matchId, cutoffAt ?? ""] as const,
+  },
 } as const;

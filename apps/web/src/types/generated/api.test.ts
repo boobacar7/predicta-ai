@@ -12,6 +12,8 @@ import { describe, expect, it } from "vitest";
 type GeneratedAiPick = components["schemas"]["AiPick"];
 type GeneratedIdentity = components["schemas"]["HistoricalMatchIdentity"];
 type GeneratedAnalyst = components["schemas"]["FootballAiAnalystReport"];
+type GeneratedPrediction = components["schemas"]["FootballModelPrediction"];
+type GeneratedValue = components["schemas"]["FootballValueAnalysis"];
 
 describe("generated OpenAPI types", () => {
   it("keeps the football product HTTP paths", () => {
@@ -74,5 +76,17 @@ describe("generated OpenAPI types", () => {
       "HOME" | "DRAW" | "AWAY" | null
     >();
     expectTypeOf<GeneratedAnalyst["home_team"]>().toEqualTypeOf<string | null>();
+  });
+
+  it("publishes football prediction probabilities without a favorite field", () => {
+    expectTypeOf<GeneratedPrediction["home_probability"]>().toEqualTypeOf<number>();
+    expectTypeOf<GeneratedPrediction["model_status"]>().toEqualTypeOf<"candidate" | "champion">();
+    expectTypeOf<GeneratedPrediction>().not.toHaveProperty("model_favorite");
+  });
+
+  it("publishes per-selection edge and EV on the football value analysis", () => {
+    expectTypeOf<GeneratedValue["value"]["home"]["ev"]>().toEqualTypeOf<number>();
+    expectTypeOf<GeneratedValue["value"]["away"]["edge"]>().toEqualTypeOf<number>();
+    expectTypeOf<GeneratedValue["metadata"]["data_mode"]>().toEqualTypeOf<"mock" | "live">();
   });
 });
