@@ -262,6 +262,17 @@ Sans `PREDICTA_INGESTION_ENABLE_LIVE=true` et sans `SPORTMONKS_API_TOKEN`,
 la commande lève `LiveIngestionDisabled` ou `ProviderNotConfigured`.
 Aucun fallback mock.
 
+Live The Odds API (football 1X2), opt-in séparé :
+
+```bash
+python -m predicta_ingestion ingest-odds --league premier-league --dry-run
+python -m predicta_ingestion ingest-odds --league premier-league --as-of 2026-09-08T15:55:00Z
+```
+
+Sans clé (`PREDICTA_INGESTION_THE_ODDS_API_KEY` ou `THE_ODDS_API_KEY`), le fetch
+lève `ProviderNotConfigured`. Aucun fallback mock. La CI n'appelle pas le provider.
+Voir [odds-provider.md](data/odds-provider.md).
+
 Historique + dataset PIT :
 
 ```bash

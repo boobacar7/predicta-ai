@@ -45,7 +45,7 @@ class SqlOddsRepository:
                 source=snapshot.source,
                 freshness=None,
                 data_mode=snapshot.data_mode,
-                raw_payload_id=None,
+                raw_payload_id=snapshot.raw_payload_id,
                 overround=None,
                 created_at=snapshot.collected_at,
                 selections=[
@@ -144,4 +144,5 @@ class SqlOddsRepository:
             available_at=row.available_at,
             source=row.source,
             data_mode=row.data_mode,  # type: ignore[arg-type]
+            raw_payload_id=row.raw_payload_id,
         )

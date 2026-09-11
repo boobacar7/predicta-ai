@@ -52,6 +52,7 @@ class OddsSnapshot:
     available_at: datetime
     source: str
     data_mode: DataMode
+    raw_payload_id: str | None = None
 
     def __post_init__(self) -> None:
         for field_name in ("id", "provider_id", "match_id", "bookmaker", "market", "source"):

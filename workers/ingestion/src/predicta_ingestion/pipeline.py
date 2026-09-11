@@ -135,7 +135,11 @@ class IngestionPipeline:
             if isinstance(memory, MemoryCanonicalSink):
                 return memory.persist(batch)
             return PersistResult(
-                inserted=len(batch.sports) + len(batch.leagues) + len(batch.teams) + len(batch.matches)
+                inserted=len(batch.sports)
+                + len(batch.leagues)
+                + len(batch.teams)
+                + len(batch.matches)
+                + len(batch.odds)
             )
         self._sink.record_raw(stored)
         persist = self._sink.persist(batch)
@@ -143,8 +147,9 @@ class IngestionPipeline:
         return persist
 
     def _consume_normalizer_quarantine(self) -> list[QuarantineItem]:
-        items = list(self._sportmonks.quarantined)
+        items = list(self._sportmonks.quarantined) + list(self._odds.quarantined)
         self._sportmonks.quarantined = []
+        self._odds.quarantined = []
         return items
 
     def _record_quarantine(self, item: QuarantineItem) -> None:
@@ -171,7 +176,7 @@ class IngestionPipeline:
             return self._basketball.normalize(stored, payload)
         if "tennis" in provider:
             return self._tennis.normalize(stored, payload)
-        if "odds" in provider:
+        if provider == "the_odds_api" or "odds" in provider:
             return self._odds.normalize(stored, payload)
         raise ValidationError("unknown_provider", f"No normalizer registered for {provider}.")
 

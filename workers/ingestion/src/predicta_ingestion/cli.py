@@ -19,7 +19,7 @@ from predicta_ingestion.ids import stable_entity_id
 from predicta_ingestion.ml.dataset import MlDataset, build_ml_dataset
 from predicta_ingestion.ml.export import write_dataset_artifacts
 from predicta_ingestion.ml.quality import build_quality_report
-from predicta_ingestion.persistence.load import hydrate_resolver_from_sql, load_memory_sink
+from predicta_ingestion.persistence.load import hydrate_match_keys_from_sql, hydrate_resolver_from_sql, load_memory_sink
 from predicta_ingestion.persistence.memory import MemoryCanonicalSink, TeeCanonicalSink
 from predicta_ingestion.persistence.sql import SqlCanonicalSink
 from predicta_ingestion.pipeline import IngestionPipeline, IngestionReport
@@ -29,6 +29,7 @@ from predicta_ingestion.providers.http import HttpxTransport
 from predicta_ingestion.providers.leagues import V1_FOOTBALL_LEAGUES
 from predicta_ingestion.providers.protocols import ProviderRequest
 from predicta_ingestion.providers.sportmonks import SportmonksFootballProvider
+from predicta_ingestion.providers.the_odds_api import TheOddsApiProvider
 from predicta_ingestion.raw.store import FilesystemRawStore
 from predicta_ingestion.secrets import redact_text
 
@@ -38,7 +39,9 @@ _LEAGUE_HELP = ", ".join(item.slug for item in V1_FOOTBALL_LEAGUES)
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m predicta_ingestion",
-        description="PREDICTA football ingestion. Live Sportmonks is opt-in and never falls back to mock.",
+        description=(
+            "PREDICTA football ingestion. Live Sportmonks and The Odds API are opt-in and never fall back to mock."
+        ),
     )
     sub = parser.add_subparsers(dest="command")
     ingest = sub.add_parser("ingest-football", help="Ingest V1 football leagues and fixtures from Sportmonks.")
@@ -52,6 +55,13 @@ def main(argv: list[str] | None = None) -> int:
         help="Ingest every discovered season. Default for MLS; European V1 is capped unless this flag is set.",
     )
     history.add_argument("--write-dataset", dest="write_dataset", help="Write the PIT 1X2 dataset JSON after ingest.")
+    odds = sub.add_parser("ingest-odds", help="Ingest football 1X2 odds from The Odds API.")
+    _add_common_ingest_args(odds, default_league="all")
+    odds.add_argument(
+        "--as-of",
+        dest="as_of",
+        help="UTC RFC 3339 timestamp for the historical odds snapshot. Omit for current pre-match odds.",
+    )
     dataset = sub.add_parser(
         "build-ml-dataset",
         help="Build a point-in-time 1X2 dataset from ingested PostgreSQL rows. Does not train a model.",
@@ -110,6 +120,16 @@ def _dispatch(args: argparse.Namespace, settings: Settings) -> dict[str, object]
             dry_run=args.dry_run,
         )
         return _report_payload(report)
+    if args.command == "ingest-odds":
+        report = ingest_odds(
+            settings=settings,
+            league=args.league,
+            date_from=args.date_from,
+            date_to=args.date_to,
+            as_of=getattr(args, "as_of", None),
+            dry_run=args.dry_run,
+        )
+        return _report_payload(report)
     if args.command == "ingest-history":
         history, dataset = run_history(
             settings=settings,
@@ -165,6 +185,41 @@ def ingest_football(
     )
     report = active_pipeline.run(sportmonks, request)
     _record_run(active_pipeline, clock, report, dry_run=dry_run)
+    return report
+
+
+def ingest_odds(
+    *,
+    settings: Settings,
+    league: str = "all",
+    date_from: str | None = None,
+    date_to: str | None = None,
+    as_of: str | None = None,
+    dry_run: bool = False,
+    provider: TheOddsApiProvider | None = None,
+    pipeline: IngestionPipeline | None = None,
+) -> IngestionReport:
+    _assert_odds_ready(settings)
+    clock = Clock()
+    odds_provider = provider or _odds_provider(settings, clock)
+    active_pipeline = pipeline or _build_pipeline(settings, clock, dry_run=dry_run, history=False, odds=True)
+    request = ProviderRequest(
+        resource=ResourceType.ODDS,
+        sport=SportCode.FOOTBALL,
+        league=league,
+        since=_parse_date(date_from, end_of_day=False) if date_from else None,
+        until=_parse_date(date_to, end_of_day=True) if date_to else None,
+        as_of=parse_rfc3339(as_of) if as_of else None,
+    )
+    report = active_pipeline.run(odds_provider, request)
+    _record_run(
+        active_pipeline,
+        clock,
+        report,
+        dry_run=dry_run,
+        provider_name="the_odds_api",
+        resource=ResourceType.ODDS,
+    )
     return report
 
 
@@ -264,6 +319,19 @@ def _sportmonks_provider(settings: Settings, clock: Clock) -> SportmonksFootball
     )
 
 
+def _odds_provider(settings: Settings, clock: Clock) -> TheOddsApiProvider:
+    return TheOddsApiProvider(
+        enable_live=settings.enable_live,
+        api_key=settings.the_odds_api_key,
+        clock=clock,
+        transport=HttpxTransport(),
+        base_url=settings.the_odds_api_base_url,
+        timeout_seconds=settings.http_timeout_seconds,
+        max_retries=settings.http_max_retries,
+        regions=settings.the_odds_api_regions,
+    )
+
+
 def _assert_live_ready(settings: Settings) -> None:
     if not settings.enable_live:
         raise LiveIngestionDisabled("sportmonks")
@@ -276,7 +344,26 @@ def _assert_live_ready(settings: Settings) -> None:
         )
 
 
-def _build_pipeline(settings: Settings, clock: Clock, *, dry_run: bool, history: bool) -> IngestionPipeline:
+def _assert_odds_ready(settings: Settings) -> None:
+    if not settings.enable_live:
+        raise LiveIngestionDisabled("the_odds_api")
+    if not settings.the_odds_api_key:
+        raise ProviderNotConfigured("the_odds_api")
+    if settings.data_mode != "live":
+        raise RuntimeError(
+            "Live The Odds API ingestion requires PREDICTA_INGESTION_DATA_MODE=live "
+            "and PREDICTA_INGESTION_ENABLE_LIVE=true. It never falls back to mock data."
+        )
+
+
+def _build_pipeline(
+    settings: Settings,
+    clock: Clock,
+    *,
+    dry_run: bool,
+    history: bool,
+    odds: bool = False,
+) -> IngestionPipeline:
     raw_store = FilesystemRawStore(Path(settings.raw_store_path))
     memory = MemoryCanonicalSink()
     resolver = IdentityResolver(clock)
@@ -290,6 +377,8 @@ def _build_pipeline(settings: Settings, clock: Clock, *, dry_run: bool, history:
     else:
         engine = create_engine(settings.database_url, pool_pre_ping=True, future=True)
         hydrate_resolver_from_sql(resolver, engine)
+        if odds:
+            hydrate_match_keys_from_sql(resolver, engine)
         sink = SqlCanonicalSink(clock=clock, engine=engine)
     return IngestionPipeline(
         settings=settings,
@@ -301,16 +390,24 @@ def _build_pipeline(settings: Settings, clock: Clock, *, dry_run: bool, history:
     )
 
 
-def _record_run(pipeline: IngestionPipeline, clock: Clock, report: IngestionReport, *, dry_run: bool) -> None:
+def _record_run(
+    pipeline: IngestionPipeline,
+    clock: Clock,
+    report: IngestionReport,
+    *,
+    dry_run: bool,
+    provider_name: str = "sportmonks",
+    resource: ResourceType = ResourceType.FIXTURES,
+) -> None:
     if dry_run:
         return
     recorder = getattr(pipeline._sink, "record_run", None)
     if not callable(recorder):
         return
     recorder(
-        run_id=stable_entity_id("run", "sportmonks", clock.now().isoformat()),
-        provider="sportmonks",
-        resource_type=ResourceType.FIXTURES.value,
+        run_id=stable_entity_id("run", provider_name, clock.now().isoformat()),
+        provider=provider_name,
+        resource_type=resource.value,
         status="completed" if not report.quarantined else "completed_with_quarantine",
         data_mode=report.data_mode.value,
         records_read=report.records_read,
@@ -329,10 +426,14 @@ def _parse_date(value: str, *, end_of_day: bool) -> datetime:
 
 
 def _redact_cli(message: str) -> str:
-    secret = (
+    sportmonks = (
         os.environ.get("SPORTMONKS_API_TOKEN") or os.environ.get("PREDICTA_INGESTION_SPORTMONKS_KEY") or ""
     ).strip()
-    return redact_text(message, secret or None)
+    odds_key = (
+        os.environ.get("THE_ODDS_API_KEY") or os.environ.get("PREDICTA_INGESTION_THE_ODDS_API_KEY") or ""
+    ).strip()
+    redacted = redact_text(message, sportmonks or None)
+    return redact_text(redacted, odds_key or None)
 
 
 def _report_payload(report: IngestionReport) -> dict[str, object]:

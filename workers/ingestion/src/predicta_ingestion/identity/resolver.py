@@ -145,6 +145,11 @@ class IdentityResolver:
             self._resolve_odds_match(snapshot)
         return quarantined
 
+    def bind_match_natural_key(self, natural_key: str, canonical_id: str) -> None:
+        """Restore a previously ingested match so later odds can join without guessing."""
+        if natural_key and natural_key not in self._by_match_key:
+            self._by_match_key[natural_key] = canonical_id
+
     def hydrate(self, bindings: list[IdentityBinding]) -> None:
         """Restore previously persisted maps so later competitions reuse canonical ids."""
         for binding in bindings:

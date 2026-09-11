@@ -23,6 +23,8 @@ def test_odds_are_not_converted_to_value_metrics(pipeline: IngestionPipeline, od
     pipeline.run(odds_provider, ProviderRequest(resource=ResourceType.ODDS))
     snapshot = next(iter(pipeline._sink.odds.values()))
     assert snapshot.selections[0].decimal_odds == Decimal("1.85")
+    assert snapshot.selections[0].selection == "HOME"
+    assert snapshot.market == "1X2"
     assert not hasattr(snapshot, "implied_probability_raw")
 
 

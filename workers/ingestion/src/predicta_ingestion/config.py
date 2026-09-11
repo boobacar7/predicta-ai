@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     http_timeout_seconds: float = 20.0
     http_max_retries: int = 3
     sportmonks_base_url: str = "https://api.sportmonks.com/v3/football"
+    the_odds_api_base_url: str = "https://api.the-odds-api.com"
+    the_odds_api_regions: str = "eu"
     api_football_key: str = Field(default="", repr=False)
     sportmonks_key: str = Field(default="", repr=False)
     the_odds_api_key: str = Field(default="", repr=False)
@@ -45,12 +47,15 @@ class Settings(BaseSettings):
         return value.strip()
 
     @model_validator(mode="after")
-    def accept_unprefixed_sportmonks_token(self) -> "Settings":
-        if self.sportmonks_key:
-            return self
-        unprefixed = (os.environ.get("SPORTMONKS_API_TOKEN") or "").strip()
-        if unprefixed:
-            self.sportmonks_key = unprefixed
+    def accept_unprefixed_tokens(self) -> "Settings":
+        if not self.sportmonks_key:
+            unprefixed = (os.environ.get("SPORTMONKS_API_TOKEN") or "").strip()
+            if unprefixed:
+                self.sportmonks_key = unprefixed
+        if not self.the_odds_api_key:
+            unprefixed_odds = (os.environ.get("THE_ODDS_API_KEY") or "").strip()
+            if unprefixed_odds:
+                self.the_odds_api_key = unprefixed_odds
         return self
 
     @property

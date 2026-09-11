@@ -1,0 +1,31 @@
+{
+  "timestamp": "2026-09-08T16:05:00Z",
+  "previous_timestamp": "2026-09-08T16:00:00Z",
+  "next_timestamp": "2026-09-08T16:10:00Z",
+  "data": [
+    {
+      "id": "epl_helix_meridian_20260908",
+      "sport_key": "soccer_epl",
+      "commence_time": "2026-09-08T18:00:00Z",
+      "home_team": "Helix FC",
+      "away_team": "Meridian Athletic",
+      "bookmakers": [
+        {
+          "key": "pinnacle",
+          "title": "Pinnacle",
+          "last_update": "2026-09-08T16:04:00Z",
+          "markets": [
+            {
+              "key": "h2h",
+              "outcomes": [
+                { "name": "Helix FC", "price": 1.92 },
+                { "name": "Draw", "price": 3.55 },
+                { "name": "Meridian Athletic", "price": 4.10 }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

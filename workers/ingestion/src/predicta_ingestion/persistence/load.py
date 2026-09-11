@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from predicta_ingestion.canonical.enums import DataMode, EntityType, MatchStatus, ResolutionMethod, SportCode
-from predicta_ingestion.canonical.models import League, Match, Provenance, Sport, Team
+from predicta_ingestion.canonical.enums import DataMode, EntityType, Freshness, MatchStatus, ResolutionMethod, SportCode
+from predicta_ingestion.canonical.models import League, Match, OddsSelection, OddsSnapshot, Provenance, Sport, Team
 from predicta_ingestion.clock import ensure_utc
 from predicta_ingestion.identity.keys import team_name_key
 from predicta_ingestion.identity.resolver import IdentityBinding, IdentityResolver
+from predicta_ingestion.ids import slugify
 from predicta_ingestion.persistence.memory import MemoryCanonicalSink
 
 
@@ -71,6 +73,7 @@ def load_memory_sink(engine: Engine) -> MemoryCanonicalSink:
         ).mappings():
             match = _match_from_row(dict(row))
             sink.matches[match.id] = match
+        _load_odds(connection, sink)
     return sink
 
 
@@ -149,6 +152,88 @@ def hydrate_resolver_from_sql(resolver: IdentityResolver, engine: Engine) -> int
             )
     resolver.hydrate(bindings)
     return len(bindings)
+
+
+def hydrate_match_keys_from_sql(resolver: IdentityResolver, engine: Engine) -> int:
+    """Rebuild football|home|away|kickoff keys from persisted matches. Names are never guessed."""
+    count = 0
+    with engine.connect() as connection:
+        rows = connection.execute(
+            text(
+                """
+                SELECT m.id, m.kickoff_at, ht.name AS home_name, at.name AS away_name
+                FROM matches m
+                JOIN teams ht ON ht.id = m.home_team_id
+                JOIN teams at ON at.id = m.away_team_id
+                """
+            )
+        ).mappings()
+        for row in rows:
+            kickoff = _utc(row["kickoff_at"])
+            natural_key = (
+                f"{SportCode.FOOTBALL.value}|{slugify(row['home_name'])}|"
+                f"{slugify(row['away_name'])}|{kickoff.isoformat()}"
+            )
+            resolver.bind_match_natural_key(natural_key, row["id"])
+            count += 1
+    return count
+
+
+def _load_odds(connection: Any, sink: MemoryCanonicalSink) -> None:
+    selections_by_snapshot: dict[str, list[OddsSelection]] = {}
+    for row in connection.execute(
+        text(
+            """
+            SELECT snapshot_id, selection, label, decimal_odds
+            FROM odds_selections
+            ORDER BY snapshot_id, selection
+            """
+        )
+    ).mappings():
+        if row["decimal_odds"] is None:
+            continue
+        selections_by_snapshot.setdefault(row["snapshot_id"], []).append(
+            OddsSelection(
+                selection=row["selection"],
+                label=row["label"],
+                decimal_odds=Decimal(str(row["decimal_odds"])),
+            )
+        )
+    for row in connection.execute(
+        text(
+            """
+            SELECT id, provider_id, match_id, market, bookmaker, provider,
+                   available_at, collected_at, source, freshness, data_mode, raw_payload_id
+            FROM odds_snapshots
+            """
+        )
+    ).mappings():
+        selections = selections_by_snapshot.get(row["id"], [])
+        if not selections:
+            continue
+        freshness = None
+        if row["freshness"]:
+            try:
+                freshness = Freshness(row["freshness"])
+            except ValueError:
+                freshness = None
+        sink.odds[row["id"]] = OddsSnapshot(
+            id=row["id"],
+            match_id=row["match_id"],
+            market=row["market"],
+            bookmaker=row["bookmaker"],
+            selections=selections,
+            provenance=Provenance(
+                provider=row["provider"],
+                provider_id=row["provider_id"],
+                collected_at=_utc(row["collected_at"]),
+                available_at=_utc(row["available_at"]),
+                source=row["source"],
+                data_mode=DataMode(row["data_mode"]),
+                freshness=freshness,
+                raw_payload_id=row["raw_payload_id"],
+            ),
+        )
 
 
 def _match_from_row(row: dict[str, Any]) -> Match:

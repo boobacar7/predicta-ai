@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Protocol
 
 from app.odds.exceptions import OddsUnavailableError
+from app.odds.the_odds_api import LIVE_ODDS_SOURCE
 from app.odds.types import (
     FOOTBALL_1X2_MARKET,
     DataMode,
@@ -15,6 +16,7 @@ from app.odds.types import (
 
 MOCK_ODDS_SOURCE = "predicta-mock-odds-v0.1"
 MOCK_MATCH_ID = "mth_football-sportmonks-19719892"
+UNCONFIGURED_LIVE_ODDS_SOURCE = "unconfigured-live-odds-provider"
 
 
 class OddsProvider(Protocol):
@@ -45,14 +47,52 @@ class MockOddsProvider:
 
 
 class LiveOddsProvider:
-    """Provider-neutral live boundary. A real adapter will implement this contract later."""
+    """Live football odds boundary. HTTP collection lives in the ingestion worker."""
 
-    source = "unconfigured-live-odds-provider"
     data_mode: DataMode = "live"
 
+    def __init__(
+        self,
+        snapshots: tuple[OddsSnapshot, ...] | None = None,
+        *,
+        enable_live: bool = False,
+        api_key: str = "",
+    ) -> None:
+        self._snapshots = snapshots
+        self._enable_live = enable_live
+        self._api_key = api_key.strip()
+
+    @property
+    def source(self) -> str:
+        if self._configured:
+            return LIVE_ODDS_SOURCE
+        return UNCONFIGURED_LIVE_ODDS_SOURCE
+
+    @property
+    def _configured(self) -> bool:
+        return self._enable_live and (self._snapshots is not None or bool(self._api_key))
+
     def fetch(self, match_id: str, market: str) -> tuple[OddsSnapshot, ...]:
+        if not self._enable_live:
+            raise OddsUnavailableError(
+                "No live odds provider is configured; live odds are never synthesized."
+            )
+        if self._snapshots is not None:
+            return tuple(
+                snapshot
+                for snapshot in self._snapshots
+                if snapshot.match_id == match_id
+                and snapshot.market == market
+                and snapshot.data_mode == "live"
+                and snapshot.source == LIVE_ODDS_SOURCE
+            )
+        if not self._api_key:
+            raise OddsUnavailableError(
+                "Live odds provider has no API key; live odds are never synthesized."
+            )
         raise OddsUnavailableError(
-            "No live odds provider is configured; live odds are never synthesized."
+            "Live football odds are ingested by the worker, not fetched by the API. "
+            "There is no mock fallback."
         )
 
 

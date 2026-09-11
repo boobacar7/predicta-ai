@@ -10,7 +10,6 @@ from predicta_ingestion.providers.live import (
     ApiFootballProvider,
     ApiTennisProvider,
     BallDontLieProvider,
-    TheOddsApiProvider,
 )
 from predicta_ingestion.providers.mock import (
     MockBasketballProvider,
@@ -28,6 +27,7 @@ from predicta_ingestion.providers.protocols import (
     TennisProvider,
 )
 from predicta_ingestion.providers.sportmonks import SportmonksFootballProvider
+from predicta_ingestion.providers.the_odds_api import LIVE_ODDS_PROVIDER, LIVE_ODDS_SOURCE, TheOddsApiProvider
 
 __all__ = [
     "ApiFootballProvider",
@@ -35,6 +35,8 @@ __all__ = [
     "BallDontLieProvider",
     "BasketballProvider",
     "FootballProvider",
+    "LIVE_ODDS_PROVIDER",
+    "LIVE_ODDS_SOURCE",
     "LiveIngestionDisabled",
     "MockBasketballProvider",
     "MockFootballProvider",

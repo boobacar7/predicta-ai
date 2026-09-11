@@ -45,9 +45,11 @@ class AppContainer:
         self.performance = PerformanceService(self.repos)
         self.analyst = AnalystService(self.matches, clock, settings)
         self._football_predictions: FootballPredictionService | None = None
-        odds_provider: OddsProvider = (
-            MockOddsProvider() if settings.resolved_data_mode() == "mock" else LiveOddsProvider()
-        )
+        odds_provider: OddsProvider
+        if settings.resolved_data_mode() == "mock":
+            odds_provider = MockOddsProvider()
+        else:
+            odds_provider = LiveOddsProvider(enable_live=True, snapshots=())
         odds_repository: OddsRepository
         if settings.repository == "sql":
             from app.odds.sql_repository import SqlOddsRepository

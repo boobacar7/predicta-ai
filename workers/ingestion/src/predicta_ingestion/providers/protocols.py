@@ -18,6 +18,7 @@ class ProviderRequest:
         cursor: str | None = None,
         league: str | None = None,
         season: str | None = None,
+        as_of: datetime | None = None,
     ) -> None:
         self.resource = resource
         self.sport = sport
@@ -26,6 +27,7 @@ class ProviderRequest:
         self.cursor = cursor
         self.league = league
         self.season = season
+        self.as_of = as_of
 
 
 class ProviderHealth:

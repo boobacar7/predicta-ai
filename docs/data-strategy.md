@@ -125,7 +125,13 @@ Aucun adapter live n'effectue d'appel réseau tant que `PREDICTA_INGESTION_ENABL
 
 L'adapter **Sportmonks Football** (MLS + ligues V1 + fixtures + découverte de saisons) est implémenté. Il refuse
 de tourner si le live n'est pas activé ou si `SPORTMONKS_API_TOKEN` est vide.
-Il ne retombe jamais sur les fixtures mock. The Odds API reste non branché.
+Il ne retombe jamais sur les fixtures mock.
+
+L'adapter **The Odds API v4** (football 1X2 / `h2h`, région `eu` par défaut) est implémenté
+derrière `PREDICTA_INGESTION_ENABLE_LIVE`, `PREDICTA_INGESTION_DATA_MODE=live` et
+`PREDICTA_INGESTION_THE_ODDS_API_KEY` (ou `THE_ODDS_API_KEY`). Sans clé, le fetch
+lève une erreur explicite. Il n'y a aucun fallback mock. La CI n'appelle pas
+`api.the-odds-api.com`. Détail : [data/odds-provider.md](data/odds-provider.md).
 
 L'historique n'est **pas** une profondeur garantie. Le pipeline découvre les saisons
 que Sportmonks retourne réellement, les documente dans le rapport d'ingestion, et
@@ -145,7 +151,7 @@ Guide de lancement : [workers/ingestion/README.md](../workers/ingestion/README.m
 4. Backfill football historique produit via Sportmonks (MLS d'abord, puis ligues européennes V1).
 5. Construction d'un dataset ML 1X2 point-in-time (`predicta_ingestion.ml`). Aucun entraînement de modèle dans DATA.
 6. Ingestion récurrente pre-match.
-7. The Odds API, puis basketball, puis tennis, sur les mêmes contrats.
+7. The Odds API (adapter live opt-in, pas d'appel CI), puis basketball, puis tennis, sur les mêmes contrats.
 
 ## 12. Hors périmètre
 

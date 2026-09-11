@@ -60,6 +60,7 @@ class RetryingJsonClient:
         timeout_seconds: float = 20.0,
         max_retries: int = 3,
         sleeper: Sleeper | None = None,
+        send_authorization: bool = True,
     ) -> None:
         self._provider = provider
         self._token = token
@@ -67,9 +68,12 @@ class RetryingJsonClient:
         self._timeout = timeout_seconds
         self._max_retries = max_retries
         self._sleep = sleeper or __import__("time").sleep
+        self._send_authorization = send_authorization
 
     def get(self, url: str) -> HttpResponse:
-        headers = {"Accept": "application/json", "Authorization": self._token}
+        headers = {"Accept": "application/json"}
+        if self._send_authorization:
+            headers["Authorization"] = self._token
         last_error: Exception | None = None
         for attempt in range(self._max_retries + 1):
             try:

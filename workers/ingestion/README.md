@@ -94,6 +94,24 @@ Vérifier qu'un run a utilisé Sportmonks :
 Si `ENABLE_LIVE=false` ou token absent, le processus échoue. Il n'y a pas de
 bascule silencieuse vers les fixtures mock.
 
+## Ingestion cotes (The Odds API)
+
+Opt-in, même flags live. La clé ne quitte pas `.env` :
+
+```bash
+PREDICTA_INGESTION_THE_ODDS_API_KEY=
+# ou THE_ODDS_API_KEY=
+python -m predicta_ingestion ingest-odds --league premier-league --dry-run
+python -m predicta_ingestion ingest-odds --league all --as-of 2026-09-08T15:55:00Z
+```
+
+`--as-of` utilise l'endpoint historical documenté (plans payants, 10 crédits par
+région et marché). Sans `--as-of`, l'endpoint courant `h2h` / région `eu`.
+Aucun appel live dans la CI. Détail : [odds-provider.md](../../docs/data/odds-provider.md).
+
+Les matchs Sportmonks doivent déjà exister pour lier les cotes. Le worker ne
+calcule ni EV, ni edge, ni no-vig.
+
 ## Règles
 
 - Les fixtures de `fixtures/mock` portent `data_mode: mock`.
@@ -105,4 +123,5 @@ bascule silencieuse vers les fixtures mock.
 Documentation : [data-strategy.md](../../docs/data-strategy.md),
 [data-pipeline.md](../../docs/data-pipeline.md),
 [data-providers.md](../../docs/data-providers.md),
+[odds-provider.md](../../docs/data/odds-provider.md),
 [ml-dataset.md](../../docs/ml-dataset.md).
