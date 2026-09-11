@@ -49,6 +49,9 @@ pythonpath = [".", "../../workers/ml/src"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 filterwarnings = ["ignore::DeprecationWarning"]
+markers = [
+  "live_assets: requires gitignored PIT parquet and football-elo-v1-candidate artefact",
+]
 
 [tool.ruff]
 target-version = "py312"

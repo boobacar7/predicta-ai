@@ -20,6 +20,7 @@ from app.value_engine.exceptions import InvalidPredictionError
 from app.value_engine.service import FootballValueService
 from fastapi.testclient import TestClient
 from tests.conftest import make_app
+from tests.live_assets import requires_live_assets
 
 MATCH_ID = "match_value_test"
 CUTOFF = datetime(2026, 7, 7, 16, tzinfo=UTC)
@@ -239,6 +240,7 @@ def test_mock_and_live_provider_modes_are_explicit() -> None:
         live.fetch(MATCH_ID, "1X2")
 
 
+@requires_live_assets
 def test_value_api_rfc9457_and_request_id_for_missing_odds() -> None:
     app = make_app()
     container = app.state.container
@@ -258,6 +260,7 @@ def test_value_api_rfc9457_and_request_id_for_missing_odds() -> None:
     assert response.json()["type"] == "/problems/odds-unavailable"
 
 
+@requires_live_assets
 def test_value_api_success_metadata_and_request_id() -> None:
     client = TestClient(make_app())
     response = client.get(

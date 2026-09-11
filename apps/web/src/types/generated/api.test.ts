@@ -1,4 +1,4 @@
-import type { components } from "@/types/generated/api";
+import type { components, paths } from "@/types/generated/api";
 import { expectTypeOf } from "vitest";
 import { describe, expect, it } from "vitest";
 
@@ -14,6 +14,13 @@ type GeneratedIdentity = components["schemas"]["HistoricalMatchIdentity"];
 type GeneratedAnalyst = components["schemas"]["FootballAiAnalystReport"];
 
 describe("generated OpenAPI types", () => {
+  it("keeps the football product HTTP paths", () => {
+    expectTypeOf<paths>().toHaveProperty("/football/predictions/{match_id}");
+    expectTypeOf<paths>().toHaveProperty("/football/value/{match_id}");
+    expectTypeOf<paths>().toHaveProperty("/football/ai-picks");
+    expectTypeOf<paths>().toHaveProperty("/football/ai-analyst/{match_id}");
+  });
+
   it("publishes nullable team labels and a required kickoff on AiPick", () => {
     expectTypeOf<GeneratedAiPick["home_team"]>().toEqualTypeOf<string | null>();
     expectTypeOf<GeneratedAiPick["away_team"]>().toEqualTypeOf<string | null>();

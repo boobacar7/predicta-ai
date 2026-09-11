@@ -129,6 +129,40 @@ Conventions de nommage :
 
 La couverture est un signal, pas une fin. Les règles de probabilité, value, cutoff temporel et disponibilité demandent des tests de propriétés et de limites.
 
+### Commandes locales
+
+Les mêmes commandes tournent en local et dans GitHub Actions. Python **3.12** (`.python-version`) pour l'API, l'ingestion et le ML. Node **≥ 20.9** (`.nvmrc`, `apps/web` `engines`).
+
+Depuis la racine, avec les venv Python activés dans chaque package concerné et `npm ci` dans `apps/web` :
+
+```bash
+npm run verify:api
+npm run verify:ingestion
+npm run verify:ml
+npm run verify:web
+npm run verify:all
+```
+
+`verify:web` commence par `verify:openapi` : génération `openapi-typescript` depuis `contracts/openapi.yaml`, puis `git diff --exit-code` sur `apps/web/src/types/generated/api.ts`. Un OpenAPI modifié sans régénération des types frontend fait échouer la commande.
+
+Chaque `verify:*` Python exécute `ruff check`, `mypy` et `pytest`. Aucun Postgres ni Redis n'est requis pour ces suites unitaires.
+
+Les artefacts gitignorés sous `var/` (parquet PIT, `artefact.joblib`, archive raw) ne sont pas téléchargés. Les tests HTTP qui en dépendent sont skippés explicitement. En local, s'ils sont présents, ces tests s'exécutent contre le candidat réel, jamais contre un modèle inventé.
+
+### CI GitHub Actions
+
+Workflow : [`.github/workflows/ci.yml`](../.github/workflows/ci.yml).
+
+Jobs requis sur une Pull Request (à cocher dans les branch protection rules, hors de ce chantier) :
+
+- `api`
+- `web`
+- `ingestion`
+- `ml`
+- `quality-gates` (agrégat : échoue si l'un des quatre domaines échoue)
+
+Cette CI vérifie lint, types, tests, build frontend et drift de contrat. Elle n'entraîne pas de modèle, n'appelle pas de LLM vendor, ne déploie rien et n'est pas un critère « production ready ».
+
 ## 11. Commits, branches et revues
 
 - Branche : `agent/<role>/<feature>`.

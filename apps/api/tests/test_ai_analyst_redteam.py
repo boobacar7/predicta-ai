@@ -17,6 +17,7 @@ from app.odds.exceptions import OddsUnavailableError
 from app.odds.types import Football1x2Selection
 from app.predictions.exceptions import PitFeaturesUnavailableError, TemporalLeakageError
 from tests.conftest import make_client
+from tests.live_assets import requires_football_http
 from tests.test_ai_analyst_engine import (
     MissingPredictionService,
     RaisingValueService,
@@ -458,6 +459,7 @@ def test_deterministic_and_llm_share_business_fields_lincoln() -> None:
     assert context.value_selection == Football1x2Selection.AWAY
 
 
+@requires_football_http
 def test_lincoln_http_preserves_favorite_and_value() -> None:
     client = make_client(analyst_narrator="llm", analyst_llm_model="mock-explainer-0.1")
     data = client.get(f"/api/v1/football/ai-analyst/{MATCH_ID}").json()["data"]
@@ -471,6 +473,7 @@ def test_lincoln_http_preserves_favorite_and_value() -> None:
     assert det["value"] == data["value"]
 
 
+@requires_football_http
 def test_pit_microseconds_llm_and_deterministic() -> None:
     for narrator in ("deterministic", "llm"):
         client = make_client(analyst_narrator=narrator, analyst_llm_model="mock-explainer-0.1")

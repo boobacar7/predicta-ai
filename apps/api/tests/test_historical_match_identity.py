@@ -7,6 +7,7 @@ import pytest
 from app.match_identity.models import MatchIdentity
 from app.match_identity.repository import ParquetArchiveMatchIdentityRepository
 from tests.conftest import make_client
+from tests.live_assets import requires_football_http
 
 REPO = Path(__file__).resolve().parents[3]
 DATASET = REPO / "workers" / "ingestion" / "var" / "football-1x2-history.parquet"
@@ -70,6 +71,7 @@ def identities() -> ParquetArchiveMatchIdentityRepository:
     return ParquetArchiveMatchIdentityRepository(DATASET, RAW_ARCHIVE)
 
 
+@requires_football_http
 @pytest.mark.parametrize(("league", "match_id", "home", "away", "kickoff"), HISTORICAL_MATCHES)
 def test_real_historical_identity_across_seven_leagues(
     identities: ParquetArchiveMatchIdentityRepository,
@@ -91,6 +93,7 @@ def test_real_historical_identity_across_seven_leagues(
     assert identity.data_mode == "live"
 
 
+@requires_football_http
 def test_historical_match_route_resolves_ai_pick_match_id() -> None:
     client = make_client()
     response = client.get("/api/v1/matches/mth_football-sportmonks-19719892")
@@ -110,6 +113,7 @@ def test_historical_match_route_resolves_ai_pick_match_id() -> None:
     }
 
 
+@requires_football_http
 def test_ai_pick_contains_resolved_match_identity() -> None:
     client = make_client()
     response = client.get("/api/v1/football/ai-picks")
@@ -121,6 +125,7 @@ def test_ai_pick_contains_resolved_match_identity() -> None:
         assert item["kickoff_at"] == "2026-07-07T16:00:00Z"
 
 
+@requires_football_http
 def test_structural_identity_projection_cannot_carry_post_kickoff_results() -> None:
     fields = set(MatchIdentity.__dataclass_fields__)
     assert fields.isdisjoint({"status", "home_score", "away_score", "result", "events"})
@@ -131,6 +136,7 @@ def test_structural_identity_projection_cannot_carry_post_kickoff_results() -> N
     assert identity.kickoff_at == datetime(2026, 9, 6, 15, 30, tzinfo=UTC)
 
 
+@requires_football_http
 def test_missing_structural_labels_remain_explicitly_null(tmp_path: Path) -> None:
     identity = ParquetArchiveMatchIdentityRepository(DATASET, tmp_path).get(
         "mth_football-sportmonks-19719892"
@@ -140,6 +146,7 @@ def test_missing_structural_labels_remain_explicitly_null(tmp_path: Path) -> Non
     assert identity.away_team is None
 
 
+@requires_football_http
 def test_truly_unknown_match_returns_clean_404_without_mock_identity() -> None:
     client = make_client()
     response = client.get(

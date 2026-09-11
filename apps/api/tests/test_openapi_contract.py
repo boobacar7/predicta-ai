@@ -5,6 +5,7 @@ from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 from tests.conftest import make_client
+from tests.live_assets import requires_football_http
 
 CONTRACT = Path(__file__).resolve().parents[3] / "contracts" / "openapi.yaml"
 
@@ -74,6 +75,19 @@ def test_responses_match_openapi_envelopes() -> None:
         _validate(schema_name, client.get(path).json())
     _validate("MatchDetailEnvelope", client.get("/api/v1/matches/mth_northgate_harbor").json())
     _validate(
+        "AnalystEnvelope",
+        client.post(
+            "/api/v1/ai/analyze",
+            json={"match_id": "mth_northgate_harbor", "question": "Explain the probabilities."},
+        ).json(),
+    )
+    _validate("ProblemDetails", client.get("/api/v1/players/missing").json())
+
+
+@requires_football_http
+def test_football_product_responses_match_openapi_envelopes() -> None:
+    client = make_client()
+    _validate(
         "FootballValueAnalysisEnvelope",
         client.get("/api/v1/football/value/mth_football-sportmonks-19719892").json(),
     )
@@ -82,11 +96,3 @@ def test_responses_match_openapi_envelopes() -> None:
         "FootballAiAnalystEnvelope",
         client.get("/api/v1/football/ai-analyst/mth_football-sportmonks-19719892").json(),
     )
-    _validate(
-        "AnalystEnvelope",
-        client.post(
-            "/api/v1/ai/analyze",
-            json={"match_id": "mth_northgate_harbor", "question": "Explain the probabilities."},
-        ).json(),
-    )
-    _validate("ProblemDetails", client.get("/api/v1/players/missing").json())

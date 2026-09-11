@@ -24,6 +24,7 @@ from app.value_engine.exceptions import InvalidPredictionError
 from app.value_engine.service import FootballValueService, PredictionService
 from fastapi.testclient import TestClient
 from tests.conftest import make_app
+from tests.live_assets import requires_live_assets
 
 MATCH_ID = "qa_match"
 CUTOFF = datetime(2026, 7, 7, 16, tzinfo=UTC)
@@ -665,6 +666,7 @@ def test_valid_ordinary_market_must_succeed_end_to_end() -> None:
     assert no_vig_sum == pytest.approx(1.0)
 
 
+@requires_live_assets
 def test_three_historical_prediction_paths_with_explicit_mock_odds() -> None:
     app = make_app()
     container = app.state.container

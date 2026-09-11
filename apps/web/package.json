@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "generate:api-types": "openapi-typescript ../../contracts/openapi.yaml --output src/types/generated/api.ts",
-    "verify": "npm run generate:api-types && npm run typecheck && npm run lint && npm test && npm run build"
+    "check:api-types": "npm run generate:api-types && git diff --exit-code -- apps/web/src/types/generated/api.ts",
+    "verify": "npm run check:api-types && npm run typecheck && npm run lint && npm test && npm run build"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",
@@ -29,6 +30,9 @@
     "react-dom": "19.2.8",
     "recharts": "^3.10.1",
     "tailwind-merge": "^3.6.0"
+  },
+  "engines": {
+    "node": ">=20.9.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

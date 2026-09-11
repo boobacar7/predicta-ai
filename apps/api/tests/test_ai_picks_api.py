@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from tests.conftest import make_client
+from tests.live_assets import requires_football_http
 
 MATCH_ID = "mth_football-sportmonks-19719892"
 
 
+@requires_football_http
 def test_ai_picks_api_metadata_data_mode_and_request_id() -> None:
     client = make_client()
     response = client.get(
@@ -31,6 +33,7 @@ def test_ai_picks_api_metadata_data_mode_and_request_id() -> None:
     assert not any(term in serialized for term in forbidden)
 
 
+@requires_football_http
 def test_ai_picks_api_filters_and_pagination() -> None:
     client = make_client()
     page = client.get("/api/v1/football/ai-picks", params={"limit": 1, "offset": 1})

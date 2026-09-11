@@ -13,6 +13,7 @@ from predicta_ml.registry.artifact import load_registry
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 from tests.conftest import make_client
+from tests.live_assets import requires_football_http, requires_live_assets, requires_pit_dataset
 
 LIVE_MATCH_ID = "mth_football-sportmonks-19719892"
 LIVE_KICKOFF = "2026-07-07T16:00:00Z"
@@ -60,6 +61,7 @@ def _assert_problem(response: Response, *, status: int, type_uri: str) -> dict:
     return body
 
 
+@requires_live_assets
 def test_football_prediction_live_candidate_response() -> None:
     client = make_client()
     response = client.get(
@@ -96,9 +98,8 @@ def test_football_prediction_live_candidate_response() -> None:
     assert again["away_probability"] == data["away_probability"]
 
 
+@requires_live_assets
 def test_ml_reference_and_api_probabilities_match_across_competitions() -> None:
-    if not ARTEFACT.is_file() or not DATASET.is_file():
-        pytest.fail("football-elo-v1-candidate artefact and PIT parquet are required for ML/API parity.")
     frame = load_football_dataset(DATASET).frame
     artefact = load_registry(ARTEFACT)
     client = make_client()
@@ -127,18 +128,21 @@ def test_published_frontend_prediction_contract_is_unchanged() -> None:
     assert "home_probability" not in body["data"]
 
 
+@requires_pit_dataset
 def test_missing_artefact_returns_rfc9457(tmp_path: Path) -> None:
     client = make_client(football_registry_dir=tmp_path)
     response = client.get(f"/api/v1/football/predictions/{LIVE_MATCH_ID}")
     _assert_problem(response, status=503, type_uri="/problems/model-artefact-not-found")
 
 
+@requires_live_assets
 def test_pit_unavailable_returns_rfc9457() -> None:
     client = make_client()
     response = client.get("/api/v1/football/predictions/mth_does_not_exist")
     _assert_problem(response, status=422, type_uri="/problems/pit-features-unavailable")
 
 
+@requires_live_assets
 def test_cutoff_before_kickoff_returns_pit_unavailable() -> None:
     client = make_client()
     response = client.get(
@@ -148,6 +152,7 @@ def test_cutoff_before_kickoff_returns_pit_unavailable() -> None:
     _assert_problem(response, status=422, type_uri="/problems/pit-features-unavailable")
 
 
+@requires_live_assets
 def test_cutoff_after_kickoff_returns_temporal_leakage() -> None:
     client = make_client()
     response = client.get(
@@ -157,6 +162,7 @@ def test_cutoff_after_kickoff_returns_temporal_leakage() -> None:
     _assert_problem(response, status=409, type_uri="/problems/temporal-leakage")
 
 
+@requires_football_http
 def test_prediction_envelope_follows_pit_not_odds_runtime() -> None:
     client = make_client()
     prediction = client.get(f"/api/v1/football/predictions/{LIVE_MATCH_ID}").json()
@@ -181,6 +187,7 @@ def test_prediction_router_does_not_hardcode_live_envelope() -> None:
     assert "data_mode='live'" not in text
 
 
+@requires_football_http
 def test_lincoln_value_invariants_remain_after_prediction_provenance_fix() -> None:
     client = make_client()
     analyst = client.get(f"/api/v1/football/ai-analyst/{LIVE_MATCH_ID}").json()["data"]

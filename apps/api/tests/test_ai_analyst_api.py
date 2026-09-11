@@ -9,6 +9,7 @@ from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 from tests.conftest import make_client
+from tests.live_assets import requires_football_http, requires_pit_dataset
 
 MATCH_ID = "mth_football-sportmonks-19719892"
 KICKOFF = "2026-07-07T16:00:00Z"
@@ -43,6 +44,7 @@ def _assert_problem(response: Response, *, status: int, type_uri: str) -> dict:
     return body
 
 
+@requires_football_http
 def test_football_ai_analyst_complete_mock_context() -> None:
     client = make_client()
     response = client.get(
@@ -91,6 +93,7 @@ def test_football_ai_analyst_complete_mock_context() -> None:
     assert again["analyst"]["generated_at"] == data["analyst"]["generated_at"]
 
 
+@requires_football_http
 def test_football_ai_analyst_rfc9457_errors() -> None:
     client = make_client()
     _assert_problem(
@@ -127,6 +130,7 @@ def test_football_ai_analyst_rfc9457_errors() -> None:
     )
 
 
+@requires_pit_dataset
 def test_missing_artefact_is_not_replaced_by_mock_analysis(tmp_path: Path) -> None:
     client = make_client(football_registry_dir=tmp_path)
     _assert_problem(
@@ -136,6 +140,7 @@ def test_missing_artefact_is_not_replaced_by_mock_analysis(tmp_path: Path) -> No
     )
 
 
+@requires_football_http
 def test_historical_match_details_and_analyst_share_identity() -> None:
     client = make_client()
     match = client.get(f"/api/v1/matches/{MATCH_ID}").json()["data"]
@@ -147,6 +152,7 @@ def test_historical_match_details_and_analyst_share_identity() -> None:
     assert match["kickoff_at"] == analyst["kickoff_at"] == KICKOFF
 
 
+@requires_football_http
 def test_football_ai_analyst_respects_pit_microseconds() -> None:
     client = make_client()
     _assert_problem(
@@ -186,6 +192,7 @@ def test_openapi_declares_football_ai_analyst() -> None:
     ]
 
 
+@requires_football_http
 def test_llm_narrator_stays_behind_the_same_http_boundary() -> None:
     client = make_client(analyst_narrator="llm", analyst_llm_model="mock-explainer-0.1")
     response = client.get(
@@ -208,6 +215,7 @@ def test_llm_narrator_stays_behind_the_same_http_boundary() -> None:
     _validate("FootballAiAnalystEnvelope", body)
 
 
+@requires_football_http
 def test_llm_narrator_cannot_invert_lincoln_favorite_and_value() -> None:
     client = make_client(analyst_narrator="llm", analyst_llm_model="mock-explainer-0.1")
     data = client.get(f"/api/v1/football/ai-analyst/{MATCH_ID}").json()["data"]
@@ -221,6 +229,7 @@ def test_llm_narrator_cannot_invert_lincoln_favorite_and_value() -> None:
     assert "home is the best value" not in summary
 
 
+@requires_football_http
 def test_llm_narrator_respects_pit_microseconds() -> None:
     client = make_client(analyst_narrator="llm", analyst_llm_model="mock-explainer-0.1")
     _assert_problem(
