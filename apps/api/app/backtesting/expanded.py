@@ -192,8 +192,16 @@ def _enrich_model_performance(
             "brier_score": grouped["brier_score"],
             "ece": grouped["ece"],
         }
+    predicted = metrics["predicted_distribution"]
     base.update(
         {
+            "n": metrics["n"],
+            "accuracy": metrics["accuracy"],
+            "hit_rate": metrics["accuracy"],
+            "hits": int(round(metrics["accuracy"] * metrics["n"])),
+            "home": predicted.get("HOME", 0),
+            "draw": predicted.get("DRAW", 0),
+            "away": predicted.get("AWAY", 0),
             "log_loss": metrics["log_loss"],
             "brier_score": metrics["brier_score"],
             "ece": metrics["ece"],

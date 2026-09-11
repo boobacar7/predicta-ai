@@ -131,11 +131,22 @@ python -m predicta_ingestion expand-historical-odds-pilot --estimate-only
 python -m predicta_ingestion expand-historical-odds-pilot
 ```
 
+Fenêtres d'évaluation `final_test` supplémentaires, définies avant scoring dans
+[final-test-windows.json](../../docs/qa/final-test-windows.json) (PL + Ligue 1,
+1 snapshot / ligue / jour, max 120 requêtes). Estimer les crédits avant l'appel
+live. Pas de `--dry-run` pour la persistance réelle :
+
+```bash
+python -m predicta_ingestion expand-final-test-history --estimate-only
+python -m predicta_ingestion expand-final-test-history
+```
+
 Le scoring 0 crédit :
 
 ```bash
 cd apps/api
 python -m app.backtesting persisted-expanded
+python -m app.backtesting persisted-final-test-history
 ```
 
 Ce n'est **pas** un backfill. Détail : [odds-provider.md](../../docs/data/odds-provider.md),

@@ -1,0 +1,126 @@
+{
+  "artefact_version": "final-test-windows-v1",
+  "kind": "expand_final_test_history",
+  "defined_before_scoring": true,
+  "defined_at": "2026-09-11T17:30:00Z",
+  "selection_criterion": "Sportmonks availability, The Odds API historical coverage from 2020-06-06, finished PL+Ligue 1 volume, consecutive matchweeks, distance from Elo calibration_select / calibration_fit / walk-forward validation, and no overlap with already-scored May 2026 or Aug–Sep 2026 fetch windows. Windows were not chosen by observing ROI.",
+  "competitions": ["premier-league", "ligue-1"],
+  "market": "h2h",
+  "canonical_market": "1X2",
+  "region": "eu",
+  "cadence": "One historical request per league per kickoff day. as_of equals the earliest kickoff that day so the provider returns the closest snapshot <= kickoff. Sub-daily / 5-minute walking is refused.",
+  "universe_at_definition": {
+    "source": "postgresql:sportmonks + parquet football-1x2-history-0.3",
+    "additional_finished_matches": 324,
+    "official_elo_final_test_additional_finished": 0,
+    "windows": [
+      {
+        "window_id": "final_test_window_01",
+        "finished_matches": 114,
+        "premier_league": 60,
+        "ligue_1": 54,
+        "league_days": 33,
+        "elo_temporal_split": "final_train"
+      },
+      {
+        "window_id": "final_test_window_02",
+        "finished_matches": 124,
+        "premier_league": 66,
+        "ligue_1": 58,
+        "league_days": 38,
+        "elo_temporal_split": "final_train"
+      },
+      {
+        "window_id": "final_test_window_03",
+        "finished_matches": 86,
+        "premier_league": 62,
+        "ligue_1": 24,
+        "league_days": 24,
+        "elo_temporal_split": "final_train"
+      },
+      {
+        "window_id": "final_test_window_existing",
+        "finished_matches": 57,
+        "premier_league": 30,
+        "ligue_1": 27,
+        "league_days": 21,
+        "elo_temporal_split": "final_test",
+        "fetch": false
+      }
+    ]
+  },
+  "windows": [
+    {
+      "window_id": "final_test_window_01",
+      "name": "2024-25-opening",
+      "start": "2024-08-16T00:00:00Z",
+      "end": "2024-10-01T00:00:00Z",
+      "fetch": true,
+      "additional": true,
+      "elo_temporal_split": "final_train",
+      "rationale": "Earliest Premier League + Ligue 1 Sportmonks block in PostgreSQL (2024-25 opening matchweeks). Consecutive finished fixtures. Same calendar phase as the current Aug–Sep 2026 official final_test. Odds API historical coverage starts 2020-06-06. Not used for Elo calibration_select. Defined from volume and data availability, not ROI."
+    },
+    {
+      "window_id": "final_test_window_02",
+      "name": "2024-25-autumn",
+      "start": "2024-10-01T00:00:00Z",
+      "end": "2024-12-01T00:00:00Z",
+      "fetch": true,
+      "additional": true,
+      "elo_temporal_split": "final_train",
+      "rationale": "Next consecutive PL + Ligue 1 matchweeks after window 01. Independent autumn block, no overlap with window 01 or May 2026. All matches finished in Sportmonks. Defined before scoring."
+    },
+    {
+      "window_id": "final_test_window_03",
+      "name": "2024-25-december",
+      "start": "2024-12-01T00:00:00Z",
+      "end": "2025-01-01T00:00:00Z",
+      "fetch": true,
+      "additional": true,
+      "elo_temporal_split": "final_train",
+      "rationale": "Next consecutive block, ending exactly at Elo FINAL_TRAIN_END / fold_1 validation start (exclusive). Stops before model-selection windows. Festive Premier League congestion is the real calendar, not a ROI filter. Defined before scoring."
+    },
+    {
+      "window_id": "final_test_window_existing",
+      "name": "existing-official-final-test-2026-08-09",
+      "start": "2026-08-21T00:00:00Z",
+      "end": "2026-09-07T00:00:00Z",
+      "fetch": false,
+      "additional": false,
+      "elo_temporal_split": "final_test",
+      "rationale": "Already persisted official Elo final_test (weekend 21–24 Aug 2026 + following matchweeks through 6 Sep). Reused for comparison. Zero fetch. Not counted toward the additional 300–500 target."
+    }
+  ],
+  "excluded_periods": [
+    {
+      "name": "fold_1_validation",
+      "start": "2025-01-01T00:00:00Z",
+      "end": "2025-07-01T00:00:00Z",
+      "reason": "Walk-forward fold_1 validation used for Elo K / home-advantage selection. Not requalified as final_test."
+    },
+    {
+      "name": "fold_2_validation_including_2025-26-opening",
+      "start": "2025-07-01T00:00:00Z",
+      "end": "2026-01-01T00:00:00Z",
+      "reason": "Walk-forward fold_2 validation (includes Aug–Sep 2025, the calendar analog of current final_test). Not requalified as final_test."
+    },
+    {
+      "name": "calibration_fit",
+      "start": "2026-01-01T00:00:00Z",
+      "end": "2026-05-01T00:00:00Z",
+      "reason": "Elo calibration_fit. Not requalified as final_test."
+    },
+    {
+      "name": "calibration_select_may_2026",
+      "start": "2026-05-01T00:00:00Z",
+      "end": "2026-07-01T00:00:00Z",
+      "reason": "Elo calibration_select (already scored in the expanded pilot). Not requalified as final_test."
+    },
+    {
+      "name": "official_final_test_unfinished_after_2026-09-07",
+      "start": "2026-09-07T00:00:00Z",
+      "end": "2026-09-12T00:00:00Z",
+      "reason": "Official Elo final_test remainder. Zero additional finished PL+L1 matches in Sportmonks at freeze time (Rennes–OM 2026-09-11 still scheduled)."
+    }
+  ]
+}

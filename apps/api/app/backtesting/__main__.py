@@ -12,6 +12,10 @@ ensure_ingestion_on_path()
 from sqlalchemy import create_engine, text  # noqa: E402
 
 from app.backtesting.expanded import expanded_catalog_from_parquet, run_persisted_expanded_pilot  # noqa: E402
+from app.backtesting.final_test_history import (  # noqa: E402
+    final_test_catalog_from_parquet,
+    run_persisted_final_test_history,
+)
 from app.backtesting.fixture_universe import LIVE_WEEKEND_END, LIVE_WEEKEND_START  # noqa: E402
 from app.backtesting.persisted import run_persisted_weekend_pilot, weekend_catalog_from_parquet  # noqa: E402
 from app.backtesting.pilot import run_fixture_pilot, run_live_weekend_model_pilot  # noqa: E402
@@ -29,6 +33,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args and args[0] == "persisted-expanded":
         json.dump(_persisted_expanded_payload(), sys.stdout, indent=2, sort_keys=True, default=str)
+        sys.stdout.write("\n")
+        return 0
+    if args and args[0] == "persisted-final-test-history":
+        json.dump(_persisted_final_test_payload(), sys.stdout, indent=2, sort_keys=True, default=str)
         sys.stdout.write("\n")
         return 0
     report = run_fixture_pilot()
@@ -80,6 +88,27 @@ def _persisted_expanded_payload() -> dict[str, object]:
         data_mode="live",
     )
     return run_persisted_expanded_pilot(
+        catalog=catalog,
+        snapshots=snapshots,
+        dataset_path=dataset,
+        registry_dir=registry,
+        persist_meta={"odds_source": "postgresql:odds_snapshots", "loaded_snapshots": len(snapshots)},
+    )
+
+
+def _persisted_final_test_payload() -> dict[str, object]:
+    dataset = repository_root() / "workers" / "ingestion" / "var" / "football-1x2-history.parquet"
+    registry = repository_root() / "workers" / "ml" / "var" / "registry"
+    settings = get_settings()
+    catalog = final_test_catalog_from_parquet(dataset, names=_expanded_team_names(settings))
+    repository = SqlOddsRepository(settings)
+    snapshots = repository.history_many(
+        [item.match_id for item in catalog],
+        "1X2",
+        source=LIVE_ODDS_SOURCE,
+        data_mode="live",
+    )
+    return run_persisted_final_test_history(
         catalog=catalog,
         snapshots=snapshots,
         dataset_path=dataset,

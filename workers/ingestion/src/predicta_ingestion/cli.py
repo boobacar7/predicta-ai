@@ -20,6 +20,14 @@ from predicta_ingestion.expand_historical_odds import (
     estimate_expand_run,
     run_expand_historical_odds_pilot,
 )
+from predicta_ingestion.final_test_history import (
+    MAX_FINAL_TEST_REQUESTS,
+    estimate_final_test_run,
+    run_expand_final_test_history,
+)
+from predicta_ingestion.final_test_history import (
+    report_payload as final_test_report_payload,
+)
 from predicta_ingestion.historical_odds import (
     DEFAULT_AS_OF_AFTER,
     DEFAULT_AS_OF_BEFORE,
@@ -149,6 +157,25 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Fetch, validate and normalize without writing PostgreSQL or the raw store.",
     )
+    final_test = sub.add_parser(
+        "expand-final-test-history",
+        help=(
+            "Persist additional bounded Premier League + Ligue 1 historical odds "
+            f"for predeclared final-test evaluation windows (max {MAX_FINAL_TEST_REQUESTS} "
+            "requests, 1 snapshot/league/day). Reuses the existing Aug–Sep 2026 official "
+            "final_test. Not a backfill."
+        ),
+    )
+    final_test.add_argument(
+        "--estimate-only",
+        action="store_true",
+        help="Plan slots and credits from PostgreSQL without calling The Odds API.",
+    )
+    final_test.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Fetch, validate and normalize without writing PostgreSQL or the raw store.",
+    )
     dataset = sub.add_parser(
         "build-ml-dataset",
         help="Build a point-in-time 1X2 dataset from ingested PostgreSQL rows. Does not train a model.",
@@ -250,6 +277,13 @@ def _dispatch(args: argparse.Namespace, settings: Settings) -> dict[str, object]
             estimate_only=bool(getattr(args, "estimate_only", False)),
         )
         return expand_report.to_dict()
+    if args.command == "expand-final-test-history":
+        final_report = expand_final_test_history(
+            settings=settings,
+            dry_run=bool(getattr(args, "dry_run", False)),
+            estimate_only=bool(getattr(args, "estimate_only", False)),
+        )
+        return final_test_report_payload(final_report)
     if args.command == "ingest-history":
         history, dataset = run_history(
             settings=settings,
@@ -473,6 +507,61 @@ def expand_historical_odds_pilot(
         target_ids=target_match_ids(estimate.fetch_matches),
     )
     report = run_expand_historical_odds_pilot(
+        provider=odds_provider,
+        pipeline=active_pipeline,
+        estimate=estimate,
+        secret=settings.the_odds_api_key or None,
+        estimate_only=False,
+    )
+    if not dry_run and report.persist is not None:
+        _record_persist_run(active_pipeline, clock, report.persist)
+    return report
+
+
+def expand_final_test_history(
+    *,
+    settings: Settings,
+    dry_run: bool = False,
+    estimate_only: bool = False,
+    provider: TheOddsApiProvider | None = None,
+    pipeline: IngestionPipeline | None = None,
+) -> ExpandHistoricalOddsReport:
+    engine = create_engine(settings.database_url, pool_pre_ping=True, future=True)
+    require_odds_history_schema(engine)
+    estimate = estimate_final_test_run(engine=engine)
+    if estimate_only:
+        clock = Clock()
+        memory_pipeline = pipeline or _build_persist_pipeline(
+            settings,
+            clock,
+            dry_run=True,
+            engine=engine,
+            target_ids=target_match_ids(estimate.fetch_matches),
+        )
+        placeholder = provider or TheOddsApiProvider(
+            enable_live=False,
+            api_key="",
+            clock=clock,
+            transport=HttpxTransport(),
+        )
+        return run_expand_final_test_history(
+            provider=placeholder,
+            pipeline=memory_pipeline,
+            estimate=estimate,
+            secret=settings.the_odds_api_key or None,
+            estimate_only=True,
+        )
+    _assert_odds_ready(settings)
+    clock = Clock()
+    odds_provider = provider or _odds_provider(settings, clock)
+    active_pipeline = pipeline or _build_persist_pipeline(
+        settings,
+        clock,
+        dry_run=dry_run,
+        engine=engine,
+        target_ids=target_match_ids(estimate.fetch_matches),
+    )
+    report = run_expand_final_test_history(
         provider=odds_provider,
         pipeline=active_pipeline,
         estimate=estimate,
