@@ -43,6 +43,15 @@ obligatoires mais nullables : une identité absente n'est jamais remplacée par
 un nom fictif. Cette variante ne contient volontairement ni score, ni statut,
 ni événement post-kickoff.
 
+`GET /football/predictions/{match_id}` n'utilise pas les cotes. Son
+`data_mode` d'enveloppe est celui des features PIT servies (archive
+historique Sportmonks, `live`). Il n'est jamais hardcodé et n'est pas
+hérité du OddsService. Un runtime avec `MockOddsProvider` peut donc
+exposer une prédiction `live` et une analyse value / AI Picks / AI Analyst
+`mock`. Le frontend Football consomme les cotes via value, AI Picks et
+AI Analyst, pas via cet endpoint. `GET /matches/{match_id}/prediction`
+reste le DTO catalogue fictif (`mock`).
+
 `GET /football/value/{match_id}` est le contrat backend strict du Value Engine
 0.1. Il appelle le Prediction Service existant, puis choisit le dernier
 snapshot de cotes complet tel que `available_at <= cutoff_at`. Sa réponse
@@ -73,6 +82,7 @@ Toute réponse réussie contient :
 
 - `data_mode: mock` signifie que le payload est explicitement fictif.
 - `data_mode: live` signifie qu'il provient des sources réelles configurées; le terme ne décrit pas le statut live d'un match.
+- L'enveloppe décrit la ressource servie par l'opération, pas le runtime global. Value, AI Picks et AI Analyst portent le `data_mode` des cotes; la prédiction modèle porte celui des features PIT.
 - Le mode `hybrid` appartient uniquement à la factory frontend qui combine plusieurs requêtes. Il n'est jamais une valeur d'enveloppe.
 - `generated_at` est un timestamp RFC 3339.
 - `request_id` est identique au header `X-Request-ID`.

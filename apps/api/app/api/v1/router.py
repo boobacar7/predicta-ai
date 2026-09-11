@@ -134,8 +134,11 @@ def get_football_model_prediction(
     match_id: str,
     cutoff_at: Annotated[datetime | None, Query()] = None,
 ) -> dict[str, object]:
-    prediction = _container(request).football_predictions().predict(match_id, cutoff_at)
-    return envelope(request, prediction, data_mode="live")
+    prediction, data_mode = _container(request).football_predictions().predict_with_provenance(
+        match_id,
+        cutoff_at,
+    )
+    return envelope(request, prediction, data_mode=data_mode)
 
 
 @router.get("/football/value/{match_id}")

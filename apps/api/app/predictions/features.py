@@ -7,6 +7,7 @@ from typing import Protocol
 
 from app.core.clock import parse_rfc3339
 from app.predictions.exceptions import PitFeaturesUnavailableError, TemporalLeakageError
+from app.predictions.provenance import prediction_envelope_data_mode
 from app.predictions.runtime import ensure_ml_on_path
 from app.predictions.types import (
     CUTOFF_POLICY_PRE_KICKOFF,
@@ -43,8 +44,7 @@ def validate_elo_snapshot(
     resolved_cutoff = ensure_utc(cutoff_at) if cutoff_at is not None else kickoff
     if cutoff_policy != CUTOFF_POLICY_PRE_KICKOFF:
         raise PitFeaturesUnavailableError("Only the pre_kickoff cutoff policy is supported.")
-    if data_mode != "live":
-        raise PitFeaturesUnavailableError("Refusing non-live feature rows; mock features cannot drive the candidate.")
+    data_mode = prediction_envelope_data_mode(data_mode)
     if resolved_cutoff > kickoff:
         raise TemporalLeakageError(
             "cutoff_at is after kickoff; post-match or future-of-cutoff data cannot be used."

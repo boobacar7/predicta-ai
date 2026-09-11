@@ -10,6 +10,7 @@ from app.core.clock import Clock
 from app.predictions.exceptions import ArtefactNotFoundError, PitFeaturesUnavailableError, TemporalLeakageError
 from app.predictions.features import InMemoryPitFeatureStore, ParquetPitFeatureStore
 from app.predictions.models import load_football_1x2_model
+from app.predictions.provenance import prediction_envelope_data_mode
 from app.predictions.service import FootballPredictionService
 from app.predictions.simplex import renormalize_1x2
 from app.predictions.types import (
@@ -96,6 +97,14 @@ def test_mock_feature_rows_are_refused() -> None:
         store.get_pit_features("mth_unit", None)
 
 
+def test_prediction_envelope_data_mode_never_upgrades_mock() -> None:
+    assert prediction_envelope_data_mode("live") == "live"
+    with pytest.raises(PitFeaturesUnavailableError, match="non-live"):
+        prediction_envelope_data_mode("mock")
+    with pytest.raises(PitFeaturesUnavailableError, match="unsupported"):
+        prediction_envelope_data_mode("hybrid")
+
+
 def test_later_match_row_cannot_leak_into_requested_match() -> None:
     _require_live_assets()
     target = _snapshot("mth_early", home=1479.5745333246837, away=1501.3822853628935)
@@ -134,8 +143,10 @@ def test_candidate_artefact_and_reproducible_simplex() -> None:
     clock = Clock(datetime(2026, 9, 9, 18, 0, tzinfo=UTC))
     service = FootballPredictionService(clock=clock, features=store, model=first)
     payload = service.predict(LIVE_MATCH_ID, LIVE_KICKOFF)
+    _prediction, data_mode = service.predict_with_provenance(LIVE_MATCH_ID, LIVE_KICKOFF)
     assert payload.model_status == "candidate"
     assert payload.home_probability + payload.draw_probability + payload.away_probability == pytest.approx(1.0)
+    assert data_mode == "live"
     dumped = payload.model_dump()
     assert "expected_value" not in dumped
     assert "edge" not in dumped

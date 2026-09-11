@@ -53,6 +53,8 @@ def _assert_problem(response: Response, *, status: int, type_uri: str) -> dict:
     assert body["title"]
     assert body["detail"]
     assert body["request_id"]
+    assert "data_mode" not in body
+    assert "data" not in body
     assert response.headers["X-Request-ID"] == body["request_id"]
     _validate("ProblemDetails", body)
     return body
@@ -68,7 +70,10 @@ def test_football_prediction_live_candidate_response() -> None:
     body = response.json()
     assert response.headers["X-Request-ID"] == "req_football_pred"
     assert body["request_id"] == "req_football_pred"
-    assert body["data_mode"] == "live"
+    frame = load_football_dataset(DATASET).frame
+    pit_data_mode = str(frame.loc[frame["match_id"] == LIVE_MATCH_ID, "data_mode"].iloc[0])
+    assert pit_data_mode == "live"
+    assert body["data_mode"] == pit_data_mode
     data = body["data"]
     assert data["model_status"] == "candidate"
     assert data["model_status"] != "champion"
@@ -150,3 +155,38 @@ def test_cutoff_after_kickoff_returns_temporal_leakage() -> None:
         params={"cutoff_at": "2026-07-07T16:00:01Z"},
     )
     _assert_problem(response, status=409, type_uri="/problems/temporal-leakage")
+
+
+def test_prediction_envelope_follows_pit_not_odds_runtime() -> None:
+    client = make_client()
+    prediction = client.get(f"/api/v1/football/predictions/{LIVE_MATCH_ID}").json()
+    value = client.get(f"/api/v1/football/value/{LIVE_MATCH_ID}").json()
+    picks = client.get("/api/v1/football/ai-picks").json()
+    analyst = client.get(f"/api/v1/football/ai-analyst/{LIVE_MATCH_ID}").json()
+    catalog = client.get("/api/v1/matches/mth_northgate_harbor/prediction").json()
+    assert prediction["data_mode"] == "live"
+    assert value["data_mode"] == "mock"
+    assert value["data"]["metadata"]["data_mode"] == "mock"
+    assert picks["data_mode"] == "mock"
+    assert all(item["data_mode"] == "mock" for item in picks["data"]["items"])
+    assert analyst["data_mode"] == "mock"
+    assert analyst["data"]["analyst"]["data_quality"]["data_mode"] == "mock"
+    assert catalog["data_mode"] == "mock"
+
+
+def test_prediction_router_does_not_hardcode_live_envelope() -> None:
+    source = Path(__file__).resolve().parents[1] / "app" / "api" / "v1" / "router.py"
+    text = source.read_text()
+    assert 'data_mode="live"' not in text
+    assert "data_mode='live'" not in text
+
+
+def test_lincoln_value_invariants_remain_after_prediction_provenance_fix() -> None:
+    client = make_client()
+    analyst = client.get(f"/api/v1/football/ai-analyst/{LIVE_MATCH_ID}").json()["data"]
+    value = client.get(f"/api/v1/football/value/{LIVE_MATCH_ID}").json()["data"]
+    assert analyst["model_favorite"] == "HOME"
+    assert analyst["value"]["value_selection"] == "AWAY"
+    assert value["value"]["home"]["ev"] == pytest.approx(-0.167, abs=1e-3)
+    assert value["value"]["away"]["ev"] == pytest.approx(0.563, abs=1e-3)
+

@@ -7,8 +7,9 @@ from app.core.clock import Clock
 from app.predictions.exceptions import ArtefactNotFoundError, PitFeaturesUnavailableError
 from app.predictions.features import ParquetPitFeatureStore, PitFeatureStore
 from app.predictions.models import load_football_1x2_model
+from app.predictions.provenance import prediction_envelope_data_mode
 from app.predictions.types import MARKET_1X2, SPORT_FOOTBALL, Football1x2Model
-from app.schemas import FootballModelPrediction
+from app.schemas import DataMode, FootballModelPrediction
 
 
 class FootballPredictionService:
@@ -24,6 +25,14 @@ class FootballPredictionService:
         self._model = model
 
     def predict(self, match_id: str, cutoff_at: datetime | None) -> FootballModelPrediction:
+        prediction, _data_mode = self.predict_with_provenance(match_id, cutoff_at)
+        return prediction
+
+    def predict_with_provenance(
+        self,
+        match_id: str,
+        cutoff_at: datetime | None,
+    ) -> tuple[FootballModelPrediction, DataMode]:
         snapshot = self._features.get_pit_features(match_id, cutoff_at)
         if snapshot.dataset_version != self._model.dataset_version:
             raise PitFeaturesUnavailableError("Feature dataset_version does not match the loaded candidate artefact.")
@@ -33,20 +42,23 @@ class FootballPredictionService:
             )
         probabilities = self._model.predict_1x2(snapshot)
         generated_at = self._clock.now()
-        return FootballModelPrediction(
-            match_id=snapshot.match_id,
-            sport=SPORT_FOOTBALL,
-            market=MARKET_1X2,
-            home_probability=probabilities.home,
-            draw_probability=probabilities.draw,
-            away_probability=probabilities.away,
-            model_version=self._model.model_version,
-            dataset_version=self._model.dataset_version,
-            feature_schema_version=self._model.feature_schema_version,
-            model_status=self._model.model_status,
-            cutoff_at=snapshot.cutoff_at,
-            cutoff_policy=snapshot.cutoff_policy,
-            generated_at=generated_at,
+        return (
+            FootballModelPrediction(
+                match_id=snapshot.match_id,
+                sport=SPORT_FOOTBALL,
+                market=MARKET_1X2,
+                home_probability=probabilities.home,
+                draw_probability=probabilities.draw,
+                away_probability=probabilities.away,
+                model_version=self._model.model_version,
+                dataset_version=self._model.dataset_version,
+                feature_schema_version=self._model.feature_schema_version,
+                model_status=self._model.model_status,
+                cutoff_at=snapshot.cutoff_at,
+                cutoff_policy=snapshot.cutoff_policy,
+                generated_at=generated_at,
+            ),
+            prediction_envelope_data_mode(snapshot.data_mode),
         )
 
 
