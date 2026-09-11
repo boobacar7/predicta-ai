@@ -3,14 +3,20 @@ from __future__ import annotations
 import re
 from decimal import Decimal
 
+from app.ai_analyst.claims import (
+    ClaimGroundingError,
+    extract_claims,
+    mentioned_selections,
+    split_sentences,
+    validate_claims,
+)
 from app.ai_analyst.context import AnalystContext, AnalystEvidence
 from app.ai_analyst.language import FORBIDDEN_CLAIMS, UNSUPPORTED_INVENTED_TOPICS
 from app.ai_analyst.models import FootballAnalystExplanation
 from app.ai_analyst.statements import FactualClaim, GroundedStatement
-from app.odds.types import Football1x2Selection
 
 VALUE_ONLY_FACTORS = frozenset({"market_probability", "edge", "ev", "data_freshness"})
-PERCENT_RE = re.compile(r"(\d+(?:[.,]\d+)?)\s*%")
+PERCENT_RE = re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:%|％|percent\b)", re.IGNORECASE)
 ODDS_RE = re.compile(
     r"(?:odds|cote|priced at|price of|prix de)\s*(?:=|de|:)?\s*(\d+(?:[.,]\d+)?)",
     re.IGNORECASE,
@@ -28,22 +34,23 @@ ACRONYM_RE = re.compile(r"\b([A-Z]{2,5})\b")
 TITLE_TOKEN_RE = re.compile(r"\b([A-Z][a-zÀ-ÿ]{4,})\b")
 NUMBER_RE = re.compile(r"(?<![\w.-])([+-]?\d+(?:[.,]\d+)?)(?![\w.])")
 MODEL_PROBABILITY_RE = re.compile(
-    r"model probability|probabilit[ée]s? (?:modèle|modélisée|modeled)|highest (?:model )?probability|"
-    r"plus haute probabilit[ée]|probabilit[ée] supérieure",
+    r"model(?:ed|led)?(?:\s+at)?(?:\s+probability)?|the model gives|model gives|"
+    r"probabilit[ée]s? (?:modèle|modélisée|modeled)|highest (?:model )?probability|"
+    r"plus haute probabilit[ée]|probabilit[ée] supérieure|modèle (?:estime|donne|attribue)",
     re.IGNORECASE,
 )
 HIGHEST_PROBABILITY_RE = re.compile(
     r"highest (?:model )?probability|plus haute probabilit[ée](?: modèle)?|"
-    r"la plus haute probabilit[ée]",
+    r"la plus haute probabilit[ée]|most likely|le plus probable",
     re.IGNORECASE,
 )
 BEST_VALUE_RE = re.compile(
-    r"best value|meilleure valeur|meilleure value|the value pick",
+    r"best value|meilleure valeur|meilleure value|the value pick|best bet",
     re.IGNORECASE,
 )
 LIVE_AFFIRMATION_RE = re.compile(
-    r"live market(?: data)?|live odds|cotes live|données live|uses live|using live|"
-    r"marché live|real-time market",
+    r"live markets?|live odds|cotes live|données live|uses live|using live|"
+    r"marchés? live|real[- ]time (?:market|odds)|données en direct|(?<!pas )en direct",
     re.IGNORECASE,
 )
 LIVE_NEGATION_RE = re.compile(
@@ -205,7 +212,17 @@ def assert_statements_grounded(context: AnalystContext, statements: tuple[Ground
             raise AnalystGroundingError("GroundedStatement referenced an unknown evidence_id.")
         for claim in statement.factual_claims:
             _assert_claim_grounded(fields, claim)
-        _assert_text_grounded(context, statement.statement)
+        cited_fields = {
+            item.source_field
+            for item in evidence
+            if item.evidence_id in statement.evidence_ids and item.availability == "available"
+        }
+        _assert_text_grounded(
+            context,
+            statement.statement,
+            cited_fields=cited_fields,
+            evidence_ids=statement.evidence_ids,
+        )
         _assert_evidence_types_match(context, statement.statement, statement.evidence_ids, evidence)
 
 
@@ -221,17 +238,30 @@ def _assert_claim_grounded(fields: dict[str, AnalystEvidence], claim: FactualCla
         )
 
 
-def _assert_text_grounded(context: AnalystContext, text: str) -> None:
-    forbidden = _forbidden_term(text)
+def _assert_text_grounded(
+    context: AnalystContext,
+    text: str,
+    cited_fields: set[str] | None = None,
+    evidence_ids: tuple[str, ...] = (),
+) -> None:
+    scanned = _mask_grounded_literals(context, text)
+    forbidden = _forbidden_term(scanned)
     if forbidden is not None:
         raise AnalystGroundingError(f"Analyst text contains forbidden language: {forbidden}.")
-    invented = _unsupported_topic(text)
+    invented = _unsupported_topic(scanned)
     if invented is not None:
         raise AnalystGroundingError(f"Analyst text invents unsupported topic: {invented}.")
-    _assert_favorite_not_confused(context, text)
-    _assert_candidate_not_promoted(context, text)
-    _assert_data_mode_not_contradicted(context, text)
-    scanned = _mask_grounded_literals(context, text)
+    try:
+        validate_claims(
+            context,
+            extract_claims(text, context, evidence_ids, masked_text=scanned),
+            cited_fields or set(),
+        )
+    except ClaimGroundingError as exc:
+        raise AnalystGroundingError(str(exc)) from exc
+    _assert_favorite_not_confused(context, scanned)
+    _assert_candidate_not_promoted(context, scanned)
+    _assert_data_mode_not_contradicted(context, scanned)
     allowed_percents = _allowed_percents(context)
     model_percents = _model_percents(context)
     for raw in PERCENT_RE.findall(scanned):
@@ -354,9 +384,9 @@ def _unsupported_topic(text: str) -> str | None:
 def _assert_favorite_not_confused(context: AnalystContext, text: str) -> None:
     favorite = context.favorite_selection()
     value_selection = context.value_selection
-    for sentence in re.split(r"[.!?]", text):
+    for sentence in split_sentences(text):
         lowered = sentence.casefold()
-        mentioned = _mentioned_selections(context, sentence)
+        mentioned = mentioned_selections(context, sentence)
         if HIGHEST_PROBABILITY_RE.search(sentence) and any(selection is not favorite for selection in mentioned):
             raise AnalystGroundingError("Narrative presents a non-favorite as having the highest model probability.")
         if BEST_VALUE_RE.search(sentence):
@@ -380,24 +410,6 @@ def _assert_favorite_not_confused(context: AnalystContext, text: str) -> None:
             raise AnalystGroundingError("Narrative presents value_selection as the model favorite.")
 
 
-def _mentioned_selections(context: AnalystContext, sentence: str) -> set[Football1x2Selection]:
-    lowered = sentence.casefold()
-    mentioned: set[Football1x2Selection] = set()
-    home_labels = ["home", "domicile"]
-    away_labels = ["away", "extérieur", "visitor", "visiteur"]
-    if context.identity.home_team:
-        home_labels.append(context.identity.home_team)
-    if context.identity.away_team:
-        away_labels.append(context.identity.away_team)
-    if any(label.casefold() in lowered for label in home_labels):
-        mentioned.add(Football1x2Selection.HOME)
-    if any(label.casefold() in lowered for label in away_labels):
-        mentioned.add(Football1x2Selection.AWAY)
-    if any(label in lowered for label in ("draw", "nul", "match nul")):
-        mentioned.add(Football1x2Selection.DRAW)
-    return mentioned
-
-
 def _assert_candidate_not_promoted(context: AnalystContext, text: str) -> None:
     if context.prediction.model_status != "candidate":
         return
@@ -410,7 +422,7 @@ def _assert_candidate_not_promoted(context: AnalystContext, text: str) -> None:
 def _assert_data_mode_not_contradicted(context: AnalystContext, text: str) -> None:
     if context.data_mode != "mock":
         return
-    for sentence in re.split(r"[.!?]", text):
+    for sentence in split_sentences(text):
         if not LIVE_AFFIRMATION_RE.search(sentence):
             continue
         if LIVE_NEGATION_RE.search(sentence):

@@ -4,7 +4,6 @@ from decimal import Decimal
 
 from app.ai_analyst.context import AnalystContext
 from app.ai_analyst.grounding import assert_statements_grounded
-from app.ai_analyst.language import FORBIDDEN_CLAIMS
 from app.ai_analyst.models import (
     ANALYST_PROVIDER_ID,
     ANALYST_VERSION,
@@ -81,6 +80,13 @@ class DeterministicAnalystProvider:
     """Pure function of AnalystContext. No clock, no I/O, no randomness."""
 
     def generate_analysis(self, context: AnalystContext) -> FootballAnalystExplanation:
+        explanation = self.assemble(context)
+        assert_statements_grounded(context, self.grounded_summary(context))
+        return explanation
+
+    def assemble(self, context: AnalystContext) -> FootballAnalystExplanation:
+        """Build a complete DTO from AnalystContext. Narrative grounding is separate."""
+
         favorite = context.favorite_selection()
         factors = self._factors(context, favorite)
         quality = FootballAnalystDataQuality(
@@ -92,8 +98,7 @@ class DeterministicAnalystProvider:
             missing=list(context.missing()),
         )
         statements = self.grounded_summary(context)
-        assert_statements_grounded(context, statements)
-        explanation = FootballAnalystExplanation(
+        return FootballAnalystExplanation(
             summary=render_statements(statements),
             key_factors=factors,
             strengths=self._strengths(context),
@@ -104,8 +109,6 @@ class DeterministicAnalystProvider:
             analysis_version=ANALYST_VERSION,
             provider=ANALYST_PROVIDER_ID,
         )
-        self._assert_no_forbidden_language(explanation.summary)
-        return explanation
 
     def grounded_summary(self, context: AnalystContext) -> tuple[GroundedStatement, ...]:
         favorite = context.favorite_selection()
@@ -275,10 +278,3 @@ class DeterministicAnalystProvider:
         if not context.identity_complete():
             items.append("L'identité d'équipe est partielle ; aucun nom manquant n'a été inventé.")
         return items
-
-    @staticmethod
-    def _assert_no_forbidden_language(summary: str) -> None:
-        lowered = summary.casefold()
-        for term in FORBIDDEN_CLAIMS:
-            if term in lowered:
-                raise ValueError(f"Analyst summary contains forbidden language: {term}.")

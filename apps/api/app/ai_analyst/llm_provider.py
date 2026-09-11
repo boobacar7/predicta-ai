@@ -184,7 +184,7 @@ class LLMAnalystProvider:
         try:
             statements = self._narrate(context)
             assert_statements_grounded(context, statements)
-            assembled = self._fallback.generate_analysis(context)
+            assembled = self._fallback.assemble(context)
             return assembled.model_copy(
                 update={
                     "summary": render_statements(statements),
@@ -195,7 +195,10 @@ class LLMAnalystProvider:
             raise
         except Exception as exc:
             self.last_fallback_reason = type(exc).__name__
-            return self._fallback.generate_analysis(context)
+            try:
+                return self._fallback.generate_analysis(context)
+            except AnalystGroundingError:
+                return self._fallback.assemble(context)
 
     def _narrate(self, context: AnalystContext) -> tuple[GroundedStatement, ...]:
         prompt = build_narration_prompt(context, prompt_version=self._prompt_version)

@@ -17,11 +17,22 @@ validated identity
   → Value Engine (optionnel)
   → AnalystContext immuable
   → AnalystEvidence (faits whitelistés)
-  → GroundedStatement (faits + narration)
-  → AnalystProvider.generate_analysis(context)
+  → LLM JSON { statements, evidence_ids }
+  → GroundedClaim interne (claim_type + subject + value)
+  → validation claim / evidence
   → assert_grounded
+  → narration rendue
   → GET /api/v1/football/ai-analyst/{match_id}
 ```
+
+Le texte narratif n'est jamais une source de vérité. Seules les claims
+typées, reliées à des `evidence_ids`, peuvent affirmer un fait. Une claim
+n'est valide que si `claim_type`, le sujet, la valeur et l'evidence sont
+compatibles. Exemple : `HOME / model_probability / 50%` est rejeté si
+l'evidence HOME vaut 41,7 %, y compris sous forme « above seventy » ou
+« soixante-dix ». Une evidence de cote ou d'implicite ne justifie pas une
+claim de probabilité modèle. `GroundedClaim` reste interne : le DTO HTTP
+ne change pas.
 
 `DeterministicAnalystProvider` reste le narrator par défaut
 (`PREDICTA_API_ANALYST_NARRATOR=deterministic`) et ne nécessite aucune clé
@@ -60,6 +71,14 @@ Deux concepts distincts :
 
 Ces champs ne sont ni un pick, ni un pari, ni une recommandation. Un EV
 positif sur `value_selection` n'autorise aucun langage de mise.
+
+`model_favorite` et `value_selection` ne sont pas interchangeables :
+
+- « AWAY is the model favorite » est faux si le favori modèle est HOME ;
+- « HOME is the best value » est faux si `value_selection` est AWAY ;
+- l'EV / l'edge du contexte portent sur `value.selection` (le favori
+  modèle), jamais sur `value_selection`. Attribuer l'EV HOME à AWAY est
+  rejeté même si les deux issues sont citées.
 
 Le Value Engine n'est pas modifié. L'analyste n'est pas un moteur de picks.
 
@@ -160,30 +179,24 @@ AnalystContext.evidence()
   → prompt (faits whitelistés uniquement)
   → LLM JSON { statements: [{ statement, evidence_ids }] }
   → parse / schema extra=forbid
-  → evidence_ids + claims
+  → extraction GroundedClaim (narration ≠ fait)
+  → claim_type + subject + value vs evidence
   → assert_statements_grounded
-  → summary
-  → assert_grounded
-  → DTO
+  → summary rendu
+  → DTO reconstruit depuis AnalystContext
 ```
 
+Toute erreur du chemin narrator (JSON malformé, schema, evidence inconnue,
+claim non supportée, grounding, `RuntimeError`, timeout, erreur client)
+retombe sur `DeterministicAnalystProvider` avec un DTO complet et
+`provider=deterministic-v0.1`. Aucune narration LLM partiellement validée
+n'est publiée. Les erreurs Prediction Service / Value Engine / PIT /
+`ApiError` ne sont pas masquées. Un nom d'équipe qui contient un terme
+interdit (`Injured FC`) est masqué avant le scan topic : l'exception reste
+dans la boundary narrator.
+
 Le LLM n'a pas le droit de définir `probabilities`, `odds`, `edge`, `EV`,
-`model_version`, `dataset_version`, `cutoff_at` ou `data_mode`. Toute
-sortie malformée, expirée, non grounded, toute exception du client LLM,
-ou toute confusion `model_favorite` / `value_selection` retombe sur
-`DeterministicAnalystProvider`.
-
-`assert_grounded` est la boundary de sécurité du narrator : une affirmation
-numérique, comparative, d'entité, de blessure, de composition, de résultat,
-de classement ou de `data_mode` doit être supportée par `AnalystEvidence`.
-Une evidence d'un autre type (cote vs probabilité modèle, implicite vs
-probabilité modèle) est refusée. Le LLM ne devient jamais source of truth.
-
-Les erreurs du chemin narratif (`RuntimeError` client, timeout, JSON
-invalide, `AnalystGroundingError`) sont contenues dans `LLMAnalystProvider`
-et produisent un DTO déterministe complet. Les erreurs de source of truth
-(Prediction Service, Value Engine, PIT, identité introuvable) ne sont pas
-masquées.
+`model_version`, `dataset_version`, `cutoff_at` ou `data_mode`.
 
 Le client livré est `mock-explainer-0.1` : un narrator déterministe qui
 parle le schéma LLM, sans vendor externe ni secret. Aucune dépendance LLM
