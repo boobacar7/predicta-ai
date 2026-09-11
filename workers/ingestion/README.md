@@ -141,6 +141,15 @@ python -m predicta_ingestion expand-final-test-history --estimate-only
 python -m predicta_ingestion expand-final-test-history
 ```
 
+Odds historiques pour la fenêtre OOS vraie (`2026-07-01` → `2026-09-10T02:30:01Z`,
+les sept compétitions V1, 1 snapshot / ligue / jour, max 85 requêtes). Réutilise
+les snapshots PL + Ligue 1 déjà persistés. Estimer **avant** tout appel live :
+
+```bash
+python -m predicta_ingestion expand-oos-historical-odds --estimate-only
+python -m predicta_ingestion expand-oos-historical-odds
+```
+
 Le scoring 0 crédit :
 
 ```bash

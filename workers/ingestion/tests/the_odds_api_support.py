@@ -44,6 +44,17 @@ class OddsScriptedTransport:
             return HttpResponse(status_code=self.force_status, body=self.force_body, headers={}, url=url)
         parsed = urlparse(url)
         query = parse_qs(parsed.query)
+        if parsed.path.rstrip("/").endswith("/v4/sports"):
+            return HttpResponse(
+                status_code=200,
+                body=b"[]",
+                headers={
+                    "x-requests-remaining": str(self.requests_remaining),
+                    "x-requests-used": str(self.requests_used),
+                    "x-requests-last": "0",
+                },
+                url=url,
+            )
         if "/historical/" in parsed.path:
             date = (query.get("date") or [""])[0]
             body = load_odds_fixture(_historical_fixture(parsed.path, date, self.historical_body))

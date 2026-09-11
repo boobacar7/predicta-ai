@@ -166,6 +166,13 @@ class TheOddsApiProvider:
         }
         return json.dumps(wrapped, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
+    def quota_headers(self) -> dict[str, str]:
+        """GET /v4/sports. Documented as 0 credits; used only to read quota headers."""
+        self._require_live()
+        url = f"{self._base_url}/v4/sports?{urlencode({'apiKey': self._token})}"
+        response = self._client.get(url)
+        return dict(response.headers)
+
     def _require_live(self) -> None:
         if not self._enable_live:
             raise LiveIngestionDisabled(self.name)

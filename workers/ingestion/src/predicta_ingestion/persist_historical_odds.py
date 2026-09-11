@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.engine import Engine
 
 from predicta_ingestion.canonical.models import CanonicalBatch, OddsSnapshot
@@ -214,13 +214,19 @@ class TargetMatchOddsSink:
             recorder(**kwargs)
 
 
-def plan_persist_slots(matches: tuple[PilotMatch, ...]) -> tuple[PersistSlot, ...]:
+def plan_persist_slots(
+    matches: tuple[PilotMatch, ...],
+    *,
+    allowed_leagues: tuple[str, ...] | None = None,
+) -> tuple[PersistSlot, ...]:
+    allowed = tuple(allowed_leagues) if allowed_leagues is not None else PILOT_LEAGUES
+    allowed_set = frozenset(allowed)
     by_league_day: dict[tuple[str, str], list[datetime]] = {}
     for match in matches:
-        if match.league_slug not in PILOT_LEAGUES:
+        if match.league_slug not in allowed_set:
             raise ValidationError(
                 "persist_scope",
-                f"Persist runner only accepts premier-league and ligue-1, not {match.league_slug}.",
+                _unsupported_league_message(match.league_slug, allowed),
             )
         day = match.kickoff_at.date().isoformat()
         by_league_day.setdefault((match.league_slug, day), []).append(match.kickoff_at)
@@ -236,19 +242,20 @@ def assert_persist_scope(
     *,
     max_requests: int,
     request_cap: int = MAX_PERSIST_REQUESTS,
+    allowed_leagues: tuple[str, ...] | None = None,
 ) -> None:
     if max_requests > request_cap:
         raise ValidationError(
             "persist_cap",
             f"Historical odds persist runner refuses more than {request_cap} requests.",
         )
+    allowed = tuple(allowed_leagues) if allowed_leagues is not None else PILOT_LEAGUES
     leagues = {item.league for item in slots}
-    unknown = sorted(leagues - set(PILOT_LEAGUES))
+    unknown = sorted(leagues - set(allowed))
     if unknown:
         raise ValidationError(
             "persist_scope",
-            "Historical odds persist runner only accepts premier-league and ligue-1, "
-            f"not {', '.join(unknown)}.",
+            _unsupported_league_scope_message(unknown, allowed),
         )
     if len(slots) > max_requests:
         raise ValidationError(
@@ -306,31 +313,51 @@ def load_matches_from_sql(
     *,
     window_start: datetime,
     window_end: datetime,
+    league_slugs: tuple[str, ...] | None = None,
+    match_ids: frozenset[str] | None = None,
+    finished_only: bool = False,
 ) -> tuple[PilotMatch, ...]:
+    slugs = tuple(league_slugs) if league_slugs is not None else PILOT_LEAGUES
+    conditions = [
+        "m.kickoff_at >= :window_start",
+        "m.kickoff_at < :window_end",
+    ]
+    if league_slugs is None:
+        conditions.append(
+            "(l.slug IN :league_slugs OR lower(l.name) IN ('premier league', 'ligue 1'))"
+        )
+    else:
+        conditions.append("l.slug IN :league_slugs")
+    params: dict[str, object] = {
+        "window_start": window_start,
+        "window_end": window_end,
+        "league_slugs": list(slugs),
+    }
+    if match_ids is not None:
+        if not match_ids:
+            return ()
+        conditions.append("m.id IN :match_ids")
+        params["match_ids"] = list(match_ids)
+    if finished_only:
+        conditions.append("m.status = 'finished'")
     query = text(
-        """
-        SELECT m.id, m.kickoff_at, m.home_team_id, m.away_team_id,
+        f"""
+        SELECT m.id, m.kickoff_at, m.home_team_id, m.away_team_id, m.status,
                ht.name AS home_name, at.name AS away_name,
                l.name AS league_name, l.slug AS league_slug
         FROM matches m
         JOIN teams ht ON ht.id = m.home_team_id
         JOIN teams at ON at.id = m.away_team_id
         JOIN leagues l ON l.id = m.league_id
-        WHERE m.kickoff_at >= :window_start
-          AND m.kickoff_at < :window_end
-          AND (
-                l.slug IN ('premier-league', 'ligue-1')
-                OR lower(l.name) IN ('premier league', 'ligue 1')
-          )
+        WHERE {' AND '.join(conditions)}
         ORDER BY m.kickoff_at, m.id
         """
-    )
+    ).bindparams(bindparam("league_slugs", expanding=True))
+    if match_ids is not None:
+        query = query.bindparams(bindparam("match_ids", expanding=True))
     matches: list[PilotMatch] = []
     with engine.connect() as connection:
-        rows = connection.execute(
-            query,
-            {"window_start": window_start, "window_end": window_end},
-        ).mappings()
+        rows = connection.execute(query, params).mappings()
         for row in rows:
             kickoff = row["kickoff_at"]
             if kickoff.tzinfo is None:
@@ -373,13 +400,19 @@ def run_persist_historical_odds_pilot(
     window_start: datetime | None = None,
     window_end: datetime | None = None,
     request_cap: int = MAX_PERSIST_REQUESTS,
+    allowed_leagues: tuple[str, ...] | None = None,
 ) -> PersistHistoricalOddsReport:
     start = window_start or PERSIST_WINDOW_START
     end = window_end or PERSIST_WINDOW_END
     if strict_window:
         assert_strict_weekend_window(matches)
-    planned = slots or plan_persist_slots(matches)
-    assert_persist_scope(planned, max_requests=max_requests, request_cap=request_cap)
+    planned = slots or plan_persist_slots(matches, allowed_leagues=allowed_leagues)
+    assert_persist_scope(
+        planned,
+        max_requests=max_requests,
+        request_cap=request_cap,
+        allowed_leagues=allowed_leagues,
+    )
     fetches: list[HistoricalFetch] = []
     ingestion: list[dict[str, object]] = []
     quarantined: list[QuarantineItem] = []
@@ -483,7 +516,7 @@ def run_persist_historical_odds_pilot(
     if isinstance(sink, TargetMatchOddsSink):
         skipped = list(sink.skipped_match_ids)
     return PersistHistoricalOddsReport(
-        leagues=PILOT_LEAGUES,
+        leagues=allowed_leagues or PILOT_LEAGUES,
         window_start=start,
         window_end=end,
         slots=planned,
@@ -670,3 +703,26 @@ def _reject_secrets(payload: dict[str, object]) -> dict[str, object]:
 
 def complete_target_snapshots(snapshots: list[OddsSnapshot]) -> list[OddsSnapshot]:
     return [item for item in snapshots if complete_1x2(item)]
+
+
+def _unsupported_league_message(league_slug: str, allowed: tuple[str, ...]) -> str:
+    if tuple(allowed) == PILOT_LEAGUES:
+        return f"Persist runner only accepts premier-league and ligue-1, not {league_slug}."
+    return (
+        "Persist runner only accepts "
+        + ", ".join(allowed)
+        + f", not {league_slug}."
+    )
+
+
+def _unsupported_league_scope_message(unknown: list[str], allowed: tuple[str, ...]) -> str:
+    if tuple(allowed) == PILOT_LEAGUES:
+        return (
+            "Historical odds persist runner only accepts premier-league and ligue-1, "
+            f"not {', '.join(unknown)}."
+        )
+    return (
+        "Historical odds persist runner only accepts "
+        + ", ".join(allowed)
+        + f", not {', '.join(unknown)}."
+    )

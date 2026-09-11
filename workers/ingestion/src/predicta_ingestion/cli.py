@@ -44,6 +44,19 @@ from predicta_ingestion.ml.dataset import MlDataset, build_ml_dataset
 from predicta_ingestion.ml.export import write_dataset_artifacts
 from predicta_ingestion.ml.prematch import build_prematch_features, write_prematch_artifacts
 from predicta_ingestion.ml.quality import build_quality_report
+from predicta_ingestion.oos_historical_odds import (
+    DEFAULT_PARQUET_PATH,
+    MAX_OOS_REQUESTS,
+    OOS_END,
+    OOS_START,
+    build_coverage_matrix,
+    estimate_oos_odds_run,
+    existing_historical_request_keys,
+    match_odds_states,
+    run_expand_oos_historical_odds,
+    table_counts,
+    write_oos_odds_artefacts,
+)
 from predicta_ingestion.persist_historical_odds import (
     MAX_PERSIST_REQUESTS,
     PersistHistoricalOddsReport,
@@ -176,6 +189,32 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Fetch, validate and normalize without writing PostgreSQL or the raw store.",
     )
+    oos_odds = sub.add_parser(
+        "expand-oos-historical-odds",
+        help=(
+            "Persist historical 1X2 odds for dataset 0.3 true-OOS matches "
+            f"({OOS_START.strftime('%Y-%m-%d')} → {OOS_END.strftime('%Y-%m-%d')}, "
+            f"seven V1 competitions, max {MAX_OOS_REQUESTS} requests, "
+            "1 snapshot/league/kickoff day). Reuses already persisted PL+Ligue 1 "
+            "snapshots. Not a backfill and not an OOS backtest."
+        ),
+    )
+    oos_odds.add_argument(
+        "--estimate-only",
+        action="store_true",
+        help="Plan slots and credits from PostgreSQL/parquet without calling The Odds API.",
+    )
+    oos_odds.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Fetch, validate and normalize without writing PostgreSQL or the raw store.",
+    )
+    oos_odds.add_argument(
+        "--parquet",
+        dest="parquet",
+        default=str(DEFAULT_PARQUET_PATH),
+        help="Dataset 0.3 parquet used to freeze the OOS match universe.",
+    )
     dataset = sub.add_parser(
         "build-ml-dataset",
         help="Build a point-in-time 1X2 dataset from ingested PostgreSQL rows. Does not train a model.",
@@ -284,6 +323,13 @@ def _dispatch(args: argparse.Namespace, settings: Settings) -> dict[str, object]
             estimate_only=bool(getattr(args, "estimate_only", False)),
         )
         return final_test_report_payload(final_report)
+    if args.command == "expand-oos-historical-odds":
+        return expand_oos_historical_odds(
+            settings=settings,
+            dry_run=bool(getattr(args, "dry_run", False)),
+            estimate_only=bool(getattr(args, "estimate_only", False)),
+            parquet_path=Path(getattr(args, "parquet", str(DEFAULT_PARQUET_PATH))),
+        )
     if args.command == "ingest-history":
         history, dataset = run_history(
             settings=settings,
@@ -571,6 +617,97 @@ def expand_final_test_history(
     if not dry_run and report.persist is not None:
         _record_persist_run(active_pipeline, clock, report.persist)
     return report
+
+
+def expand_oos_historical_odds(
+    *,
+    settings: Settings,
+    dry_run: bool = False,
+    estimate_only: bool = False,
+    parquet_path: Path | None = None,
+    provider: TheOddsApiProvider | None = None,
+    pipeline: IngestionPipeline | None = None,
+) -> dict[str, object]:
+    engine = create_engine(settings.database_url, pool_pre_ping=True, future=True)
+    require_odds_history_schema(engine)
+    raw_root = Path(settings.raw_store_path)
+    dataset = parquet_path or DEFAULT_PARQUET_PATH
+    counts_before = table_counts(engine)
+    existing_keys = existing_historical_request_keys(raw_root)
+    estimate = estimate_oos_odds_run(
+        engine=engine,
+        parquet_path=dataset,
+        existing_request_keys=existing_keys,
+        raw_root=raw_root,
+    )
+    coverage_before = build_coverage_matrix(
+        estimate.matches,
+        match_odds_states(engine, estimate.matches),
+        previously_covered=estimate.reusable_match_ids,
+    )
+    if estimate_only:
+        clock = Clock()
+        memory_pipeline = pipeline or _build_persist_pipeline(
+            settings,
+            clock,
+            dry_run=True,
+            engine=engine,
+            target_ids=target_match_ids(estimate.matches),
+        )
+        placeholder = provider or TheOddsApiProvider(
+            enable_live=False,
+            api_key="",
+            clock=clock,
+            transport=HttpxTransport(),
+        )
+        report = run_expand_oos_historical_odds(
+            provider=placeholder,
+            pipeline=memory_pipeline,
+            estimate=estimate,
+            secret=settings.the_odds_api_key or None,
+            estimate_only=True,
+            engine=engine,
+            coverage=coverage_before,
+            counts_before=counts_before,
+        )
+        paths = write_oos_odds_artefacts(report)
+        payload = report.to_dict()
+        payload["paths"] = paths
+        return payload
+    _assert_odds_ready(settings)
+    clock = Clock()
+    odds_provider = provider or _odds_provider(settings, clock)
+    active_pipeline = pipeline or _build_persist_pipeline(
+        settings,
+        clock,
+        dry_run=dry_run,
+        engine=engine,
+        target_ids=target_match_ids(estimate.matches),
+    )
+    report = run_expand_oos_historical_odds(
+        provider=odds_provider,
+        pipeline=active_pipeline,
+        estimate=estimate,
+        secret=settings.the_odds_api_key or None,
+        estimate_only=False,
+        probe_quota=not dry_run,
+        engine=engine,
+        coverage=None if not dry_run else coverage_before,
+        counts_before=counts_before,
+    )
+    if not dry_run and report.persist is not None:
+        _record_persist_run(active_pipeline, clock, report.persist)
+        report.counts_after = table_counts(engine)
+        report.coverage = build_coverage_matrix(
+            estimate.matches,
+            match_odds_states(engine, estimate.matches),
+            previously_covered=estimate.reusable_match_ids,
+            persist=report.persist,
+        )
+    paths = write_oos_odds_artefacts(report)
+    payload = report.to_dict()
+    payload["paths"] = paths
+    return payload
 
 
 def _build_persist_pipeline(
