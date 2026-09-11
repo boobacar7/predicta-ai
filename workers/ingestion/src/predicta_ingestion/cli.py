@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy import create_engine
+from sqlalchemy.engine import Engine
 
 from predicta_ingestion.canonical.enums import ResourceType, SportCode
 from predicta_ingestion.clock import Clock, parse_rfc3339
@@ -29,6 +30,18 @@ from predicta_ingestion.ml.dataset import MlDataset, build_ml_dataset
 from predicta_ingestion.ml.export import write_dataset_artifacts
 from predicta_ingestion.ml.prematch import build_prematch_features, write_prematch_artifacts
 from predicta_ingestion.ml.quality import build_quality_report
+from predicta_ingestion.persist_historical_odds import (
+    MAX_PERSIST_REQUESTS,
+    PersistHistoricalOddsReport,
+    PilotMatch,
+    TargetMatchOddsSink,
+    assert_persist_scope,
+    assert_strict_weekend_window,
+    load_weekend_matches_from_sql,
+    plan_persist_slots,
+    run_persist_historical_odds_pilot,
+    target_match_ids,
+)
 from predicta_ingestion.persistence.load import hydrate_match_keys_from_sql, hydrate_resolver_from_sql, load_memory_sink
 from predicta_ingestion.persistence.memory import MemoryCanonicalSink, TeeCanonicalSink
 from predicta_ingestion.persistence.schema import require_odds_history_schema
@@ -96,6 +109,18 @@ def main(argv: list[str] | None = None) -> int:
         help="PIT cutoff T. Default: 2026-08-16T14:00:00Z.",
     )
     pilot.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Fetch, validate and normalize without writing PostgreSQL or the raw store.",
+    )
+    persist = sub.add_parser(
+        "persist-historical-odds-pilot",
+        help=(
+            "Persist bounded Premier League + Ligue 1 historical odds for the "
+            "21-24 Aug 2026 weekend (max 8 requests, 1 snapshot/league/day). Not a backfill."
+        ),
+    )
+    persist.add_argument(
         "--dry-run",
         action="store_true",
         help="Fetch, validate and normalize without writing PostgreSQL or the raw store.",
@@ -188,6 +213,12 @@ def _dispatch(args: argparse.Namespace, settings: Settings) -> dict[str, object]
             dry_run=bool(getattr(args, "dry_run", False)),
         )
         return pilot_report.to_dict()
+    if args.command == "persist-historical-odds-pilot":
+        persist_report = persist_historical_odds_pilot(
+            settings=settings,
+            dry_run=bool(getattr(args, "dry_run", False)),
+        )
+        return persist_report.to_dict()
     if args.command == "ingest-history":
         history, dataset = run_history(
             settings=settings,
@@ -321,6 +352,109 @@ def historical_odds_pilot(
         pit_cutoff=parse_rfc3339(pit_cutoff) if pit_cutoff else DEFAULT_PIT_CUTOFF,
         secret=settings.the_odds_api_key or None,
     )
+
+
+def persist_historical_odds_pilot(
+    *,
+    settings: Settings,
+    dry_run: bool = False,
+    provider: TheOddsApiProvider | None = None,
+    pipeline: IngestionPipeline | None = None,
+    matches: tuple[PilotMatch, ...] | None = None,
+) -> PersistHistoricalOddsReport:
+    _assert_odds_ready(settings)
+    clock = Clock()
+    engine = create_engine(settings.database_url, pool_pre_ping=True, future=True)
+    require_odds_history_schema(engine)
+    weekend_matches = matches if matches is not None else load_weekend_matches_from_sql(engine)
+    if not weekend_matches:
+        raise ValidationError(
+            "persist_window",
+            "No Premier League / Ligue 1 matches were found in the 21-24 Aug 2026 window. "
+            "Sportmonks fixtures must already exist; odds never create matches.",
+        )
+    assert_strict_weekend_window(weekend_matches)
+    slots = plan_persist_slots(weekend_matches)
+    assert_persist_scope(slots, max_requests=MAX_PERSIST_REQUESTS)
+    odds_provider = provider or _odds_provider(settings, clock)
+    active_pipeline = pipeline or _build_persist_pipeline(
+        settings,
+        clock,
+        dry_run=dry_run,
+        engine=engine,
+        target_ids=target_match_ids(weekend_matches),
+    )
+    report = run_persist_historical_odds_pilot(
+        provider=odds_provider,
+        pipeline=active_pipeline,
+        matches=weekend_matches,
+        slots=slots,
+        max_requests=MAX_PERSIST_REQUESTS,
+        strict_window=True,
+        secret=settings.the_odds_api_key or None,
+    )
+    if not dry_run:
+        _record_persist_run(active_pipeline, clock, report)
+    return report
+
+
+def _build_persist_pipeline(
+    settings: Settings,
+    clock: Clock,
+    *,
+    dry_run: bool,
+    engine: Engine,
+    target_ids: frozenset[str],
+) -> IngestionPipeline:
+    raw_store = FilesystemRawStore(Path(settings.raw_store_path))
+    memory = MemoryCanonicalSink()
+    resolver = IdentityResolver(clock)
+    hydrate_resolver_from_sql(resolver, engine)
+    hydrate_match_keys_from_sql(resolver, engine)
+    sql = None if dry_run else SqlCanonicalSink(clock=clock, engine=engine)
+    tee = TeeCanonicalSink(memory, sql)
+    sink = TargetMatchOddsSink(tee, target_ids)
+    return IngestionPipeline(
+        settings=settings,
+        clock=clock,
+        raw_store=raw_store,
+        sink=sink,
+        resolver=resolver,
+        dry_run=dry_run,
+    )
+
+
+def _record_persist_run(pipeline: IngestionPipeline, clock: Clock, report: PersistHistoricalOddsReport) -> None:
+    recorder = getattr(pipeline._sink, "record_run", None)
+    if not callable(recorder):
+        return
+    accepted = 0
+    read = 0
+    quarantined = 0
+    for item in report.ingestion:
+        accepted += _as_int(item.get("records_accepted"))
+        read += _as_int(item.get("records_read"))
+        details = item.get("quarantine_details")
+        if isinstance(details, list):
+            quarantined += len(details)
+    recorder(
+        run_id=stable_entity_id("run", "the_odds_api", clock.now().isoformat()),
+        provider="the_odds_api",
+        resource_type=ResourceType.ODDS.value,
+        status="completed" if quarantined == 0 else "completed_with_quarantine",
+        data_mode="live",
+        records_read=read,
+        records_accepted=accepted,
+        records_quarantined=quarantined,
+    )
+
+
+def _as_int(value: object) -> int:
+    if isinstance(value, bool) or value is None:
+        return 0
+    if isinstance(value, int):
+        return value
+    return 0
 
 
 def run_history(

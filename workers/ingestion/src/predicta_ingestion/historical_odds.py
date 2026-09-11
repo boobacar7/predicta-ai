@@ -11,7 +11,7 @@ from predicta_ingestion.clock import parse_rfc3339, to_rfc3339
 from predicta_ingestion.errors import ValidationError
 from predicta_ingestion.ids import canonical_id, slugify
 from predicta_ingestion.normalization.odds import CANONICAL_1X2_MARKET
-from predicta_ingestion.persistence.memory import MemoryCanonicalSink, TeeCanonicalSink
+from predicta_ingestion.persistence.memory import MemoryCanonicalSink
 from predicta_ingestion.pipeline import IngestionPipeline, IngestionReport
 from predicta_ingestion.pit.store import PointInTimeStore
 from predicta_ingestion.providers.leagues import resolve_v1_leagues
@@ -423,13 +423,28 @@ def run_historical_odds_pilot(
     )
 
 
-def _odds_sink(pipeline: IngestionPipeline) -> MemoryCanonicalSink:
+def memory_odds_sink(pipeline: IngestionPipeline) -> MemoryCanonicalSink:
     sink = pipeline._sink
     if isinstance(sink, MemoryCanonicalSink):
         return sink
-    if isinstance(sink, TeeCanonicalSink):
-        return sink.memory
+    memory = getattr(sink, "memory", None)
+    if isinstance(memory, MemoryCanonicalSink):
+        return memory
     raise TypeError("Historical odds pilot requires a MemoryCanonicalSink or TeeCanonicalSink.")
+
+
+def _odds_sink(pipeline: IngestionPipeline) -> MemoryCanonicalSink:
+    return memory_odds_sink(pipeline)
+
+
+def fetch_historical_odds_envelope(
+    provider: TheOddsApiProvider,
+    *,
+    league: str,
+    as_of: datetime,
+    secret: str | None,
+) -> RawEnvelope:
+    return _fetch_one(provider, league=league, as_of=as_of, secret=secret)
 
 
 def _fetch_one(

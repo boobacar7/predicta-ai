@@ -1,0 +1,122 @@
+{
+  "timestamp": "2026-08-22T18:40:00Z",
+  "previous_timestamp": "2026-08-22T18:35:00Z",
+  "next_timestamp": "2026-08-22T18:45:00Z",
+  "data": [
+    {
+      "id": "fl1_marseille_monaco_20260822",
+      "sport_key": "soccer_france_ligue_one",
+      "sport_title": "Ligue 1",
+      "commence_time": "2026-08-22T18:45:00Z",
+      "home_team": "Marseille",
+      "away_team": "AS Monaco",
+      "bookmakers": [
+        {
+          "key": "pinnacle",
+          "title": "Pinnacle",
+          "last_update": "2026-08-22T17:52:00Z",
+          "markets": [
+            {
+              "key": "h2h",
+              "outcomes": [
+                { "name": "Marseille", "price": 2.25 },
+                { "name": "Draw", "price": 3.30 },
+                { "name": "AS Monaco", "price": 3.20 }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "pmu_fr",
+          "title": "PMU",
+          "last_update": "2026-08-22T17:53:00Z",
+          "markets": [
+            {
+              "key": "h2h",
+              "outcomes": [
+                { "name": "Marseille", "price": 2.20 },
+                { "name": "Draw", "price": 3.25 },
+                { "name": "AS Monaco", "price": 3.15 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fl1_troyes_paris_fc_20260822",
+      "sport_key": "soccer_france_ligue_one",
+      "sport_title": "Ligue 1",
+      "commence_time": "2026-08-22T18:45:00Z",
+      "home_team": "Troyes",
+      "away_team": "Paris FC",
+      "bookmakers": [
+        {
+          "key": "pinnacle",
+          "title": "Pinnacle",
+          "last_update": "2026-08-22T17:54:00Z",
+          "markets": [
+            {
+              "key": "h2h",
+              "outcomes": [
+                { "name": "Troyes", "price": 2.40 },
+                { "name": "Draw", "price": 3.20 },
+                { "name": "Paris FC", "price": 3.10 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fl1_psg_rennes_inverted_20260823",
+      "sport_key": "soccer_france_ligue_one",
+      "sport_title": "Ligue 1",
+      "commence_time": "2026-08-23T18:45:00Z",
+      "home_team": "Paris Saint Germain",
+      "away_team": "Rennes",
+      "bookmakers": [
+        {
+          "key": "pinnacle",
+          "title": "Pinnacle",
+          "last_update": "2026-08-22T17:55:00Z",
+          "markets": [
+            {
+              "key": "h2h",
+              "outcomes": [
+                { "name": "Paris Saint Germain", "price": 1.45 },
+                { "name": "Draw", "price": 4.40 },
+                { "name": "Rennes", "price": 6.50 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fl1_lyon_nice_out_of_window_20260830",
+      "sport_key": "soccer_france_ligue_one",
+      "sport_title": "Ligue 1",
+      "commence_time": "2026-08-30T18:45:00Z",
+      "home_team": "Lyon",
+      "away_team": "Nice",
+      "bookmakers": [
+        {
+          "key": "pinnacle",
+          "title": "Pinnacle",
+          "last_update": "2026-08-22T17:56:00Z",
+          "markets": [
+            {
+              "key": "h2h",
+              "outcomes": [
+                { "name": "Lyon", "price": 2.05 },
+                { "name": "Draw", "price": 3.40 },
+                { "name": "Nice", "price": 3.70 }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

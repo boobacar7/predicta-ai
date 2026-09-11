@@ -70,11 +70,15 @@ class OddsScriptedTransport:
 
 def _historical_fixture(path: str, date: str, default_body: str) -> str:
     if "soccer_france_ligue_one" in path:
+        if "2026-08-22" in date or "2026-08-23" in date or "2026-08-24" in date:
+            return "soccer_ligue1_persist_near_kickoff.json"
         if "2026-08-16T15:00" in date:
             return "soccer_ligue1_historical_pilot_later.json"
         if "2026-08-16T11:00" in date:
             return "soccer_ligue1_historical_pilot.json"
         return "soccer_ligue1_historical_pilot.json"
+    if "2026-08-21" in date or "2026-08-24" in date:
+        return "soccer_epl_persist_near_kickoff.json"
     if "2026-08-16T15:00" in date:
         return "soccer_epl_historical_pilot_later.json"
     if "2026-08-16T11:00" in date:

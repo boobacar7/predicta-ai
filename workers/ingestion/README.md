@@ -115,8 +115,16 @@ Pilote historique borné (Premier League + Ligue 1, 2 timestamps, max 4 requête
 python -m predicta_ingestion historical-odds-pilot --dry-run
 ```
 
-Ce n'est **pas** un backfill. Détail : [odds-provider.md](../../docs/data/odds-provider.md)
-et [historical-odds-pilot.md](../../docs/qa/historical-odds-pilot.md).
+Persistance bornée du weekend 21–24 août 2026 (1 snapshot / ligue / jour de
+coup d'envoi, max 8 requêtes). Le run QA s'exécute **sans** `--dry-run` :
+
+```bash
+python -m predicta_ingestion persist-historical-odds-pilot
+```
+
+Ce n'est **pas** un backfill. Détail : [odds-provider.md](../../docs/data/odds-provider.md),
+[historical-odds-pilot.md](../../docs/qa/historical-odds-pilot.md) et
+[historical-odds-value-ai-picks-pilot.md](../../docs/qa/historical-odds-value-ai-picks-pilot.md).
 
 Les matchs Sportmonks doivent déjà exister pour lier les cotes. Le worker ne
 calcule ni EV, ni edge, ni no-vig.
