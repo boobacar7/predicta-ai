@@ -1,6 +1,7 @@
 "use client";
 
 import { PageHeader } from "@/components/domain/page-header";
+import { PrototypeNotice } from "@/components/domain/prototype-notice";
 import { QueryBoundary } from "@/components/domain/query-boundary";
 import { TeamComparison } from "@/components/domain/team-comparison";
 import { Unavailable } from "@/components/domain/unavailable";
@@ -24,6 +25,11 @@ export function AnalyticsView() {
   return (
     <div className="space-y-6">
       <PageHeader eyebrow={meta.eyebrow} title={meta.title} description={meta.description} />
+
+      <PrototypeNotice>
+        Les statistiques de cette page suivent le catalogue de navigation. Aucun indicateur
+        avancé du moteur football n&apos;est inventé ici.
+      </PrototypeNotice>
 
       <QueryBoundary
         query={list}

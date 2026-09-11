@@ -163,12 +163,28 @@ Le défaut reste `mock` pour le développement local sans parquet. Chaque
 réponse porte encore `data_mode` ; l'UI affiche « Mock data » uniquement
 lorsque l'enveloppe le dit.
 
-### Value Finder — filtres du contrat
+### Value Finder — Value Engine canonique
 
-`GET /value` accepte `sport`, `league_id`, `date`, `status`, `limit`,
-`offset`. Ceux-là partent à l'API. Marché, seuils numériques et tri n'ont
-pas de paramètre équivalent : ils restent un affinage local, étiqueté
-comme tel. Inventer `min_edge` sur cette route serait un contrat fantôme.
+`/value-finder` lit `GET /api/v1/football/value/{match_id}` via
+`getFootballValue`. Il n'y a pas de liste agrégée dans le contrat : la
+page inspecte un match à la fois (Lincoln par défaut). Le tri HOME/DRAW/AWAY
+est un affinage local, étiqueté comme tel. L'interface ne recalcule
+jamais implicite, no-vig, edge ou EV.
+
+`GET /value` reste une ressource catalogue prototype (`value`). Elle n'alimente
+plus l'expérience football principale.
+
+Ressources moteur :
+
+```
+NEXT_PUBLIC_PREDICTA_HTTP_RESOURCES=football_predictions,football_value,football_ai_picks,football_ai_analyst,matches
+NEXT_PUBLIC_PREDICTA_API_BASE_URL=http://localhost:8000/api/v1
+```
+
+Le Dashboard compose AI Picks, Value Engine et le catalogue de navigation.
+Les métriques fb-ens-* ne sont plus présentées comme le modèle football.
+Performance et Statistiques restent des surfaces prototype, explicitement
+libellées, tant qu'aucune API football stable n'existe pour ces données.
 
 ## Thèmes
 
@@ -186,6 +202,14 @@ via `useChartColors`. Le thème ne change aucune donnée métier.
   narration, derrière le backend.
 - Profil : placeholder, phase 10.
 - Univers AI Picks V0.1 : un match candidat côté backend.
+- Performance football : pas d'API stable pour log loss / Brier / ROI du
+  candidat. La page le dit explicitement.
+- Statistiques / ligues / équipes / joueurs : catalogue prototype.
+- `GET /dashboard`, `GET /value`, `GET /performance`, `GET /picks` :
+  encore dans le DataSource pour le prototype, plus utilisés comme
+  source moteur football.
+- `MatchDetail` et `ValueOpportunity` restent des DTO manuscrits pour le
+  catalogue. Les flux football utilisent les schémas OpenAPI générés.
 
 ## Non fait volontairement
 

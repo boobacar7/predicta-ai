@@ -52,6 +52,10 @@ export function createDataSource({
     getMatch: (id) => from("matches").getMatch(id),
     getPicks: (filters) => from("picks").getPicks(filters),
     getFootballAiPicks: (filters) => from("football_ai_picks").getFootballAiPicks(filters),
+    getFootballPrediction: (matchId, cutoffAt) =>
+      from("football_predictions").getFootballPrediction(matchId, cutoffAt),
+    getFootballValue: (matchId, cutoffAt) =>
+      from("football_value").getFootballValue(matchId, cutoffAt),
     getValue: (filters) => from("value").getValue(filters),
     getPerformance: () => from("performance").getPerformance(),
     getTeams: (filters) => from("teams").getTeams(filters),

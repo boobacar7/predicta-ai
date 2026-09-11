@@ -4,6 +4,8 @@ import type {
   AiPicksResult,
   AnalystSession,
   FootballAiAnalystReport,
+  FootballModelPrediction,
+  FootballValueAnalysis,
   CatalogFilters,
   DashboardSnapshot,
   League,
@@ -29,9 +31,8 @@ import type { DataSource, ListResult } from "@/types/datasource";
  * is inert until a resource is pointed at `http` through configuration, so it can
  * be wired endpoint by endpoint without touching a single view.
  *
- * Known divergence to reconcile when `contracts/openapi.yaml` lands: the API list
- * has no aggregate dashboard route, so `GET /dashboard` is assumed here. It is the
- * only path in this file not already documented in the contract.
+ * Catalogue routes (`/dashboard`, `/matches`, `/value`, `/performance`) remain
+ * the prototype surface. Football engines are the `/football/*` paths.
  */
 export class HttpDataSource implements DataSource {
   readonly kind = "http" as const;
@@ -72,6 +73,20 @@ export class HttpDataSource implements DataSource {
 
   getFootballAiPicks(filters: AiPicksFilters = {}) {
     return this.client.get<AiPicksResult>("/football/ai-picks", aiPicksParams(filters));
+  }
+
+  getFootballPrediction(matchId: string, cutoffAt?: string) {
+    return this.client.get<FootballModelPrediction>(
+      `/football/predictions/${encodeURIComponent(matchId)}`,
+      { cutoff_at: cutoffAt },
+    );
+  }
+
+  getFootballValue(matchId: string, cutoffAt?: string) {
+    return this.client.get<FootballValueAnalysis>(
+      `/football/value/${encodeURIComponent(matchId)}`,
+      { cutoff_at: cutoffAt },
+    );
   }
 
   getValue(filters: MatchFilters = {}) {

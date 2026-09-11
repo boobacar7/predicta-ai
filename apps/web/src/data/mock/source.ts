@@ -9,6 +9,10 @@ import { historicalMatchIdentities } from "@/data/mock/historical-identity";
 import { createAnalystSession } from "@/data/mock/analyst";
 import { leagues, players, sports, teams } from "@/data/mock/catalog";
 import { MOCK_NOW_ISO } from "@/data/mock/clock";
+import {
+  getFootballPredictionFixture,
+  getFootballValueFixture,
+} from "@/data/mock/football-engine";
 import { matches, matchSummaries } from "@/data/mock/matches";
 import { insights, performanceReport } from "@/data/mock/performance";
 import {
@@ -219,6 +223,38 @@ export class MockDataSource implements DataSource {
     });
   }
 
+  async getFootballPrediction(matchId: string, cutoffAt?: string) {
+    await this.begin();
+    this.assertFootballCutoff(cutoffAt);
+
+    if (isEmptyScenario(this.scenario)) {
+      throw notFound("Prédiction football");
+    }
+
+    const prediction = getFootballPredictionFixture(matchId);
+    if (!prediction) {
+      throw notFound("Prédiction football");
+    }
+
+    return envelope(prediction);
+  }
+
+  async getFootballValue(matchId: string, cutoffAt?: string) {
+    await this.begin();
+    this.assertFootballCutoff(cutoffAt);
+
+    if (isEmptyScenario(this.scenario)) {
+      throw notFound("Analyse value football");
+    }
+
+    const analysis = getFootballValueFixture(matchId);
+    if (!analysis) {
+      throw notFound("Analyse value football");
+    }
+
+    return envelope(analysis);
+  }
+
   async getValue(filters: MatchFilters = {}) {
     await this.begin();
 
@@ -417,6 +453,17 @@ export class MockDataSource implements DataSource {
 
     if (this.scenario === "error") {
       throw new DataSourceError({ kind: "mock_scenario" });
+    }
+  }
+
+  private assertFootballCutoff(cutoffAt?: string) {
+    if (cutoffAt === "not-a-timestamp") {
+      throw problemError(
+        400,
+        "/problems/validation",
+        "Validation Error",
+        "cutoff_at n'est pas un horodatage RFC 3339.",
+      );
     }
   }
 }

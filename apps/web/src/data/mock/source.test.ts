@@ -285,6 +285,34 @@ describe("football AI analyst", () => {
   });
 });
 
+describe("football prediction and value", () => {
+  it("publishes the Lincoln candidate prediction without inferring a favorite", async () => {
+    const result = await source().getFootballPrediction("mth_football-sportmonks-19719892");
+
+    expect(result.data.model_version).toBe("football-elo-v1-candidate");
+    expect(result.data.model_status).toBe("candidate");
+    expect(result.data.home_probability).toBe(0.4165);
+    expect(result.data).not.toHaveProperty("model_favorite");
+  });
+
+  it("publishes Lincoln value with AWAY EV distinct from HOME EV", async () => {
+    const result = await source().getFootballValue("mth_football-sportmonks-19719892");
+
+    expect(result.data.value.home.ev).toBe(-0.167);
+    expect(result.data.value.away.ev).toBe(0.5630743998504424);
+    expect(result.data.metadata.data_mode).toBe("mock");
+  });
+
+  it("returns not found for an unknown match rather than a mock substitute", async () => {
+    await expect(source().getFootballPrediction("mth_unknown")).rejects.toMatchObject({
+      kind: "not_found",
+    });
+    await expect(source().getFootballValue("mth_unknown")).rejects.toMatchObject({
+      kind: "not_found",
+    });
+  });
+});
+
 describe("value catalogue filters", () => {
   it("honours league_id and date on GET /value, the parameters the contract actually has", async () => {
     const tennis = await source().getValue({ league_id: "lg_grand_court" });

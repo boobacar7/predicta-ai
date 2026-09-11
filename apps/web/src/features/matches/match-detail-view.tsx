@@ -6,6 +6,9 @@ import { MatchTimeline } from "@/components/domain/match-timeline";
 import { OddsDisplay } from "@/components/domain/odds-display";
 import { PageHeader } from "@/components/domain/page-header";
 import { ProbabilityBar } from "@/components/domain/probability-bar";
+import { FootballPredictionPanel } from "@/components/domain/football-prediction-panel";
+import { FootballValuePanel } from "@/components/domain/football-value-panel";
+import { PrototypeNotice } from "@/components/domain/prototype-notice";
 import { QueryBoundary } from "@/components/domain/query-boundary";
 import { TeamComparison } from "@/components/domain/team-comparison";
 import { TeamLogo } from "@/components/domain/team-logo";
@@ -14,11 +17,12 @@ import { ValueBadge } from "@/components/domain/value-badge";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { CardSkeleton } from "@/components/ui/skeleton";
+import { isCataloguePrototypeModel } from "@/lib/football/catalogue";
 import { formatAbsolute, formatKickoff } from "@/lib/format/dates";
 import { formatKickoffOrUnknown, formatMatchup } from "@/lib/format/identity";
 import { matchStatusLabels, sportLabels } from "@/lib/format/labels";
 import { formatPoints, formatScore } from "@/lib/format/numbers";
-import { useMatch } from "@/lib/query/hooks";
+import { useFootballPrediction, useFootballValue, useMatch } from "@/lib/query/hooks";
 import type { HistoricalMatchIdentity, MatchDetail } from "@/types/api";
 import { isHistoricalMatchIdentity } from "@/types/api";
 import Link from "next/link";
@@ -80,6 +84,12 @@ function MatchDetailContent({ match }: { match: MatchDetail }) {
             <CardTitle>Probabilités calibrées</CardTitle>
           </CardHeader>
           <CardBody className="space-y-4">
+            {isCataloguePrototypeModel(match.prediction?.model_version) ? (
+              <PrototypeNotice>
+                Cette prédiction catalogue ({match.prediction?.model_version}) n&apos;est pas le
+                moteur GET /football/predictions.
+              </PrototypeNotice>
+            ) : null}
             {match.prediction ? (
               <>
                 <div className="flex flex-wrap gap-2">
@@ -201,6 +211,8 @@ function HistoricalIdentityContent({ identity }: { identity: HistoricalMatchIden
         </CardBody>
       </Card>
 
+      <FootballEngineSections matchId={identity.match_id} />
+
       <Unavailable
         label="Statistiques, cotes, prédiction et chronologie"
         reason="Ce match n'est disponible que sous forme d'identité structurelle archivée ; aucune de ces sections n'est publiée pour cet identifiant."
@@ -234,3 +246,28 @@ function IdentityField({
     </div>
   );
 }
+
+function FootballEngineSections({ matchId }: { matchId: string }) {
+  const prediction = useFootballPrediction(matchId);
+  const value = useFootballValue(matchId);
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <Card>
+        <CardBody>
+          <QueryBoundary query={prediction} skeleton={<CardSkeleton rows={5} />}>
+            {(payload) => <FootballPredictionPanel prediction={payload} />}
+          </QueryBoundary>
+        </CardBody>
+      </Card>
+      <Card>
+        <CardBody>
+          <QueryBoundary query={value} skeleton={<CardSkeleton rows={5} />}>
+            {(payload) => <FootballValuePanel analysis={payload} />}
+          </QueryBoundary>
+        </CardBody>
+      </Card>
+    </div>
+  );
+}
+

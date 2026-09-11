@@ -434,6 +434,27 @@ export type FootballAnalystExplanation = Schemas["FootballAnalystExplanation"];
 export type FootballAiAnalystReport = Schemas["FootballAiAnalystReport"];
 
 /**
+ * Candidate football 1X2 model (`GET /football/predictions/{match_id}`).
+ *
+ * Aliases of the generated OpenAPI schemas. The UI copies these probabilities
+ * and never infers a favorite from them.
+ */
+export type FootballModelPrediction = Schemas["FootballModelPrediction"];
+
+/**
+ * Canonical Value Engine (`GET /football/value/{match_id}`).
+ *
+ * Distinct from the handwritten `ValueOpportunity` used by the legacy
+ * `GET /value` catalogue. The product football surface reads this shape.
+ */
+export type FootballValueAnalysis = Schemas["FootballValueAnalysis"];
+export type FootballValueOdds = Schemas["FootballValueOdds"];
+export type FootballValueMarket = Schemas["FootballValueMarket"];
+export type FootballValueBySelection = Schemas["FootballValueBySelection"];
+export type FootballValueMetadata = Schemas["FootballValueMetadata"];
+export type SelectionValue = Schemas["SelectionValue"];
+
+/**
  * Query parameters of `GET /football/ai-picks`.
  *
  * There is no sport parameter: the engine serves football only, as declared by

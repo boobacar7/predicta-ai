@@ -102,6 +102,29 @@ export function useFootballAiPicks(filters?: AiPicksFilters) {
   });
 }
 
+export function useFootballPrediction(matchId: string, cutoffAt?: string) {
+  const { source, scenario } = useSource();
+
+  return useQuery({
+    queryKey: queryKeys.footballPredictions.detail(scenario, matchId, cutoffAt),
+    queryFn: () => source.getFootballPrediction(matchId, cutoffAt),
+    enabled: Boolean(matchId),
+  });
+}
+
+export function useFootballValue(matchId: string, cutoffAt?: string) {
+  const { source, scenario } = useSource();
+
+  return useQuery({
+    queryKey: queryKeys.footballValue.detail(scenario, matchId, cutoffAt),
+    queryFn: () => source.getFootballValue(matchId, cutoffAt),
+    enabled: Boolean(matchId),
+  });
+}
+
+/**
+ * Legacy `GET /value`. The football Value Finder uses `useFootballValue`.
+ */
 export function useValueOpportunities(filters?: MatchFilters) {
   const { source, scenario } = useSource();
 
