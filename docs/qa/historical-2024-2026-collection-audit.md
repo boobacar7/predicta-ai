@@ -1,72 +1,114 @@
-# Historical 2024–2026 Odds collection — cost / coverage audit
+# Historical Odds collection — finalized STOP
 
-**Decision: STOP**
+**Status: STOPPED**
 
-Stopped because 711 remaining claimed requests are expected to add approximately
-0 additional canonical OOS matches at a cost of 7110 credits.
+The unverified full-historical-2024-2026 collection job is stopped.
 
-Audited at 2026-09-12T15:12Z. Data collection only. No backtest, no ROI, nothing
-deleted, no rollback.
+No collector is running. No replacement job will be started. No additional paid
+Odds API requests will be made from this work. Existing raw payloads, snapshots,
+and ingestion metadata are unchanged.
+
+Audited at 2026-09-12T15:12Z. Stop finalized at 2026-09-12T17:09Z.
 
 Machine-readable copy: `workers/ml/reports/historical-2024-2026-collection-audit.json`.
 
 ---
 
-## Live probe (this environment)
+## Authoritative verified state
 
-There is **no running 2024–2026 collection job** in this Cloud Agent VM.
+Source: `origin/agent/data/final-oos-odds-batch` commit `1cde8f7`
+(`workers/ml/reports/oos-odds-final-batch.json`). These figures are the last
+verified persisted snapshot. They are not live Postgres reads from this VM.
 
-| Check | Result |
-| --- | --- |
-| Collector / ingestion process | none (only mock `uvicorn` + `next dev`) |
-| PostgreSQL `:5432` | closed |
-| Docker Compose Postgres | not running |
-| `THE_ODDS_API_KEY` | absent — live `x-requests-*` headers cannot be read |
-| `workers/ingestion/var` raw store | absent |
-| Accessible cloud agents running a collector | 0 |
-| 1348-request planner on `main` | absent (collector lives on unmerged data branches) |
+| Item | Verified value |
+| --- | ---: |
+| Canonical matches | **7622** |
+| Live odds snapshots | **43280** |
+| Raw payloads | **203** |
+| Valid pre-kickoff 1X2 OOS matches | **181 / 387 = 46.77%** |
+| Last paid historical requests | **10** |
+| Credits consumed by that paid batch (`sum(x-requests-last)`) | **100** |
+| New canonical OOS matches from those 10 paid requests | **0** |
+| Reused requests (free replay of existing keys) | **77** |
+| Unmatched Odds API names (quarantined) | **3738** |
+| Champions League qualification slots that cannot be mapped | **15** |
+| Last verified `x-requests-remaining` | **17010** |
 
-The numbers `637 / 1348`, `436` new requests, `~19 s/request`, `~4.8 h remaining`,
-`637` raw keys, and `~1114` PIT records were supplied in the audit prompt. They
-are **not** present in any process, database, raw store, or git artefact reachable
-from this environment. They are treated as unverified claims.
+OOS universe is dataset 0.3, `2026-07-01T00:00:00Z` inclusive through
+`2026-09-10T02:30:01Z` exclusive. Coverage counts canonical matches with a valid
+pre-kickoff 1X2 snapshot. It does not count raw events or snapshot rows as
+matches.
 
-This environment cannot stop a collector on another machine. It also must not
-start a new 1348-request historical spend.
+| Competition | Target matches | Matches with valid PIT odds | Coverage % |
+| --- | ---: | ---: | ---: |
+| Premier League | 30 | 30 | 100.00 |
+| Ligue 1 | 27 | 24 | 88.89 |
+| La Liga | 41 | 12 | 29.27 |
+| Bundesliga | 18 | 7 | 38.89 |
+| Serie A | 30 | 22 | 73.33 |
+| Champions League | 102 | 6 | 5.88 |
+| MLS | 139 | 80 | 57.55 |
+| **Total (OOS window)** | **387** | **181** | **46.77** |
+
+Year-split coverage for 2024, 2025, and full-year 2026 is **unavailable**.
+Those figures are not inferred.
 
 ---
 
-## 1. Credit audit
+## Discarded unverified claims
 
-Live Odds API quota in this VM:
+The following are **not** facts. Do not use them for planning, credits, or
+coverage:
 
-| Field | Value |
+- 637 / 1348 planned requests
+- 436 new requests executed
+- ~1114 PIT records
+- ~4.8 hours remaining
+- ~19 seconds/request
+- 711 remaining requests
+- 7110 remaining credits
+- any hypothetical credit remaining derived from those numbers
+
+---
+
+## Live probe at stop
+
+| Check | Result |
 | --- | --- |
-| `credits_before` | **unavailable** |
-| `credits_consumed` | **unavailable** |
-| `credits_remaining` | **unavailable** |
-| `estimated_remaining_cost` | **unavailable** |
-| `estimated_final_cost` | **unavailable** |
+| Collector / ingestion process | none |
+| PostgreSQL `:5432` | closed |
+| `THE_ODDS_API_KEY` | absent — no live quota probe, no paid calls |
+| Raw store `workers/ingestion/var` | absent on this VM |
+| Paid Odds API requests this stop | **0** |
+| Data deleted / rolled back / rewritten | **none** |
+| Backtest / ROI | **not run** |
 
-Reason: no API key, so `GET /v4/sports` (documented 0 credits) cannot be used to
-read `x-requests-remaining` / `x-requests-used` / `x-requests-last`.
+This VM never had the unverified 2024–2026 job. It also must not start one.
 
-### Last verified headers (actual Odds API metadata)
+---
 
-Source: `persist.fetches[].quota` in
-`workers/ml/reports/oos-odds-final-batch.json` on
-`origin/agent/data/final-oos-odds-batch` (`1cde8f7`, 2026-09-12 11:38:38 +0200).
+## Why remaining paid collection is stopped
 
-Probe remaining came from `GET /v4/sports`. Each historical call billed
-`x-requests-last = 10`.
+The last verified paid batch consumed 100 credits and added 0 new canonical OOS
+matches. The +67 MLS OOS matches in that report came from 0-credit replay of
+already-stored raw payloads (`77` reused request keys).
 
-| Field | Value |
-| --- | --- |
-| `credits_before` | **17110** (`x-requests-remaining` after sports catalog probe) |
-| `credits_consumed` | **100** (`sum(x-requests-last)` over 10 historical requests) |
-| `credits_remaining` | **17010** (last historical response) |
-| `estimated_remaining_cost` | **0** (that job completed) |
-| `estimated_final_cost` | **100** |
+Further paid historical requests are blocked by identity and catalog limits, not
+by missing timestamps:
+
+- 15 planned Champions League qualification slots cannot map because
+  `soccer_uefa_champs_league_qualification` is absent from The Odds API catalog.
+- 3738 unmatched Odds API names remain quarantined. Names are not guessed.
+- Premier League, Ligue 1, La Liga, Bundesliga, Serie A, and Champions League
+  coverage did not move after the last 10 paid MLS historical calls.
+
+---
+
+## Last verified Odds API headers
+
+From `persist.fetches[].quota` on the same `1cde8f7` report. Each historical
+call billed `x-requests-last = 10`. Probe remaining was 17110; last historical
+remaining was 17010; `x-requests-used` moved 2900 → 2990.
 
 | `as_of` | sport | `x-requests-last` | `x-requests-used` | `x-requests-remaining` |
 | --- | --- | ---: | ---: | ---: |
@@ -81,160 +123,34 @@ Probe remaining came from `GET /v4/sports`. Each historical call billed
 | 2026-09-06T00:30:00Z | `soccer_usa_mls` | 10 | 2980 | 17020 |
 | 2026-09-10T00:00:00Z | `soccer_usa_mls` | 10 | 2990 | 17010 |
 
-Documented historical cost remains **10 credits / request**.
-
-### If the unverified 1348-request job were real
-
-This row is **not** measured. It only applies 10 credits per claimed new request
-to the last verified remaining balance.
-
-| Field | Hypothetical |
-| --- | ---: |
-| `credits_before` | 17010 |
-| `credits_consumed` | 4360 (436 × 10) |
-| `credits_remaining` | 12650 |
-| `estimated_remaining_cost` | 7110 (711 × 10) |
-| `estimated_final_cost` | 11470 |
-
-Do not treat this block as Odds API metadata.
+Live remaining credits in this VM are unavailable (no API key). The last
+verified remaining value is **17010**. It is not updated by this stop.
 
 ---
 
-## 2. Coverage audit
+## Preserved
 
-Live PostgreSQL coverage by year **cannot be computed**. Port 5432 is closed.
-Inventing 2024 / 2025 / 2026 percentages would violate data integrity rules.
-
-Coverage below is the last verified SQL snapshot. It counts **canonical matches
-with a valid pre-kickoff 1X2 snapshot**. It does not count raw events as matches
-and does not count snapshot rows as matches.
-
-Universe: dataset 0.3 true OOS window only
-(`2026-07-01T00:00:00Z` inclusive → `2026-09-10T02:30:01Z` exclusive).
-**387** target matches.
-
-| Competition | Target matches | Matches with valid PIT odds | Coverage % |
-| --- | ---: | ---: | ---: |
-| Premier League | 30 | 30 | 100.00 |
-| Ligue 1 | 27 | 24 | 88.89 |
-| La Liga | 41 | 12 | 29.27 |
-| Bundesliga | 18 | 7 | 38.89 |
-| Serie A | 30 | 22 | 73.33 |
-| Champions League | 102 | 6 | 5.88 |
-| MLS | 139 | 80 | 57.55 |
-| **Total (OOS window)** | **387** | **181** | **46.77** |
-
-| Year | Target matches | Matches with valid PIT odds | Coverage % |
-| --- | --- | --- | --- |
-| 2024 | unavailable | unavailable | unavailable |
-| 2025 | unavailable | unavailable | unavailable |
-| 2026 (OOS window only) | 387 | 181 | 46.77 |
-| 2026 outside OOS / full calendar | unavailable | unavailable | unavailable |
-
-SQL inventory at that snapshot (not match coverage):
-
-- canonical matches: 7622
-- live odds snapshots: 43280
-- odds raw payloads: 203
-- mock snapshots: 0
-
-User-claimed PIT coverage `~1114 records` is **not verified**. 43280 is a
-snapshot count, not a match count. Valid PIT match coverage is **181 / 387** in
-the OOS window.
-
-Ligue 1 includes 3 isolated Paris FC matches that must not be aliased.
-
----
-
-## 3. Marginal value of remaining requests
-
-Last completed paid job (`expand-oos-final-odds-batch`):
-
-| Item | Count |
-| --- | ---: |
-| Planned requests | 25 |
-| Executed (paid) | 10 |
-| Skipped (wrong sport key) | 15 |
-| Reused existing request keys | 77 |
-| Credits consumed | 100 |
-| New canonical OOS matches from those 10 paid requests | **0** |
-| New canonical OOS matches from 0-credit MLS raw replay | **67** |
-| New fetch events | 141 |
-| Exact identity matches | 80 |
-| Unmatched (fetch events + replay quarantines) | 3738 |
-| False matches | 0 |
-
-Premier League, Ligue 1, La Liga, Bundesliga, Serie A, and Champions League
-coverage **did not move** after the 10 paid MLS historical calls. All +67 OOS
-matches were MLS franchise-alias replay of payloads already stored.
-
-Remaining paid work is blocked by identity / catalog, not by missing timestamps:
-
-- Champions League qualifying clubs (Lincoln Red Imps, Inter Club d'Escaldes,
-  The New Saints, Sabah, …) have no Odds API sport key
-  (`soccer_uefa_champs_league_qualification` absent from `/v4/sports`).
-- La Liga, Bundesliga, remaining MLS suffixes, and CL group-stage names stay
-  quarantined. Names are not guessed.
-- Target matches that already have a valid pre-kickoff 1X2 snapshot are skipped
-  by the persist planner; refetching those days does not add canonical matches.
-
-Taking the unverified 1348-request claim at face value:
-
-| Item | Value |
-| --- | ---: |
-| Requests remaining | 711 |
-| Requests already in the 637 (reused vs new) | 201 reused / 436 new |
-| Expected new canonical OOS matches | **~0** if remaining slots resemble the last paid batch |
-| Expected final OOS coverage if stopped now | **181 / 387 (46.77%)** |
-| Marginal canonical OOS matches per 100 credits (last paid batch) | **0** |
-
-Further historical requests would still increase **raw snapshots**. That is not
-the optimisation target. The target is additional valid canonical matches with
-PIT odds.
-
----
-
-## 4. Stop condition
-
-Remaining requests have poor expected marginal value.
-
-- No live job exists here to continue.
-- The last 100 paid credits added 0 canonical OOS matches.
-- 15 planned CL-qualification slots cannot map to Sportmonks via The Odds API.
-- Completing 711 claimed remaining requests would cost **7110 credits**.
-
-Do not continue blindly. Do not start a replacement 1348-request spend from this
-VM.
-
----
-
-## 5. What was preserved
-
-- No raw payloads deleted
-- No snapshots deleted
-- No ingestion metadata deleted
+- All persisted raw payloads kept
+- All persisted snapshots kept
+- Ingestion metadata kept
+- Idempotence preserved
 - No rollback
-- Idempotence unchanged
-- `production-oos-backtest` not run
-- `final-oos-evaluation` not run
-- ROI not calculated
+- No mutation of existing raw payloads or snapshots
 
 ---
 
-## 6. Decision
+## Next step (separate decision)
 
-**B. STOP**
+Do not continue historical collection from this stop.
 
-Stopped because 711 remaining claimed requests are expected to add approximately
-0 additional canonical OOS matches at a cost of 7110 credits.
+The next step is a **separate** decision about the walk-forward dataset and
+backtest, based **only** on verified persisted data:
 
-Resume only after:
+- 7622 canonical matches
+- 43280 live odds snapshots
+- 203 raw payloads
+- 181/387 valid pre-kickoff 1X2 OOS matches
 
-1. The collector VM (with Postgres + Odds API key) is identified, **or**
-2. Identity matching is fixed for unmatched Odds API names / CL qualification,
-   **and**
-3. A remaining-slot plan shows expected new canonical matches, not raw snapshot
-   growth.
-
-Until then, keep the persisted OOS snapshots (181/387) and the last verified
-quota remaining of **17010**.
+That decision is out of scope for this stop. Do not run
+`production-oos-backtest` or `final-oos-evaluation` until that separate
+decision is made.
