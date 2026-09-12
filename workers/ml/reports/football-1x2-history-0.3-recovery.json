@@ -1,0 +1,233 @@
+{
+  "kind": "football-1x2-history-0.3-recovery",
+  "status": "NOT_FOUND",
+  "dataset_version": "football-1x2-history-0.3",
+  "expected_path": "workers/ingestion/var/football-1x2-history.parquet",
+  "expected_sha256": "0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5",
+  "expected_sha256_modified": false,
+  "recovered": false,
+  "exact_sha_match": false,
+  "copied_to_expected_var": false,
+  "parquet_open_verified": false,
+  "dataset_regenerated": false,
+  "sportmonks_rebuild": false,
+  "odds_api_requests": 0,
+  "backtest_run": false,
+  "model_retrained": false,
+  "protocol_modified": false,
+  "availability_from_this_environment": "PERMANENTLY_UNAVAILABLE",
+  "availability_note": "The original parquet was gitignored, never committed, and is absent from every locally accessible store on this Cloud Agent VM. It may still exist on the developer machine recorded in provenance.",
+  "original_source_hint": "/Users/boubacar/Development/predicta-ai/workers/ingestion/var/football-1x2-history.parquet",
+  "searched_at_start": "2026-09-12T18:14:06Z",
+  "searched_at_end": "2026-09-12T18:15:19Z",
+  "vm": {
+    "workspace": "/workspace",
+    "branch": "cursor/football-1x2-history-0.3-recovery-b277",
+    "boot_build_id": "bld-20260912-f1589764-8043-4433-9d6b-e5a17fabddbb",
+    "cloud_agent_bc_id": "bc-1accccec-d584-43ed-9976-827cb657b277"
+  },
+  "locations_searched": [
+    {
+      "id": "git_objects",
+      "paths": ["/workspace/.git", "/tmp/predicta-ml/.git"],
+      "result": "no parquet-named blobs; 212 blobs >=10KiB hashed per worktree git dir; 0 SHA matches; fsck dangling empty; lost-found absent"
+    },
+    {
+      "id": "git_worktrees",
+      "paths": ["/workspace", "/tmp/predicta-ml"],
+      "result": "var/ missing in both; no joblib artefacts"
+    },
+    {
+      "id": "local_branches_reflogs",
+      "paths": ["/workspace/.git/logs", "/workspace/.git/refs"],
+      "result": "SHA present only in docs/JSON; stash empty; no parquet in any ls-tree"
+    },
+    {
+      "id": "cursor_worktrees",
+      "paths": ["/tmp/cursor/worktrees", "/cursor/stores", "/opt/cursor/artifacts"],
+      "result": "no extra worktrees; artifacts are this run's reports/logs only"
+    },
+    {
+      "id": "workspace_root",
+      "paths": ["/workspace"],
+      "result": "expected var path missing; filename search found recovery docs only"
+    },
+    {
+      "id": "tmp",
+      "paths": ["/tmp", "/tmp/predicta-ml", "/tmp/pytest-of-ubuntu", "/tmp/cursor"],
+      "result": "pytest fixture parquet copies only; no labeled 0.3 file"
+    },
+    {
+      "id": "mnt_data",
+      "paths": ["/mnt/data", "/mnt"],
+      "result": "/mnt/data does not exist; /mnt empty"
+    },
+    {
+      "id": "home_directories",
+      "paths": ["/home/ubuntu", "/root", "/Users/boubacar/Development/predicta-ai"],
+      "result": "no football-1x2-history data files; macOS provenance path not present"
+    },
+    {
+      "id": "docker",
+      "paths": ["/var/lib/docker", "/var/lib/containerd"],
+      "result": "docker/podman not installed; volume dirs absent; postgres :5432 closed"
+    },
+    {
+      "id": "caches_artifact_stores",
+      "paths": ["/home/ubuntu/.cache", "/var/cache", "/var/tmp", "/workspace/.venv", "/workspace/apps/api/.venv", "/workspace/workers/ingestion/.venv"],
+      "result": "no labeled dataset; huggingface/torch caches absent"
+    },
+    {
+      "id": "git_lfs",
+      "paths": ["/workspace/.git/lfs/objects"],
+      "result": "LFS installed but unused; objects dir empty; ls-files empty"
+    },
+    {
+      "id": "ci_github_artifacts",
+      "paths": ["GitHub Actions artifacts", "GitHub Releases", "GitHub Actions runs"],
+      "result": "artifacts total_count=0; releases=[]; workflow runs total_count=0; contents API 404 for workers/ingestion/var"
+    },
+    {
+      "id": "ml_ingestion_artifact_dirs",
+      "paths": [
+        "/workspace/workers/ingestion/var",
+        "/workspace/workers/ml/var",
+        "/tmp/predicta-ml/workers/ingestion/var",
+        "/tmp/predicta-ml/workers/ml/var",
+        "/tmp/predicta-ml/workers/ml/reports"
+      ],
+      "result": "var dirs missing; reports contain SHA string in JSON only"
+    },
+    {
+      "id": "other_roots",
+      "paths": ["/opt", "/cursor", "/var"],
+      "result": "no data parquet; PAR1 magic scan of files >=50KiB excluding venv/node/.git: NONE"
+    }
+  ],
+  "expected_var_paths_checked": [
+    {
+      "path": "/workspace/workers/ingestion/var/football-1x2-history.parquet",
+      "exists": false
+    },
+    {
+      "path": "/tmp/predicta-ml/workers/ingestion/var/football-1x2-history.parquet",
+      "exists": false
+    },
+    {
+      "path": "/workspace/workers/ml/var/football-1x2-history.parquet",
+      "exists": false
+    },
+    {
+      "path": "/tmp/predicta-ml/workers/ml/var/football-1x2-history.parquet",
+      "exists": false
+    },
+    {
+      "path": "/Users/boubacar/Development/predicta-ai/workers/ingestion/var/football-1x2-history.parquet",
+      "exists": false
+    }
+  ],
+  "candidates_hashed": [
+    {
+      "path": "/tmp/pytest-of-ubuntu/pytest-2/test_future_odds_do_not_change0/cover.parquet",
+      "bytes": 40051,
+      "sha256": "6c99e01a6611b97b3c908cb9ad59247cc3d7f995f8720b7db8438b4074e6ee6c",
+      "match": false
+    },
+    {
+      "path": "/tmp/pytest-of-ubuntu/pytest-2/test_identity_ambiguity_duplic0/cover.parquet",
+      "bytes": 40051,
+      "sha256": "6c99e01a6611b97b3c908cb9ad59247cc3d7f995f8720b7db8438b4074e6ee6c",
+      "match": false
+    },
+    {
+      "path": "/tmp/pytest-of-ubuntu/pytest-2/test_invalid_oos_window_on_dat0/cover.parquet",
+      "bytes": 40051,
+      "sha256": "6c99e01a6611b97b3c908cb9ad59247cc3d7f995f8720b7db8438b4074e6ee6c",
+      "match": false
+    },
+    {
+      "path": "/tmp/pytest-of-ubuntu/pytest-2/test_outcome_cannot_be_read_be0/cover.parquet",
+      "bytes": 40051,
+      "sha256": "6c99e01a6611b97b3c908cb9ad59247cc3d7f995f8720b7db8438b4074e6ee6c",
+      "match": false
+    },
+    {
+      "path": "/tmp/pytest-of-ubuntu/pytest-2/test_post_cutoff_feature_event0/cover.parquet",
+      "bytes": 40051,
+      "sha256": "6c99e01a6611b97b3c908cb9ad59247cc3d7f995f8720b7db8438b4074e6ee6c",
+      "match": false
+    },
+    {
+      "path": "/tmp/pytest-of-ubuntu/pytest-2/test_prediction_cutoff_after_k0/cover.parquet",
+      "bytes": 40051,
+      "sha256": "6c99e01a6611b97b3c908cb9ad59247cc3d7f995f8720b7db8438b4074e6ee6c",
+      "match": false
+    },
+    {
+      "path": "/tmp/pytest-of-ubuntu/pytest-2/test_same_match_same_cutoff_sa0/cover.parquet",
+      "bytes": 40051,
+      "sha256": "6c99e01a6611b97b3c908cb9ad59247cc3d7f995f8720b7db8438b4074e6ee6c",
+      "match": false
+    },
+    {
+      "path": "/tmp/pytest-of-ubuntu/pytest-2/test_valid_oos_window_runs_and0/cover.parquet",
+      "bytes": 40051,
+      "sha256": "6c99e01a6611b97b3c908cb9ad59247cc3d7f995f8720b7db8438b4074e6ee6c",
+      "match": false
+    },
+    {
+      "path": "/tmp/pytest-of-ubuntu/pytest-4/test_prematch_store_rejects_la0/labeled.parquet",
+      "bytes": 3056,
+      "sha256": "bb8ca2beb9f790cef567ffa97c66c9d3d87831dc0ea344de2f6f47fcd74148f0",
+      "match": false
+    },
+    {
+      "path": "/tmp/pytest-of-ubuntu/pytest-4/test_prematch_store_rejects_po0/prematch.parquet",
+      "bytes": 3783,
+      "sha256": "29761b9bace189b4b2af67a9f6220e68820b41b8d874dfc1abd75bfea1f8aa5f",
+      "match": false
+    },
+    {
+      "path": "/workspace/apps/api/.venv/lib/python3.12/site-packages/pyarrow/tests/data/parquet/v0.7.1.all-named-index.parquet",
+      "bytes": 3948,
+      "sha256": "60f1945edc3e4ec38f6e234389e647a1b369de8afb9c7840c491a39880c0caa1",
+      "match": false
+    },
+    {
+      "path": "/workspace/apps/api/.venv/lib/python3.12/site-packages/pyarrow/tests/data/parquet/v0.7.1.column-metadata-handling.parquet",
+      "bytes": 2012,
+      "sha256": "eec79b660a5f75c3f7ed092c4f71610cbeaf380f6047a1816aae3834256d398c",
+      "match": false
+    },
+    {
+      "path": "/workspace/apps/api/.venv/lib/python3.12/site-packages/pyarrow/tests/data/parquet/v0.7.1.parquet",
+      "bytes": 4372,
+      "sha256": "be6773848ce905b99192adc68f0c3b2aabab7d214db50b92a52203790566ab2b",
+      "match": false
+    },
+    {
+      "path": "/workspace/apps/api/.venv/lib/python3.12/site-packages/pyarrow/tests/data/parquet/v0.7.1.some-named-index.parquet",
+      "bytes": 4008,
+      "sha256": "5468128ea8a1091b5d07195471f3f9b3705247b69440aba45be6c68092dffc76",
+      "match": false
+    }
+  ],
+  "git_blobs_hashed_ge_10kib": {
+    "workspace": 212,
+    "predicta_ml_worktree": 212,
+    "exact_matches": 0
+  },
+  "par1_magic_files_ge_50kib_excluding_venv_node_git": [],
+  "exact_matches": [],
+  "forbidden_actions_not_taken": [
+    "regenerate_dataset",
+    "rebuild_from_sportmonks",
+    "download_odds_api",
+    "modify_expected_sha",
+    "substitute_another_parquet",
+    "run_backtest",
+    "retrain_model",
+    "modify_frozen_walk_forward_protocol"
+  ],
+  "required_unblock": "Restore the original workers/ingestion/var/football-1x2-history.parquet whose SHA-256 is exactly 0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5, then re-run Evaluation A only."
+}
