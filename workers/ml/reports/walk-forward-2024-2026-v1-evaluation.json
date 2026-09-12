@@ -1,0 +1,114 @@
+{
+  "kind": "walk-forward-2024-2026-v1-evaluation-a",
+  "protocol_id": "walk-forward-2024-2026-v1",
+  "evaluation": "A",
+  "status": "BLOCKED",
+  "blocked_reason": "Pinned football-1x2-history-0.3 parquet is absent from this VM and cannot be restored from git, Git LFS, GitHub Releases, Docker volumes, or live PostgreSQL. Protocol forbids substituting another dataset.",
+  "predictions_run": false,
+  "value_engine_run": false,
+  "ai_picks_run": false,
+  "odds_api_requests": 0,
+  "historical_odds_used": false,
+  "roi_computed": false,
+  "ev_computed": false,
+  "hyperparameters_modified": false,
+  "candidate_used_to_score_2024_2025_oos": false,
+  "model_promoted": false,
+  "promoted_to_production": false,
+  "dataset": {
+    "required_version": "football-1x2-history-0.3",
+    "required_path": "workers/ingestion/var/football-1x2-history.parquet",
+    "required_sha256": "0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5",
+    "loaded": false,
+    "verified": false,
+    "status": "UNAVAILABLE"
+  },
+  "restore_attempt": {
+    "paths_checked": [
+      "/workspace/workers/ingestion/var/football-1x2-history.parquet",
+      "/tmp/predicta-ml/workers/ingestion/var/football-1x2-history.parquet",
+      "/workspace/workers/ml/var/football-1x2-history.parquet"
+    ],
+    "git_objects": false,
+    "git_lfs": false,
+    "github_releases": false,
+    "docker_volumes": false,
+    "live_postgres": false,
+    "non_pytest_parquet_on_vm": "NONE",
+    "gitignore_note": "var/ is gitignored on the ML lineage; the parquet was never committed."
+  },
+  "intended_windows_not_executed": [
+    {
+      "id": "WF-1",
+      "train": {"start": "2024-02-22T00:00:00+00:00", "end_exclusive": "2025-01-01T00:00:00+00:00", "n": 1538},
+      "calibration": {"rule": "trailing TRAIN n_calib>=200 and n_train_fit>=1000", "n": "UNAVAILABLE FROM CURRENT PERSISTED STATE"},
+      "oos": {"start": "2025-01-01T00:00:00+00:00", "end_exclusive": "2025-07-01T00:00:00+00:00", "n": 1305}
+    },
+    {
+      "id": "WF-2",
+      "train_fit": {"start": "2024-02-22T00:00:00+00:00", "end_exclusive": "2025-01-01T00:00:00+00:00", "n": 1538},
+      "calibration": {"start": "2025-01-01T00:00:00+00:00", "end_exclusive": "2025-07-01T00:00:00+00:00", "n": 1305},
+      "oos": {"start": "2025-07-01T00:00:00+00:00", "end_exclusive": "2026-01-01T00:00:00+00:00", "n": 1251}
+    },
+    {
+      "id": "WF-3",
+      "train_fit": {"start": "2024-02-22T00:00:00+00:00", "end_exclusive": "2026-01-01T00:00:00+00:00", "n": 4094},
+      "calibration": {"start": "2026-01-01T00:00:00+00:00", "end_exclusive": "2026-07-01T00:00:00+00:00", "n": 1248},
+      "oos": {"start": "2026-07-01T00:00:00+00:00", "end_exclusive": "2026-09-10T02:30:01+00:00", "n": 387}
+    }
+  ],
+  "intended_oos_prediction_count_if_parquet_present": 2943,
+  "metrics": {
+    "n_predictions": "NOT RUN",
+    "date_range": "NOT COMPUTED",
+    "log_loss": "NOT COMPUTED",
+    "brier": "NOT COMPUTED",
+    "accuracy": "NOT COMPUTED",
+    "ece": "NOT COMPUTED",
+    "class_level_calibration": "NOT COMPUTED",
+    "predicted_home_draw_away": "NOT COMPUTED",
+    "actual_home_draw_away": "NOT COMPUTED",
+    "by_step": "NOT COMPUTED",
+    "by_competition": "NOT COMPUTED"
+  },
+  "leakage": {
+    "status": "NOT RUN",
+    "note": "Parquet was not loaded; no OOS scores were produced."
+  },
+  "reproducibility": {
+    "status": "BLOCKED",
+    "protocol_id": "walk-forward-2024-2026-v1",
+    "dataset_sha256_required": "0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5",
+    "dataset_sha256_verified": null,
+    "feature_schema_version": "football-1x2-features-0.3",
+    "implementation_audit_sha": "1cde8f701e2fcdfd85f9574983b76abd810003cc",
+    "walk_forward_artefacts_created": [],
+    "candidate_loaded": false,
+    "calibration_versions_fit": [],
+    "random_seed": 42,
+    "odds_fingerprint": null
+  },
+  "frozen_hyperparameters_unused": {
+    "elo_initial": 1500.0,
+    "k": 20.0,
+    "home_advantage": 80.0,
+    "scale": 400.0,
+    "calibration_method": "sigmoid"
+  },
+  "status_block": {
+    "STATUS": "BLOCKED",
+    "DATASET": "UNAVAILABLE",
+    "PREDICTIONS": "NOT RUN",
+    "LOGLOSS": "NOT COMPUTED",
+    "BRIER": "NOT COMPUTED",
+    "ACCURACY": "NOT COMPUTED",
+    "ECE": "NOT COMPUTED",
+    "LEAKAGE": "NOT RUN",
+    "REPRODUCIBILITY": "BLOCKED",
+    "BACKTEST TYPE": "Evaluation A only (not executed)",
+    "ODDS API REQUESTS": 0,
+    "VALUE/AI PICKS": "NOT RUN",
+    "MODEL PROMOTION": "NOT PROMOTED"
+  },
+  "required_unblock": "Place workers/ingestion/var/football-1x2-history.parquet with SHA-256 0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5 on the evaluation host, then re-run Evaluation A only."
+}
