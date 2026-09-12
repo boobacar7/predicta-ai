@@ -87,7 +87,7 @@ class TheOddsApiProvider:
         return envelopes
 
     def _fetch_league(self, request: ProviderRequest, league: V1FootballLeague) -> RawEnvelope:
-        sport_key = V1_LEAGUE_SPORT_KEYS.get(league.slug)
+        sport_key = request.sport_key or V1_LEAGUE_SPORT_KEYS.get(league.slug)
         if sport_key is None:
             raise ValidationError("unknown_league", f"No The Odds API sport key is mapped for '{league.slug}'.")
         query: dict[str, str] = {
@@ -168,10 +168,22 @@ class TheOddsApiProvider:
 
     def quota_headers(self) -> dict[str, str]:
         """GET /v4/sports. Documented as 0 credits; used only to read quota headers."""
+        _sports, headers = self.sports_catalog()
+        return headers
+
+    def sports_catalog(self) -> tuple[list[dict[str, Any]], dict[str, str]]:
+        """GET /v4/sports. Documented as 0 credits."""
         self._require_live()
         url = f"{self._base_url}/v4/sports?{urlencode({'apiKey': self._token})}"
         response = self._client.get(url)
-        return dict(response.headers)
+        payload = _parse_json(response.body, self.name)
+        if not isinstance(payload, list):
+            raise ProviderUnavailable(self.name, "Sports catalog must be a JSON array.")
+        sports: list[dict[str, Any]] = []
+        for item in payload:
+            if isinstance(item, dict):
+                sports.append(item)
+        return sports, dict(response.headers)
 
     def _require_live(self) -> None:
         if not self._enable_live:

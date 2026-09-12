@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from predicta_ingestion.canonical.enums import DataMode, EntityType, ResolutionMethod, SportCode
 from predicta_ingestion.canonical.models import CanonicalBatch, League, Provenance, Sport, Team
 from predicta_ingestion.clock import Clock
@@ -182,6 +184,16 @@ def test_franchise_key_is_exact_slug_alias_not_fuzzy() -> None:
     unknown, aliased_unknown = franchise_key("mls", "Imaginary United")
     assert unknown == "imaginary-united"
     assert aliased_unknown is False
+
+
+def test_mls_franchise_natural_keys_cover_existing_suffix_aliases() -> None:
+    from predicta_ingestion.identity.historical import mls_franchise_natural_keys
+
+    kickoff = datetime(2026, 7, 17, 2, 30, tzinfo=UTC)
+    keys = mls_franchise_natural_keys("Seattle Sounders", "Portland Timbers", kickoff)
+    assert "football|seattle-sounders-fc|portland-timbers|2026-07-17T02:30:00+00:00" in keys
+    unknown = mls_franchise_natural_keys("Toronto", "Charlotte", kickoff)
+    assert unknown == ()
 
 
 def test_identity_diagnostic_does_not_embed_tokens(clock: Clock) -> None:

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime
+
+from predicta_ingestion.canonical.enums import SportCode
 from predicta_ingestion.ids import slugify
 
 MLS_SLUG = "mls"
@@ -81,3 +84,29 @@ def provider_franchise_key(competition_slug: str, provider_team_id: str) -> str 
     if competition_slug != MLS_SLUG:
         return None
     return MLS_PROVIDER_ID_ALIASES.get(provider_team_id)
+
+
+def mls_slugs_for_name(name: str) -> tuple[str, ...]:
+    """Exact MLS franchise slug set. Unknown names keep their own slug only."""
+    slug = slugify(name)
+    franchise, _aliased = franchise_key(MLS_SLUG, name)
+    slugs = {slug, franchise}
+    for alias_slug, canonical in MLS_NAME_ALIASES.items():
+        if canonical == franchise:
+            slugs.add(alias_slug)
+    return tuple(sorted(slugs))
+
+
+def mls_franchise_natural_keys(home_name: str, away_name: str, kickoff: datetime) -> tuple[str, ...]:
+    """Extra football|home|away|kickoff keys from the existing MLS franchise table."""
+    original = f"{SportCode.FOOTBALL.value}|{slugify(home_name)}|{slugify(away_name)}|{kickoff.isoformat()}"
+    keys: list[str] = []
+    seen = {original}
+    for home_slug in mls_slugs_for_name(home_name):
+        for away_slug in mls_slugs_for_name(away_name):
+            key = f"{SportCode.FOOTBALL.value}|{home_slug}|{away_slug}|{kickoff.isoformat()}"
+            if key in seen:
+                continue
+            seen.add(key)
+            keys.append(key)
+    return tuple(keys)

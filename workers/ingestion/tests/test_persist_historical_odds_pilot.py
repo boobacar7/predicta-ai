@@ -351,3 +351,50 @@ def test_reproducible_reconstruction(
     store_a = PointInTimeStore(first_pipeline._sink.memory)
     store_b = PointInTimeStore(second_pipeline._sink.memory)
     assert store_a.odds_as_of(HELIX_ID, HELIX_KICKOFF).id == store_b.odds_as_of(HELIX_ID, HELIX_KICKOFF).id
+
+
+def test_target_sink_skips_post_kickoff_snapshots() -> None:
+    from decimal import Decimal
+
+    from predicta_ingestion.canonical.models import CanonicalBatch, OddsSelection, OddsSnapshot
+
+    memory = MemoryCanonicalSink()
+    sink = TargetMatchOddsSink(
+        TeeCanonicalSink(memory, None),
+        frozenset({HELIX_ID}),
+        kickoffs={HELIX_ID: HELIX_KICKOFF},
+    )
+    post = OddsSnapshot(
+        id="odd_post_kickoff",
+        match_id=HELIX_ID,
+        market="1X2",
+        bookmaker="pinnacle",
+        selections=[
+            OddsSelection(selection="HOME", label="Helix FC", decimal_odds=Decimal("1.80")),
+            OddsSelection(selection="DRAW", label="Draw", decimal_odds=Decimal("3.50")),
+            OddsSelection(selection="AWAY", label="Meridian Athletic", decimal_odds=Decimal("4.20")),
+        ],
+        provenance=Provenance(
+            provider="the_odds_api",
+            provider_id="post",
+            collected_at=HELIX_KICKOFF + timedelta(minutes=5),
+            available_at=HELIX_KICKOFF + timedelta(minutes=5),
+            source="the-odds-api-v4",
+            data_mode=DataMode.LIVE,
+        ),
+    )
+    pre = post.model_copy(
+        update={
+            "id": "odd_pre_kickoff",
+            "provenance": post.provenance.model_copy(
+                update={
+                    "available_at": HELIX_KICKOFF - timedelta(minutes=5),
+                    "collected_at": HELIX_KICKOFF - timedelta(minutes=5),
+                }
+            ),
+        }
+    )
+    sink.persist(CanonicalBatch(odds=[pre, post]))
+    assert "odd_pre_kickoff" in memory.odds
+    assert "odd_post_kickoff" not in memory.odds
+    assert sink.skipped_post_kickoff == ["odd_post_kickoff"]

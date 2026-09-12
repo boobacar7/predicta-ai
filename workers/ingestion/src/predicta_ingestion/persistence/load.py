@@ -11,10 +11,12 @@ from predicta_ingestion.canonical.enums import DataMode, EntityType, Freshness, 
 from predicta_ingestion.canonical.models import League, Match, OddsSelection, OddsSnapshot, Provenance, Sport, Team
 from predicta_ingestion.clock import ensure_utc
 from predicta_ingestion.identity.aliases import aliased_natural_keys
+from predicta_ingestion.identity.historical import mls_franchise_natural_keys
 from predicta_ingestion.identity.keys import team_name_key
 from predicta_ingestion.identity.resolver import IdentityBinding, IdentityResolver
 from predicta_ingestion.ids import slugify
 from predicta_ingestion.persistence.memory import MemoryCanonicalSink
+from predicta_ingestion.providers.leagues import MLS_SLUG, normalize_league_slug
 from predicta_ingestion.providers.the_odds_api import LIVE_ODDS_PROVIDER
 
 
@@ -164,10 +166,12 @@ def hydrate_match_keys_from_sql(resolver: IdentityResolver, engine: Engine) -> i
             text(
                 """
                 SELECT m.id, m.kickoff_at, m.home_team_id, m.away_team_id,
-                       ht.name AS home_name, at.name AS away_name
+                       ht.name AS home_name, at.name AS away_name,
+                       l.name AS league_name, l.slug AS league_slug
                 FROM matches m
                 JOIN teams ht ON ht.id = m.home_team_id
                 JOIN teams at ON at.id = m.away_team_id
+                JOIN leagues l ON l.id = m.league_id
                 """
             )
         ).mappings()
@@ -187,6 +191,16 @@ def hydrate_match_keys_from_sql(resolver: IdentityResolver, engine: Engine) -> i
                 kickoff=kickoff,
             ):
                 resolver.bind_match_natural_key(aliased_key, row["id"])
+            slug_raw = str(row["league_slug"] or "")
+            league_name = str(row["league_name"] or "")
+            league_slug = normalize_league_slug(slug_raw) if slug_raw else normalize_league_slug(league_name.lower())
+            if league_slug == MLS_SLUG:
+                for franchise_key_name in mls_franchise_natural_keys(
+                    str(row["home_name"]),
+                    str(row["away_name"]),
+                    kickoff,
+                ):
+                    resolver.bind_match_natural_key(franchise_key_name, row["id"])
             count += 1
     return count
 

@@ -122,6 +122,26 @@ def test_historical_fetch_uses_documented_date_parameter(clock: Clock) -> None:
     assert "date=2026-09-08T15%3A55%3A00Z" in url or "date=2026-09-08T15:55:00Z" in url
 
 
+def test_historical_fetch_can_override_sport_key_for_champions_league_qualification(clock: Clock) -> None:
+    transport = OddsScriptedTransport()
+    provider = _provider(clock, transport)
+    as_of = datetime(2026, 7, 7, 16, 0, tzinfo=UTC)
+    envelopes = provider.fetch(
+        ProviderRequest(
+            resource=ResourceType.ODDS,
+            league="champions-league",
+            as_of=as_of,
+            sport_key="soccer_uefa_champs_league_qualification",
+        )
+    )
+    payload = json.loads(envelopes[0].body.decode("utf-8"))
+    assert payload["sport_key"] == "soccer_uefa_champs_league_qualification"
+    assert payload["league_slug"] == "champions-league"
+    url, _headers = transport.calls[0]
+    assert "/v4/historical/sports/soccer_uefa_champs_league_qualification/odds" in url
+    assert TEST_ODDS_API_KEY not in envelopes[0].request_key
+
+
 def test_http_401_is_auth_error_without_secret(clock: Clock) -> None:
     transport = OddsScriptedTransport()
     transport.force_status = 401

@@ -100,32 +100,68 @@ class IngestionPipeline:
                 if stored.duplicate:
                     report.duplicates += 1
                     continue
-            try:
-                payload = self._validator.validate(stored, expected_mode=expected_mode)
-                batch = self._normalize(stored, payload)
-                batch = _filter_matches(batch, since=since, until=until)
-                report.quarantined.extend(self._consume_normalizer_quarantine())
-                quarantined = self._resolver.resolve(batch, data_mode=expected_mode)
-                report.quarantined.extend(quarantined)
-                persist = self._persist(stored, batch)
-                report.records_accepted += persist.inserted
-                report.duplicates += persist.duplicates
-                report.persist = persist
-            except ValidationError as exc:
-                item = QuarantineItem(
-                    reason_code=exc.reason_code,
-                    detail=exc.detail,
-                    provider=provider_name,
-                    entity_type=resource.value,
-                    data_mode=expected_mode,
-                    raw_payload_id=stored.id,
-                    created_at=self._clock.now(),
-                )
-                report.quarantined.append(item)
+            self._ingest_stored(stored, report, expected_mode, provider_name, resource, since=since, until=until)
         if not self._dry_run:
             for item in report.quarantined:
                 self._record_quarantine(item)
         return report
+
+    def reprocess_stored(
+        self,
+        stored_items: list[StoredRaw],
+        *,
+        provider_name: str,
+        resource: ResourceType,
+    ) -> IngestionReport:
+        """Normalize already persisted raw payloads without rewriting the immutable store."""
+        expected_mode = DataMode(self._settings.resolved_data_mode())
+        report = IngestionReport(
+            provider=provider_name,
+            resource=resource,
+            data_mode=expected_mode,
+            dry_run=self._dry_run,
+        )
+        report.records_read = len(stored_items)
+        for stored in stored_items:
+            self._ingest_stored(stored, report, expected_mode, provider_name, resource)
+        if not self._dry_run:
+            for item in report.quarantined:
+                self._record_quarantine(item)
+        return report
+
+    def _ingest_stored(
+        self,
+        stored: StoredRaw,
+        report: IngestionReport,
+        expected_mode: DataMode,
+        provider_name: str,
+        resource: ResourceType,
+        *,
+        since: datetime | None = None,
+        until: datetime | None = None,
+    ) -> None:
+        try:
+            payload = self._validator.validate(stored, expected_mode=expected_mode)
+            batch = self._normalize(stored, payload)
+            batch = _filter_matches(batch, since=since, until=until)
+            report.quarantined.extend(self._consume_normalizer_quarantine())
+            quarantined = self._resolver.resolve(batch, data_mode=expected_mode)
+            report.quarantined.extend(quarantined)
+            persist = self._persist(stored, batch)
+            report.records_accepted += persist.inserted
+            report.duplicates += persist.duplicates
+            report.persist = persist
+        except ValidationError as exc:
+            item = QuarantineItem(
+                reason_code=exc.reason_code,
+                detail=exc.detail,
+                provider=provider_name,
+                entity_type=resource.value,
+                data_mode=expected_mode,
+                raw_payload_id=stored.id,
+                created_at=self._clock.now(),
+            )
+            report.quarantined.append(item)
 
     def _persist(self, stored: StoredRaw, batch: CanonicalBatch) -> PersistResult:
         if self._dry_run:

@@ -148,6 +148,8 @@ les snapshots PL + Ligue 1 déjà persistés. Estimer **avant** tout appel live 
 ```bash
 python -m predicta_ingestion expand-oos-historical-odds --estimate-only
 python -m predicta_ingestion expand-oos-historical-odds
+python -m predicta_ingestion expand-oos-final-odds-batch --estimate-only
+python -m predicta_ingestion expand-oos-final-odds-batch
 ```
 
 Le scoring 0 crédit :

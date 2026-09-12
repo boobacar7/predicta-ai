@@ -47,7 +47,7 @@ class OddsScriptedTransport:
         if parsed.path.rstrip("/").endswith("/v4/sports"):
             return HttpResponse(
                 status_code=200,
-                body=b"[]",
+                body=b'[{"key":"soccer_epl","active":true},{"key":"soccer_uefa_champs_league","active":true},{"key":"soccer_uefa_champs_league_qualification","active":true}]',
                 headers={
                     "x-requests-remaining": str(self.requests_remaining),
                     "x-requests-used": str(self.requests_used),
@@ -80,6 +80,8 @@ class OddsScriptedTransport:
 
 
 def _historical_fixture(path: str, date: str, default_body: str) -> str:
+    if "soccer_uefa_champs_league_qualification" in path:
+        return "soccer_ucl_qualification_historical.json"
     if "soccer_france_ligue_one" in path:
         if "2026-08-22" in date or "2026-08-23" in date or "2026-08-24" in date:
             return "soccer_ligue1_persist_near_kickoff.json"

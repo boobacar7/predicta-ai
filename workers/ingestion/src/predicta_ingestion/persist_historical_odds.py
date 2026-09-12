@@ -88,13 +88,17 @@ class PersistSlot:
     league: str
     as_of: datetime
     kickoff_date: str
+    sport_key: str | None = None
 
     def to_dict(self) -> dict[str, str]:
-        return {
+        payload = {
             "league": self.league,
             "as_of": to_rfc3339(self.as_of),
             "kickoff_date": self.kickoff_date,
         }
+        if self.sport_key:
+            payload["sport_key"] = self.sport_key
+        return payload
 
 
 @dataclass(frozen=True)
@@ -171,12 +175,19 @@ class PersistHistoricalOddsReport:
 
 
 class TargetMatchOddsSink:
-    """Persist odds only for the bounded weekend match ids. Extra Sportmonks hits are skipped."""
+    """Persist odds only for the bounded match ids. Extra Sportmonks hits are skipped."""
 
-    def __init__(self, inner: CanonicalSink, target_match_ids: frozenset[str]) -> None:
+    def __init__(
+        self,
+        inner: CanonicalSink,
+        target_match_ids: frozenset[str],
+        kickoffs: dict[str, datetime] | None = None,
+    ) -> None:
         self._inner = inner
         self._target_match_ids = target_match_ids
+        self._kickoffs = dict(kickoffs or {})
         self.skipped_match_ids: list[str] = []
+        self.skipped_post_kickoff: list[str] = []
 
     @property
     def memory(self) -> MemoryCanonicalSink:
@@ -191,10 +202,14 @@ class TargetMatchOddsSink:
     def persist(self, batch: CanonicalBatch) -> PersistResult:
         kept: list[OddsSnapshot] = []
         for snapshot in batch.odds:
-            if snapshot.match_id in self._target_match_ids:
-                kept.append(snapshot)
-            else:
+            if snapshot.match_id not in self._target_match_ids:
                 self.skipped_match_ids.append(snapshot.match_id)
+                continue
+            kickoff = self._kickoffs.get(snapshot.match_id)
+            if kickoff is not None and snapshot.provenance.available_at > kickoff:
+                self.skipped_post_kickoff.append(snapshot.id)
+                continue
+            kept.append(snapshot)
         return self._inner.persist(batch.model_copy(update={"odds": kept}))
 
     def record_raw(self, stored: StoredRaw) -> None:
@@ -444,6 +459,7 @@ def run_persist_historical_odds_pilot(
             league=slot.league,
             as_of=slot.as_of,
             secret=secret,
+            sport_key=slot.sport_key,
         )
         requests += 1
         payload = envelope.json_payload()

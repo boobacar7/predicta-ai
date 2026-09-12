@@ -170,11 +170,17 @@ class OosOddsExpansionReport:
         return _reject_secrets(payload)
 
 
-def historical_request_key(league: str, as_of: datetime, *, regions: str = DEFAULT_REGIONS) -> str:
-    sport_key = V1_LEAGUE_SPORT_KEYS.get(league)
-    if sport_key is None:
+def historical_request_key(
+    league: str,
+    as_of: datetime,
+    *,
+    regions: str = DEFAULT_REGIONS,
+    sport_key: str | None = None,
+) -> str:
+    mapped = sport_key or V1_LEAGUE_SPORT_KEYS.get(league)
+    if mapped is None:
         raise ValidationError("unknown_league", f"No The Odds API sport key is mapped for '{league}'.")
-    return f"the_odds_api:historical_odds:{sport_key}:{regions}:{DEFAULT_MARKETS}:{to_rfc3339(as_of)}"
+    return f"the_odds_api:historical_odds:{mapped}:{regions}:{DEFAULT_MARKETS}:{to_rfc3339(as_of)}"
 
 
 def existing_historical_request_keys(raw_root: Path) -> frozenset[str]:
@@ -358,7 +364,7 @@ def partition_oos_slots(
     skipped_requested: list[PersistSlot] = []
     skipped_identity: list[PersistSlot] = []
     for slot in slots:
-        key = historical_request_key(slot.league, slot.as_of)
+        key = historical_request_key(slot.league, slot.as_of, sport_key=slot.sport_key)
         targets = by_slot.get((slot.league, slot.kickoff_date), [])
         actionable = [item for item in targets if item.match_id not in isolated_ids]
         if key in existing_keys:

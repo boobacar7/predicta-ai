@@ -443,8 +443,9 @@ def fetch_historical_odds_envelope(
     league: str,
     as_of: datetime,
     secret: str | None,
+    sport_key: str | None = None,
 ) -> RawEnvelope:
-    return _fetch_one(provider, league=league, as_of=as_of, secret=secret)
+    return _fetch_one(provider, league=league, as_of=as_of, secret=secret, sport_key=sport_key)
 
 
 def _fetch_one(
@@ -453,6 +454,7 @@ def _fetch_one(
     league: str,
     as_of: datetime,
     secret: str | None,
+    sport_key: str | None = None,
 ) -> RawEnvelope:
     envelopes = provider.fetch(
         ProviderRequest(
@@ -460,6 +462,7 @@ def _fetch_one(
             sport=SportCode.FOOTBALL,
             league=league,
             as_of=as_of,
+            sport_key=sport_key,
         )
     )
     if len(envelopes) != 1:

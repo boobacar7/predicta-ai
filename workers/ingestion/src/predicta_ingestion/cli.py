@@ -44,6 +44,13 @@ from predicta_ingestion.ml.dataset import MlDataset, build_ml_dataset
 from predicta_ingestion.ml.export import write_dataset_artifacts
 from predicta_ingestion.ml.prematch import build_prematch_features, write_prematch_artifacts
 from predicta_ingestion.ml.quality import build_quality_report
+from predicta_ingestion.oos_final_odds_batch import (
+    MAX_FINAL_BATCH_CREDITS,
+    estimate_final_oos_odds_batch,
+    existing_historical_request_keys_from_sql,
+    run_final_oos_odds_batch,
+    write_final_batch_artefacts,
+)
 from predicta_ingestion.oos_historical_odds import (
     DEFAULT_PARQUET_PATH,
     MAX_OOS_REQUESTS,
@@ -215,6 +222,31 @@ def main(argv: list[str] | None = None) -> int:
         default=str(DEFAULT_PARQUET_PATH),
         help="Dataset 0.3 parquet used to freeze the OOS match universe.",
     )
+    oos_final = sub.add_parser(
+        "expand-oos-final-odds-batch",
+        help=(
+            "Final historical 1X2 odds batch for the frozen OOS window "
+            f"(max {MAX_FINAL_BATCH_CREDITS} credits). Replays existing MLS payloads, "
+            "fetches Champions League qualification, and fills remaining league-days. "
+            "Not an OOS backtest."
+        ),
+    )
+    oos_final.add_argument(
+        "--estimate-only",
+        action="store_true",
+        help="Plan slots and credits from PostgreSQL/parquet without calling The Odds API.",
+    )
+    oos_final.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Replay/fetch, validate and normalize without writing PostgreSQL or the raw store.",
+    )
+    oos_final.add_argument(
+        "--parquet",
+        dest="parquet",
+        default=str(DEFAULT_PARQUET_PATH),
+        help="Dataset 0.3 parquet used to freeze the OOS match universe.",
+    )
     dataset = sub.add_parser(
         "build-ml-dataset",
         help="Build a point-in-time 1X2 dataset from ingested PostgreSQL rows. Does not train a model.",
@@ -325,6 +357,13 @@ def _dispatch(args: argparse.Namespace, settings: Settings) -> dict[str, object]
         return final_test_report_payload(final_report)
     if args.command == "expand-oos-historical-odds":
         return expand_oos_historical_odds(
+            settings=settings,
+            dry_run=bool(getattr(args, "dry_run", False)),
+            estimate_only=bool(getattr(args, "estimate_only", False)),
+            parquet_path=Path(getattr(args, "parquet", str(DEFAULT_PARQUET_PATH))),
+        )
+    if args.command == "expand-oos-final-odds-batch":
+        return expand_oos_final_odds_batch(
             settings=settings,
             dry_run=bool(getattr(args, "dry_run", False)),
             estimate_only=bool(getattr(args, "estimate_only", False)),
@@ -653,6 +692,7 @@ def expand_oos_historical_odds(
             dry_run=True,
             engine=engine,
             target_ids=target_match_ids(estimate.matches),
+            kickoffs={item.match_id: item.kickoff_at for item in estimate.matches},
         )
         placeholder = provider or TheOddsApiProvider(
             enable_live=False,
@@ -683,6 +723,7 @@ def expand_oos_historical_odds(
         dry_run=dry_run,
         engine=engine,
         target_ids=target_match_ids(estimate.matches),
+        kickoffs={item.match_id: item.kickoff_at for item in estimate.matches},
     )
     report = run_expand_oos_historical_odds(
         provider=odds_provider,
@@ -710,6 +751,108 @@ def expand_oos_historical_odds(
     return payload
 
 
+def expand_oos_final_odds_batch(
+    *,
+    settings: Settings,
+    dry_run: bool = False,
+    estimate_only: bool = False,
+    parquet_path: Path | None = None,
+    provider: TheOddsApiProvider | None = None,
+    pipeline: IngestionPipeline | None = None,
+) -> dict[str, object]:
+    engine = create_engine(settings.database_url, pool_pre_ping=True, future=True)
+    require_odds_history_schema(engine)
+    raw_root = Path(settings.raw_store_path)
+    dataset = parquet_path or DEFAULT_PARQUET_PATH
+    counts_before = table_counts(engine)
+    existing_keys = existing_historical_request_keys(raw_root) | existing_historical_request_keys_from_sql(engine)
+    estimate = estimate_final_oos_odds_batch(
+        engine=engine,
+        parquet_path=dataset,
+        existing_request_keys=existing_keys,
+        raw_root=raw_root,
+    )
+    coverage_before = build_coverage_matrix(
+        estimate.matches,
+        match_odds_states(engine, estimate.matches),
+        previously_covered=estimate.covered_match_ids,
+    )
+    print(json.dumps(estimate.plan_summary(), indent=2, sort_keys=True), flush=True)
+    if estimate_only:
+        clock = Clock()
+        memory_pipeline = pipeline or _build_persist_pipeline(
+            settings,
+            clock,
+            dry_run=True,
+            engine=engine,
+            target_ids=target_match_ids(estimate.matches),
+            kickoffs={item.match_id: item.kickoff_at for item in estimate.matches},
+        )
+        placeholder = provider or TheOddsApiProvider(
+            enable_live=False,
+            api_key="",
+            clock=clock,
+            transport=HttpxTransport(),
+        )
+        report = run_final_oos_odds_batch(
+            provider=placeholder,
+            pipeline=memory_pipeline,
+            estimate=estimate,
+            secret=settings.the_odds_api_key or None,
+            estimate_only=True,
+            engine=engine,
+            raw_root=raw_root,
+            parquet_path=dataset,
+            coverage_before=coverage_before,
+            counts_before=counts_before,
+        )
+        paths = write_final_batch_artefacts(report)
+        payload = report.to_dict()
+        payload["paths"] = paths
+        return payload
+    if estimate.estimated_credits > MAX_FINAL_BATCH_CREDITS:
+        raise ValidationError("persist_cap", estimate.stop_reason or "Final batch exceeds 10,000 credits.")
+    _assert_odds_ready(settings)
+    clock = Clock()
+    odds_provider = provider or _odds_provider(settings, clock)
+    active_pipeline = pipeline or _build_persist_pipeline(
+        settings,
+        clock,
+        dry_run=dry_run,
+        engine=engine,
+        target_ids=target_match_ids(estimate.matches),
+        kickoffs={item.match_id: item.kickoff_at for item in estimate.matches},
+    )
+    report = run_final_oos_odds_batch(
+        provider=odds_provider,
+        pipeline=active_pipeline,
+        estimate=estimate,
+        secret=settings.the_odds_api_key or None,
+        estimate_only=False,
+        probe_quota=not dry_run,
+        engine=engine,
+        raw_root=raw_root,
+        parquet_path=dataset,
+        coverage_before=coverage_before,
+        counts_before=counts_before,
+    )
+    if not dry_run and report.persist is not None:
+        _record_persist_run(active_pipeline, clock, report.persist)
+    if not dry_run:
+        report.counts_after = table_counts(engine)
+        report.coverage_after = build_coverage_matrix(
+            estimate.matches,
+            match_odds_states(engine, estimate.matches),
+            previously_covered=estimate.covered_match_ids,
+            persist=report.persist,
+        )
+        report.pit = report.pit or {}
+    paths = write_final_batch_artefacts(report)
+    payload = report.to_dict()
+    payload["paths"] = paths
+    return payload
+
+
 def _build_persist_pipeline(
     settings: Settings,
     clock: Clock,
@@ -717,6 +860,7 @@ def _build_persist_pipeline(
     dry_run: bool,
     engine: Engine,
     target_ids: frozenset[str],
+    kickoffs: dict[str, datetime] | None = None,
 ) -> IngestionPipeline:
     raw_store = FilesystemRawStore(Path(settings.raw_store_path))
     memory = MemoryCanonicalSink()
@@ -725,7 +869,7 @@ def _build_persist_pipeline(
     hydrate_match_keys_from_sql(resolver, engine)
     sql = None if dry_run else SqlCanonicalSink(clock=clock, engine=engine)
     tee = TeeCanonicalSink(memory, sql)
-    sink = TargetMatchOddsSink(tee, target_ids)
+    sink = TargetMatchOddsSink(tee, target_ids, kickoffs=kickoffs)
     return IngestionPipeline(
         settings=settings,
         clock=clock,
