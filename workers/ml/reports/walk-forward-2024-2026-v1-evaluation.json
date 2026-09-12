@@ -40,21 +40,56 @@
   "intended_windows_not_executed": [
     {
       "id": "WF-1",
-      "train": {"start": "2024-02-22T00:00:00+00:00", "end_exclusive": "2025-01-01T00:00:00+00:00", "n": 1538},
-      "calibration": {"rule": "trailing TRAIN n_calib>=200 and n_train_fit>=1000", "n": "UNAVAILABLE FROM CURRENT PERSISTED STATE"},
-      "oos": {"start": "2025-01-01T00:00:00+00:00", "end_exclusive": "2025-07-01T00:00:00+00:00", "n": 1305}
+      "train": {
+        "start": "2024-02-22T00:00:00+00:00",
+        "end_exclusive": "2025-01-01T00:00:00+00:00",
+        "n": 1538
+      },
+      "calibration": {
+        "rule": "trailing TRAIN n_calib>=200 and n_train_fit>=1000",
+        "n": "UNAVAILABLE FROM CURRENT PERSISTED STATE"
+      },
+      "oos": {
+        "start": "2025-01-01T00:00:00+00:00",
+        "end_exclusive": "2025-07-01T00:00:00+00:00",
+        "n": 1305
+      }
     },
     {
       "id": "WF-2",
-      "train_fit": {"start": "2024-02-22T00:00:00+00:00", "end_exclusive": "2025-01-01T00:00:00+00:00", "n": 1538},
-      "calibration": {"start": "2025-01-01T00:00:00+00:00", "end_exclusive": "2025-07-01T00:00:00+00:00", "n": 1305},
-      "oos": {"start": "2025-07-01T00:00:00+00:00", "end_exclusive": "2026-01-01T00:00:00+00:00", "n": 1251}
+      "train_fit": {
+        "start": "2024-02-22T00:00:00+00:00",
+        "end_exclusive": "2025-01-01T00:00:00+00:00",
+        "n": 1538
+      },
+      "calibration": {
+        "start": "2025-01-01T00:00:00+00:00",
+        "end_exclusive": "2025-07-01T00:00:00+00:00",
+        "n": 1305
+      },
+      "oos": {
+        "start": "2025-07-01T00:00:00+00:00",
+        "end_exclusive": "2026-01-01T00:00:00+00:00",
+        "n": 1251
+      }
     },
     {
       "id": "WF-3",
-      "train_fit": {"start": "2024-02-22T00:00:00+00:00", "end_exclusive": "2026-01-01T00:00:00+00:00", "n": 4094},
-      "calibration": {"start": "2026-01-01T00:00:00+00:00", "end_exclusive": "2026-07-01T00:00:00+00:00", "n": 1248},
-      "oos": {"start": "2026-07-01T00:00:00+00:00", "end_exclusive": "2026-09-10T02:30:01+00:00", "n": 387}
+      "train_fit": {
+        "start": "2024-02-22T00:00:00+00:00",
+        "end_exclusive": "2026-01-01T00:00:00+00:00",
+        "n": 4094
+      },
+      "calibration": {
+        "start": "2026-01-01T00:00:00+00:00",
+        "end_exclusive": "2026-07-01T00:00:00+00:00",
+        "n": 1248
+      },
+      "oos": {
+        "start": "2026-07-01T00:00:00+00:00",
+        "end_exclusive": "2026-09-10T02:30:01+00:00",
+        "n": 387
+      }
     }
   ],
   "intended_oos_prediction_count_if_parquet_present": 2943,
@@ -86,7 +121,8 @@
     "candidate_loaded": false,
     "calibration_versions_fit": [],
     "random_seed": 42,
-    "odds_fingerprint": null
+    "odds_fingerprint": null,
+    "evaluation_report_sha": "2b9177c916a30b1de53e9f56d2870266d428180e"
   },
   "frozen_hyperparameters_unused": {
     "elo_initial": 1500.0,

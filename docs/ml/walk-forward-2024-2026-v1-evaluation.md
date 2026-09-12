@@ -111,7 +111,7 @@ Static protocol constraints remain in force and were not relaxed.
 | Dataset version | `football-1x2-history-0.3` (required, not loaded) |
 | Dataset SHA-256 | required `0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5` — **unverified, file absent** |
 | Feature schema | `football-1x2-features-0.3` |
-| Code SHA (this eval branch) | filled at commit time |
+| Code SHA (this eval branch) |  |
 | Implementation audit SHA | `1cde8f701e2fcdfd85f9574983b76abd810003cc` |
 | Walk-forward artefacts | not created |
 | Candidate | not loaded, not promoted |
