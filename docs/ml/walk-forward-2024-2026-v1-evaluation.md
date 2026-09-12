@@ -7,33 +7,68 @@
 This file is a blocked-run record. It is **not** a completed backtest and must
 not be quoted as model performance.
 
+A follow-up on 2026-09-12T18:35:30Z ran the requested command on this Cloud
+Agent host:
+
+```text
+shasum -a 256 workers/ingestion/var/football-1x2-history.parquet
+```
+
+Result:
+
+```text
+shasum: workers/ingestion/var/football-1x2-history.parquet: No such file or directory
+exit=1
+```
+
+SHA-256 did not match (no file to hash). Evaluation A **aborted immediately**.
+The parquet was not regenerated, downloaded, or substituted.
+
+---
+
+## 0. Dataset gate (printed before any execution)
+
+Required:
+
+```text
+DATASET PATH: workers/ingestion/var/football-1x2-history.parquet
+DATASET SHA256: 0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5
+DATASET VERSION: football-1x2-history-0.3
+```
+
+Observed on this host (`cursor`, 2026-09-12T18:35:30Z) after `shasum -a 256`:
+
+```text
+DATASET PATH: workers/ingestion/var/football-1x2-history.parquet
+DATASET PATH (absolute checked): /workspace/workers/ingestion/var/football-1x2-history.parquet — MISSING
+DATASET SHA256: UNAVAILABLE FROM THIS HOST (file absent)
+DATASET SHA256 (required): 0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5
+DATASET VERSION: UNAVAILABLE FROM THIS HOST (required football-1x2-history-0.3)
+ROW COUNT: UNAVAILABLE FROM THIS HOST
+DATE RANGE: UNAVAILABLE FROM THIS HOST
+GATE: FAIL — Evaluation A aborted immediately
+```
+
+Also missing: `/tmp/predicta-ml/workers/ingestion/var/football-1x2-history.parquet`.
+
+A developer-machine verification is **not** a SHA-256 measured on this
+evaluation host. This agent did not hash any file on
+`/Users/boubacar/Development/predicta-ai/...`. It did not copy, download, or
+regenerate the parquet.
+
 ---
 
 ## 1. Why Evaluation A did not run
 
-The frozen protocol requires the SHA-256-pinned dataset
+The frozen protocol refuses to start unless the SHA-256-pinned dataset is
+present **on the evaluation host** and hashes to
 
-```text
-dataset_version = football-1x2-history-0.3
-path            = workers/ingestion/var/football-1x2-history.parquet
-sha256          = 0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5
-```
+`0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5`.
 
-That parquet is gitignored (`var/` in `.gitignore` on the ML lineage). It is
-not in git, GitHub Releases, Git LFS, Docker volumes, or this Cloud Agent VM.
-
-Searched and not found:
-
-| Location | Result |
-| --- | --- |
-| `/workspace/workers/ingestion/var/football-1x2-history.parquet` | missing |
-| `/tmp/predicta-ml/workers/ingestion/var/football-1x2-history.parquet` | missing |
-| Git objects on `main` and `origin/agent/data/final-oos-odds-batch` | no parquet |
-| Git LFS | empty |
-| GitHub Releases | none |
-| Docker volumes | none |
-| Live PostgreSQL `:5432` | closed; cannot rebuild without re-fetch |
-| Non-pytest `*.parquet` on this VM | none |
+That parquet is gitignored (`var/` in `.gitignore`). It is not in git, GitHub
+Releases, Git LFS, Docker volumes, or this Cloud Agent VM. The recovery search
+(`docs/ml/football-1x2-history-0.3-recovery.md`, status `NOT_FOUND`) already
+established that. This follow-up confirmed the expected path is still empty.
 
 The protocol forbids substituting another dataset. An empty Postgres rebuild
 would not be `football-1x2-history-0.3` with the pinned SHA-256.
@@ -42,8 +77,8 @@ Therefore Evaluation A **stopped before any prediction**.
 
 No Odds API request was made. No historical odds were read. No Value Engine
 or AI Picks code path ran. Hyperparameters were not changed.
-`football-elo-v1-candidate` was not used to score 2024/2025. No artefact was
-promoted.
+`football-elo-v1-candidate` was not retrained and was not used to score
+2024/2025. No walk-forward artefact was written. No artefact was promoted.
 
 ---
 
@@ -66,6 +101,7 @@ Frozen hyperparameters (unchanged, unused):
 - Calibration method sigmoid (coefficients refit per step)
 - New artefacts `football-elo-v1-wf-2024-2026-step-{1,2,3}`
 - Do not score `football-elo-v1-candidate` on 2024/2025 OOS
+- Strict PIT chronology; no leakage
 
 ---
 
@@ -109,12 +145,12 @@ Static protocol constraints remain in force and were not relaxed.
 | --- | --- |
 | Protocol | `walk-forward-2024-2026-v1` |
 | Dataset version | `football-1x2-history-0.3` (required, not loaded) |
-| Dataset SHA-256 | required `0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5` — **unverified, file absent** |
+| Dataset SHA-256 | required `0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5` — **unverified on this host, file absent** |
 | Feature schema | `football-1x2-features-0.3` |
-| Code SHA (this eval branch) | `2b9177c916a30b1de53e9f56d2870266d428180e` |
+| Code SHA (this eval branch) | `d72ff19afa60f088a890c599592ccdad1b6c3354` |
 | Implementation audit SHA | `1cde8f701e2fcdfd85f9574983b76abd810003cc` |
 | Walk-forward artefacts | not created |
-| Candidate | not loaded, not promoted |
+| Candidate | not loaded, not retrained, not promoted |
 | Calibration versions | not fit |
 | Random seed | 42 (unused) |
 | Odds fingerprint | not applicable (Evaluation A) |
@@ -123,10 +159,27 @@ Static protocol constraints remain in force and were not relaxed.
 
 ## 6. Quality gates
 
-Allowed: existence/hash check of the pinned parquet. That check **failed**.
+Allowed: existence/hash check of the pinned parquet on this host. That check
+**failed** (file missing; SHA not computed).
 
-Forbidden and not done: Odds API, retraining a substitute dataset, Value/AI
-Picks, ROI, model promotion.
+Forbidden and not done: Odds API, dataset regeneration, parquet modification,
+retraining `football-elo-v1-candidate`, Value/AI Picks, ROI, EV, model
+promotion.
+
+Existing code-level PIT / calibration / OOS-helper tests (unmerged
+`1cde8f7` worktree, 2026-09-12T18:31:28Z):
+
+| Suite | Result |
+| --- | --- |
+| Value Engine / odds PIT | 34 passed, 2 skipped |
+| ML provenance / OOS helpers / calibration / metrics / splits | 29 passed |
+| AI Picks / Analyst grounding / frozen OOS | 33 passed |
+| production-oos-sql / prematch | 18 passed, 1 skipped |
+| Ingestion PIT / ML dataset | 19 passed, 1 failed (`pyarrow` missing in ingestion venv export test — packaging, not leakage) |
+| Dataset SHA on this host | FAIL (file absent) |
+
+These tests do **not** replace Evaluation A. They did not load the pinned
+parquet and did not score 2024–2026 walk-forward OOS.
 
 ---
 
@@ -134,7 +187,7 @@ Picks, ROI, model promotion.
 
 ```text
 STATUS: BLOCKED
-DATASET: UNAVAILABLE
+DATASET: UNAVAILABLE ON THIS HOST
 PREDICTIONS: NOT RUN
 LOGLOSS: NOT COMPUTED
 BRIER: NOT COMPUTED
@@ -142,7 +195,7 @@ ACCURACY: NOT COMPUTED
 ECE: NOT COMPUTED
 LEAKAGE: NOT RUN
 REPRODUCIBILITY: BLOCKED
-BACKTEST TYPE: Evaluation A only (not executed)
+BACKTEST TYPE: Evaluation A only (aborted before execution)
 ODDS API REQUESTS: 0
 VALUE/AI PICKS: NOT RUN
 MODEL PROMOTION: NOT PROMOTED
@@ -151,6 +204,8 @@ MODEL PROMOTION: NOT PROMOTED
 The model is not production. The model is not validated. No performance
 claim is made.
 
-**Required unblock:** place `workers/ingestion/var/football-1x2-history.parquet`
-with SHA-256 `0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5`
-on the evaluation host, then re-run Evaluation A only.
+**Required unblock:** copy the original file onto this evaluation host at
+`workers/ingestion/var/football-1x2-history.parquet`, confirm SHA-256
+`0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5` **on this
+host**, then re-run Evaluation A only. A hash measured on another machine is
+not sufficient.
