@@ -7,10 +7,22 @@
 This file is a blocked-run record. It is **not** a completed backtest and must
 not be quoted as model performance.
 
-A follow-up on 2026-09-12T18:30:00Z re-checked this Cloud Agent host after a
-developer-machine claim that the pinned parquet was verified locally. The file
-is still **absent on this VM**. SHA-256 could not be calculated here.
-Evaluation A therefore **did not execute**.
+A follow-up on 2026-09-12T18:35:30Z ran the requested command on this Cloud
+Agent host:
+
+```text
+shasum -a 256 workers/ingestion/var/football-1x2-history.parquet
+```
+
+Result:
+
+```text
+shasum: workers/ingestion/var/football-1x2-history.parquet: No such file or directory
+exit=1
+```
+
+SHA-256 did not match (no file to hash). Evaluation A **aborted immediately**.
+The parquet was not regenerated, downloaded, or substituted.
 
 ---
 
@@ -24,7 +36,7 @@ DATASET SHA256: 0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5
 DATASET VERSION: football-1x2-history-0.3
 ```
 
-Observed on this host (`cursor`, 2026-09-12T18:30:00Z):
+Observed on this host (`cursor`, 2026-09-12T18:35:30Z) after `shasum -a 256`:
 
 ```text
 DATASET PATH: workers/ingestion/var/football-1x2-history.parquet
@@ -34,7 +46,7 @@ DATASET SHA256 (required): 0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a
 DATASET VERSION: UNAVAILABLE FROM THIS HOST (required football-1x2-history-0.3)
 ROW COUNT: UNAVAILABLE FROM THIS HOST
 DATE RANGE: UNAVAILABLE FROM THIS HOST
-GATE: FAIL — Evaluation A refused
+GATE: FAIL — Evaluation A aborted immediately
 ```
 
 Also missing: `/tmp/predicta-ml/workers/ingestion/var/football-1x2-history.parquet`.
@@ -183,7 +195,7 @@ ACCURACY: NOT COMPUTED
 ECE: NOT COMPUTED
 LEAKAGE: NOT RUN
 REPRODUCIBILITY: BLOCKED
-BACKTEST TYPE: Evaluation A only (not executed)
+BACKTEST TYPE: Evaluation A only (aborted before execution)
 ODDS API REQUESTS: 0
 VALUE/AI PICKS: NOT RUN
 MODEL PROMOTION: NOT PROMOTED

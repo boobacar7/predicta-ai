@@ -3,7 +3,7 @@
   "protocol_id": "walk-forward-2024-2026-v1",
   "evaluation": "A",
   "status": "BLOCKED",
-  "blocked_reason": "Pinned football-1x2-history-0.3 parquet is absent from this Cloud Agent VM. A developer-machine verification claim is not a SHA-256 measured on this host. Evaluation A refused to start. Protocol forbids substituting, downloading, or regenerating the dataset.",
+  "blocked_reason": "shasum -a 256 workers/ingestion/var/football-1x2-history.parquet failed on this Cloud Agent host: No such file or directory. SHA did not match. Evaluation A aborted immediately. Dataset was not regenerated, downloaded, or substituted.",
   "predictions_run": false,
   "value_engine_run": false,
   "ai_picks_run": false,
@@ -17,8 +17,11 @@
   "model_promoted": false,
   "promoted_to_production": false,
   "dataset_gate": {
-    "checked_at": "2026-09-12T18:30:00Z",
+    "checked_at": "2026-09-12T18:35:30Z",
     "host": "cursor",
+    "command": "shasum -a 256 workers/ingestion/var/football-1x2-history.parquet",
+    "command_stderr": "shasum: workers/ingestion/var/football-1x2-history.parquet: No such file or directory",
+    "command_exit": 1,
     "required_path": "workers/ingestion/var/football-1x2-history.parquet",
     "required_sha256": "0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5",
     "required_version": "football-1x2-history-0.3",
@@ -31,7 +34,8 @@
       "DATE RANGE": "UNAVAILABLE FROM THIS HOST"
     },
     "result": "FAIL",
-    "developer_machine_claim": "User stated the file was verified on the developer machine. This host did not observe or hash that file.",
+    "aborted": true,
+    "developer_machine_claim": "User stated the file is present and verified on the developer machine. This Cloud Agent host does not share that filesystem. shasum could not hash a missing path.",
     "sha256_on_this_host": null,
     "row_count_on_this_host": null,
     "date_range_on_this_host": null
@@ -192,7 +196,7 @@
     "ECE": "NOT COMPUTED",
     "LEAKAGE": "NOT RUN",
     "REPRODUCIBILITY": "BLOCKED",
-    "BACKTEST TYPE": "Evaluation A only (not executed)",
+    "BACKTEST TYPE": "Evaluation A only (aborted before execution)",
     "ODDS API REQUESTS": 0,
     "VALUE/AI PICKS": "NOT RUN",
     "MODEL PROMOTION": "NOT PROMOTED"
