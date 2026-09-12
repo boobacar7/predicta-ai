@@ -3,7 +3,7 @@
   "protocol_id": "walk-forward-2024-2026-v1",
   "evaluation": "A",
   "status": "BLOCKED",
-  "blocked_reason": "Pinned football-1x2-history-0.3 parquet is absent from this VM and cannot be restored from git, Git LFS, GitHub Releases, Docker volumes, or live PostgreSQL. Protocol forbids substituting another dataset.",
+  "blocked_reason": "Pinned football-1x2-history-0.3 parquet is absent from this Cloud Agent VM. A developer-machine verification claim is not a SHA-256 measured on this host. Evaluation A refused to start. Protocol forbids substituting, downloading, or regenerating the dataset.",
   "predictions_run": false,
   "value_engine_run": false,
   "ai_picks_run": false,
@@ -12,22 +12,42 @@
   "roi_computed": false,
   "ev_computed": false,
   "hyperparameters_modified": false,
+  "candidate_retrained": false,
   "candidate_used_to_score_2024_2025_oos": false,
   "model_promoted": false,
   "promoted_to_production": false,
+  "dataset_gate": {
+    "checked_at": "2026-09-12T18:30:00Z",
+    "host": "cursor",
+    "required_path": "workers/ingestion/var/football-1x2-history.parquet",
+    "required_sha256": "0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5",
+    "required_version": "football-1x2-history-0.3",
+    "printed_before_execution": {
+      "DATASET PATH": "workers/ingestion/var/football-1x2-history.parquet",
+      "DATASET PATH_ABSOLUTE": "/workspace/workers/ingestion/var/football-1x2-history.parquet — MISSING",
+      "DATASET SHA256": "UNAVAILABLE FROM THIS HOST (file absent)",
+      "DATASET VERSION": "UNAVAILABLE FROM THIS HOST (required football-1x2-history-0.3)",
+      "ROW COUNT": "UNAVAILABLE FROM THIS HOST",
+      "DATE RANGE": "UNAVAILABLE FROM THIS HOST"
+    },
+    "result": "FAIL",
+    "developer_machine_claim": "User stated the file was verified on the developer machine. This host did not observe or hash that file.",
+    "sha256_on_this_host": null,
+    "row_count_on_this_host": null,
+    "date_range_on_this_host": null
+  },
   "dataset": {
     "required_version": "football-1x2-history-0.3",
     "required_path": "workers/ingestion/var/football-1x2-history.parquet",
     "required_sha256": "0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5",
     "loaded": false,
     "verified": false,
-    "status": "UNAVAILABLE"
+    "status": "UNAVAILABLE ON THIS HOST"
   },
   "restore_attempt": {
     "paths_checked": [
       "/workspace/workers/ingestion/var/football-1x2-history.parquet",
-      "/tmp/predicta-ml/workers/ingestion/var/football-1x2-history.parquet",
-      "/workspace/workers/ml/var/football-1x2-history.parquet"
+      "/tmp/predicta-ml/workers/ingestion/var/football-1x2-history.parquet"
     ],
     "git_objects": false,
     "git_lfs": false,
@@ -35,7 +55,8 @@
     "docker_volumes": false,
     "live_postgres": false,
     "non_pytest_parquet_on_vm": "NONE",
-    "gitignore_note": "var/ is gitignored on the ML lineage; the parquet was never committed."
+    "gitignore_note": "var/ is gitignored on the ML lineage; the parquet was never committed.",
+    "recovery_report": "docs/ml/football-1x2-history-0.3-recovery.md status NOT_FOUND"
   },
   "intended_windows_not_executed": [
     {
@@ -108,7 +129,7 @@
   },
   "leakage": {
     "status": "NOT RUN",
-    "note": "Parquet was not loaded; no OOS scores were produced."
+    "note": "Parquet was not loaded on this host; no OOS scores were produced."
   },
   "reproducibility": {
     "status": "BLOCKED",
@@ -119,10 +140,11 @@
     "implementation_audit_sha": "1cde8f701e2fcdfd85f9574983b76abd810003cc",
     "walk_forward_artefacts_created": [],
     "candidate_loaded": false,
+    "candidate_retrained": false,
     "calibration_versions_fit": [],
     "random_seed": 42,
     "odds_fingerprint": null,
-    "evaluation_report_sha": "2b9177c916a30b1de53e9f56d2870266d428180e"
+    "evaluation_report_sha": "PENDING"
   },
   "frozen_hyperparameters_unused": {
     "elo_initial": 1500.0,
@@ -131,9 +153,14 @@
     "scale": 400.0,
     "calibration_method": "sigmoid"
   },
+  "quality_gates": {
+    "dataset_sha_on_this_host": "FAIL",
+    "odds_api": "not used",
+    "code_tests": "PENDING"
+  },
   "status_block": {
     "STATUS": "BLOCKED",
-    "DATASET": "UNAVAILABLE",
+    "DATASET": "UNAVAILABLE ON THIS HOST",
     "PREDICTIONS": "NOT RUN",
     "LOGLOSS": "NOT COMPUTED",
     "BRIER": "NOT COMPUTED",
@@ -146,5 +173,5 @@
     "VALUE/AI PICKS": "NOT RUN",
     "MODEL PROMOTION": "NOT PROMOTED"
   },
-  "required_unblock": "Place workers/ingestion/var/football-1x2-history.parquet with SHA-256 0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5 on the evaluation host, then re-run Evaluation A only."
+  "required_unblock": "Copy the original workers/ingestion/var/football-1x2-history.parquet onto this evaluation host and confirm SHA-256 0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5 on this host, then re-run Evaluation A only. A hash from another machine is not sufficient."
 }
