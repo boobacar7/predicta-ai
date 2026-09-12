@@ -1,0 +1,256 @@
+{
+  "kind": "historical_odds_cost_coverage_audit",
+  "audited_at": "2026-09-12T15:14:26.069861+00:00",
+  "decision": "STOP",
+  "decision_sentence": "Stopped because 711 remaining claimed requests are expected to add approximately 0 additional canonical OOS matches at a cost of 7110 credits.",
+  "live_environment": {
+    "collection_process_running": false,
+    "postgres_port_5432_open": false,
+    "odds_api_key_present": false,
+    "the_odds_api_live_headers_readable": false,
+    "accessible_cloud_agents_with_collection_job": 0,
+    "raw_store_present": false,
+    "branch_audited": "origin/agent/data/final-oos-odds-batch",
+    "commit_audited": "1cde8f701e2fcdfd85f9574983b76abd810003cc"
+  },
+  "claimed_progress_from_user": {
+    "source": "user_message_unverified",
+    "planned_requests": 1348,
+    "progress_requests": 637,
+    "new_requests_executed": 436,
+    "seconds_per_request": 19,
+    "estimated_hours_remaining": 4.8,
+    "historical_raw_keys": 637,
+    "pit_coverage_records": 1114
+  },
+  "claimed_progress_verified": false,
+  "credit_audit_live": {
+    "credits_before": null,
+    "credits_consumed": null,
+    "credits_remaining": null,
+    "estimated_remaining_cost": null,
+    "estimated_final_cost": null,
+    "unavailable_reason": "No THE_ODDS_API_KEY in this environment; GET /v4/sports (0-credit quota probe) cannot be executed. No in-flight collector metadata."
+  },
+  "credit_audit_last_verified_headers": {
+    "source": "persist.fetches[].quota in workers/ml/reports/oos-odds-final-batch.json on origin/agent/data/final-oos-odds-batch (commit 1cde8f7, 2026-09-12 11:38:38 +0200)",
+    "credits_before": 17110,
+    "credits_consumed": 100,
+    "credits_remaining": 17010,
+    "estimated_remaining_cost": 0,
+    "estimated_final_cost": 100,
+    "x_requests_last_each": 10,
+    "sum_x_requests_last": 100,
+    "first_fetch_x_requests_used": 2900,
+    "last_fetch_x_requests_used": 2990,
+    "first_fetch_x_requests_remaining": 17100,
+    "last_fetch_x_requests_remaining": 17010,
+    "documented_credits_per_historical_request": 10,
+    "fetches": [
+      {
+        "league": "mls",
+        "requested_as_of": "2026-07-17T00:30:00Z",
+        "request_key": "the_odds_api:historical_odds:soccer_usa_mls:eu:h2h:2026-07-17T00:30:00Z",
+        "event_count": 21,
+        "x_requests_last": 10,
+        "x_requests_remaining": 17100,
+        "x_requests_used": 2900
+      },
+      {
+        "league": "mls",
+        "requested_as_of": "2026-07-23T00:15:00Z",
+        "request_key": "the_odds_api:historical_odds:soccer_usa_mls:eu:h2h:2026-07-23T00:15:00Z",
+        "event_count": 30,
+        "x_requests_last": 10,
+        "x_requests_remaining": 17090,
+        "x_requests_used": 2910
+      },
+      {
+        "league": "mls",
+        "requested_as_of": "2026-07-26T00:30:00Z",
+        "request_key": "the_odds_api:historical_odds:soccer_usa_mls:eu:h2h:2026-07-26T00:30:00Z",
+        "event_count": 21,
+        "x_requests_last": 10,
+        "x_requests_remaining": 17080,
+        "x_requests_used": 2920
+      },
+      {
+        "league": "mls",
+        "requested_as_of": "2026-08-02T00:10:00Z",
+        "request_key": "the_odds_api:historical_odds:soccer_usa_mls:eu:h2h:2026-08-02T00:10:00Z",
+        "event_count": 30,
+        "x_requests_last": 10,
+        "x_requests_remaining": 17070,
+        "x_requests_used": 2930
+      },
+      {
+        "league": "mls",
+        "requested_as_of": "2026-08-16T00:30:00Z",
+        "request_key": "the_odds_api:historical_odds:soccer_usa_mls:eu:h2h:2026-08-16T00:30:00Z",
+        "event_count": 45,
+        "x_requests_last": 10,
+        "x_requests_remaining": 17060,
+        "x_requests_used": 2940
+      },
+      {
+        "league": "mls",
+        "requested_as_of": "2026-08-20T00:00:00Z",
+        "request_key": "the_odds_api:historical_odds:soccer_usa_mls:eu:h2h:2026-08-20T00:00:00Z",
+        "event_count": 33,
+        "x_requests_last": 10,
+        "x_requests_remaining": 17050,
+        "x_requests_used": 2950
+      },
+      {
+        "league": "mls",
+        "requested_as_of": "2026-08-23T00:30:00Z",
+        "request_key": "the_odds_api:historical_odds:soccer_usa_mls:eu:h2h:2026-08-23T00:30:00Z",
+        "event_count": 30,
+        "x_requests_last": 10,
+        "x_requests_remaining": 17040,
+        "x_requests_used": 2960
+      },
+      {
+        "league": "mls",
+        "requested_as_of": "2026-08-30T00:30:00Z",
+        "request_key": "the_odds_api:historical_odds:soccer_usa_mls:eu:h2h:2026-08-30T00:30:00Z",
+        "event_count": 29,
+        "x_requests_last": 10,
+        "x_requests_remaining": 17030,
+        "x_requests_used": 2970
+      },
+      {
+        "league": "mls",
+        "requested_as_of": "2026-09-06T00:30:00Z",
+        "request_key": "the_odds_api:historical_odds:soccer_usa_mls:eu:h2h:2026-09-06T00:30:00Z",
+        "event_count": 43,
+        "x_requests_last": 10,
+        "x_requests_remaining": 17020,
+        "x_requests_used": 2980
+      },
+      {
+        "league": "mls",
+        "requested_as_of": "2026-09-10T00:00:00Z",
+        "request_key": "the_odds_api:historical_odds:soccer_usa_mls:eu:h2h:2026-09-10T00:00:00Z",
+        "event_count": 29,
+        "x_requests_last": 10,
+        "x_requests_remaining": 17010,
+        "x_requests_used": 2990
+      }
+    ],
+    "note": "Job consumption = sum(x-requests-last)=100. Probe remaining 17110 -> last historical remaining 17010. x-requests-used 2900 -> 2990."
+  },
+  "credit_audit_if_unverified_1348_job_were_real": {
+    "assumption": "UNVERIFIED. Applies user-claimed 436 new historical requests at 10 credits each against last verified remaining 17010. No live x-requests-* headers exist for this alleged job.",
+    "credits_before": 17010,
+    "credits_consumed": 4360,
+    "credits_remaining": 12650,
+    "estimated_remaining_cost": 7110,
+    "estimated_final_cost": 11470
+  },
+  "coverage_audit": {
+    "postgres_live_query": "UNAVAILABLE",
+    "year_split_2024_2025_2026": "UNAVAILABLE",
+    "last_verified_sql_snapshot": {
+      "as_of_commit": "1cde8f7",
+      "universe": "dataset 0.3 true OOS window only (2026-07-01 inclusive to 2026-09-10T02:30:01Z exclusive)",
+      "target_matches": 387,
+      "matches_with_valid_pit_odds": 181,
+      "coverage_pct": 46.77,
+      "total_canonical_matches_in_sql": 7622,
+      "live_odds_snapshots": 43280,
+      "odds_raw_payloads": 203,
+      "by_competition": [
+        {
+          "competition": "bundesliga",
+          "target_matches_oos_window": 18,
+          "matches_with_valid_pit_odds": 7,
+          "coverage_pct": 38.89,
+          "isolated": 0
+        },
+        {
+          "competition": "champions-league",
+          "target_matches_oos_window": 102,
+          "matches_with_valid_pit_odds": 6,
+          "coverage_pct": 5.88,
+          "isolated": 0
+        },
+        {
+          "competition": "la-liga",
+          "target_matches_oos_window": 41,
+          "matches_with_valid_pit_odds": 12,
+          "coverage_pct": 29.27,
+          "isolated": 0
+        },
+        {
+          "competition": "ligue-1",
+          "target_matches_oos_window": 27,
+          "matches_with_valid_pit_odds": 24,
+          "coverage_pct": 88.89,
+          "isolated": 4
+        },
+        {
+          "competition": "mls",
+          "target_matches_oos_window": 139,
+          "matches_with_valid_pit_odds": 80,
+          "coverage_pct": 57.55,
+          "isolated": 0
+        },
+        {
+          "competition": "premier-league",
+          "target_matches_oos_window": 30,
+          "matches_with_valid_pit_odds": 30,
+          "coverage_pct": 100.0,
+          "isolated": 0
+        },
+        {
+          "competition": "serie-a",
+          "target_matches_oos_window": 30,
+          "matches_with_valid_pit_odds": 22,
+          "coverage_pct": 73.33,
+          "isolated": 0
+        }
+      ],
+      "pit_records_user_claimed": 1114,
+      "pit_records_user_claimed_verified": false
+    }
+  },
+  "marginal_value": {
+    "last_paid_historical_requests": 10,
+    "last_paid_credits": 100,
+    "new_canonical_oos_matches_from_those_paid_requests": 0,
+    "new_canonical_oos_matches_from_zero_credit_mls_replay": 67,
+    "requests_planned_last_job": 25,
+    "requests_executed_last_job": 10,
+    "requests_skipped_last_job": 15,
+    "requests_reused_last_job": 77,
+    "qualification_sport_key_unavailable": true,
+    "identity_exact_matches_new_fetch_events": 80,
+    "identity_unmatched_including_replay_quarantine": 3738,
+    "false_matches": 0,
+    "competitions_flat_after_paid_fetches": [
+      "premier-league",
+      "ligue-1",
+      "la-liga",
+      "bundesliga",
+      "serie-a",
+      "champions-league"
+    ],
+    "claimed_requests_remaining": 711,
+    "claimed_requests_already_covered_or_reusable": 201,
+    "expected_new_canonical_oos_matches_if_remaining_resemble_last_paid_batch": 0,
+    "expected_final_oos_coverage_if_stopped_now": "181 / 387",
+    "marginal_canonical_oos_matches_per_100_credits_last_paid_batch": 0,
+    "remaining_credit_cost_if_unverified_plan_completed": 7110
+  },
+  "preserved": {
+    "deleted_anything": false,
+    "rollback": false,
+    "backtest_run": false
+  },
+  "not_run": [
+    "production-oos-backtest",
+    "final-oos-evaluation",
+    "ROI"
+  ]
+}
