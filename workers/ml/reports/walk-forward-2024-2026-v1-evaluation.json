@@ -144,7 +144,7 @@
     "calibration_versions_fit": [],
     "random_seed": 42,
     "odds_fingerprint": null,
-    "evaluation_report_sha": "PENDING"
+    "evaluation_report_sha": "d72ff19afa60f088a890c599592ccdad1b6c3354"
   },
   "frozen_hyperparameters_unused": {
     "elo_initial": 1500.0,
@@ -156,7 +156,31 @@
   "quality_gates": {
     "dataset_sha_on_this_host": "FAIL",
     "odds_api": "not used",
-    "code_tests": "PENDING"
+    "checked_at": "2026-09-12T18:31:28Z",
+    "worktree": "/tmp/predicta-ml @ 1cde8f701e2fcdfd85f9574983b76abd810003cc",
+    "suites": [
+      {
+        "name": "value_engine_odds_pit",
+        "result": "34 passed, 2 skipped"
+      },
+      {
+        "name": "ml_provenance_oos_calibration_metrics_splits",
+        "result": "29 passed"
+      },
+      {
+        "name": "ai_picks_analyst_frozen_oos",
+        "result": "33 passed"
+      },
+      {
+        "name": "production_oos_sql_prematch",
+        "result": "18 passed, 1 skipped"
+      },
+      {
+        "name": "ingestion_pit_ml_dataset",
+        "result": "19 passed, 1 failed (test_dataset_export_and_quality_report: pyarrow missing in ingestion venv; packaging, not PIT leakage)"
+      }
+    ],
+    "note": "Code tests do not replace Evaluation A. They did not load the pinned parquet."
   },
   "status_block": {
     "STATUS": "BLOCKED",

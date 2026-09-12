@@ -135,7 +135,7 @@ Static protocol constraints remain in force and were not relaxed.
 | Dataset version | `football-1x2-history-0.3` (required, not loaded) |
 | Dataset SHA-256 | required `0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5` — **unverified on this host, file absent** |
 | Feature schema | `football-1x2-features-0.3` |
-| Code SHA (this eval branch) | pending commit SHA |
+| Code SHA (this eval branch) | `d72ff19afa60f088a890c599592ccdad1b6c3354` |
 | Implementation audit SHA | `1cde8f701e2fcdfd85f9574983b76abd810003cc` |
 | Walk-forward artefacts | not created |
 | Candidate | not loaded, not retrained, not promoted |
@@ -154,8 +154,20 @@ Forbidden and not done: Odds API, dataset regeneration, parquet modification,
 retraining `football-elo-v1-candidate`, Value/AI Picks, ROI, EV, model
 promotion.
 
-Existing code-level PIT / calibration / OOS-helper tests are recorded in the
-JSON companion after they run. They do **not** replace Evaluation A.
+Existing code-level PIT / calibration / OOS-helper tests (unmerged
+`1cde8f7` worktree, 2026-09-12T18:31:28Z):
+
+| Suite | Result |
+| --- | --- |
+| Value Engine / odds PIT | 34 passed, 2 skipped |
+| ML provenance / OOS helpers / calibration / metrics / splits | 29 passed |
+| AI Picks / Analyst grounding / frozen OOS | 33 passed |
+| production-oos-sql / prematch | 18 passed, 1 skipped |
+| Ingestion PIT / ML dataset | 19 passed, 1 failed (`pyarrow` missing in ingestion venv export test — packaging, not leakage) |
+| Dataset SHA on this host | FAIL (file absent) |
+
+These tests do **not** replace Evaluation A. They did not load the pinned
+parquet and did not score 2024–2026 walk-forward OOS.
 
 ---
 
