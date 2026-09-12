@@ -31,6 +31,10 @@ def main(argv: list[str] | None = None) -> int:
         json.dump(_production_oos_payload(), sys.stdout, indent=2, sort_keys=True, default=str)
         sys.stdout.write("\n")
         return 0
+    if args and args[0] == "production-oos-sql":
+        json.dump(_production_oos_sql_payload(), sys.stdout, indent=2, sort_keys=True, default=str)
+        sys.stdout.write("\n")
+        return 0
     if args and args[0] == "persisted-weekend":
         json.dump(_persisted_weekend_payload(), sys.stdout, indent=2, sort_keys=True, default=str)
         sys.stdout.write("\n")
@@ -69,6 +73,15 @@ def _production_oos_payload() -> dict[str, object]:
     payload["odds_source"] = "persisted_analytical_dataset" if quotes else "none"
     payload["new_api_credits"] = 0
     return payload
+
+
+def _production_oos_sql_payload() -> dict[str, object]:
+    from app.backtesting.production_oos_sql import run_live_sql_oos_backtest, summary_without_rows
+
+    dataset = repository_root() / "workers" / "ingestion" / "var" / "football-1x2-history.parquet"
+    repository = SqlOddsRepository(get_settings())
+    payload = run_live_sql_oos_backtest(dataset_path=dataset, repository=repository)
+    return summary_without_rows(payload)
 
 
 def _persisted_weekend_payload() -> dict[str, object]:
