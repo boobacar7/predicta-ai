@@ -295,6 +295,24 @@ describe("football prediction and value", () => {
     expect(result.data).not.toHaveProperty("model_favorite");
   });
 
+  it("publishes staging-verified Serie A predictions without a catalogue preview", async () => {
+    const torino = await source().getFootballPrediction("mth_football-sportmonks-19713579");
+    const inter = await source().getFootballPrediction("mth_football-sportmonks-19713584");
+    const udinese = await source().getFootballPrediction("mth_football-sportmonks-19713588");
+    const catalog = await source().getMatch("mth_football-sportmonks-19713579");
+
+    expect(torino.data.home_probability).toBe(0.2766);
+    expect(torino.data.draw_probability).toBe(0.2344);
+    expect(torino.data.away_probability).toBe(0.489);
+    expect(inter.data.home_probability).toBe(0.6197);
+    expect(udinese.data.home_probability).toBe(0.3735742608321212);
+    expect(catalog.data).toMatchObject({
+      id: "mth_football-sportmonks-19713579",
+      prediction: null,
+      prediction_preview: null,
+    });
+  });
+
   it("publishes Lincoln value with AWAY EV distinct from HOME EV", async () => {
     const result = await source().getFootballValue("mth_football-sportmonks-19719892");
 

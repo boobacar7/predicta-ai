@@ -6,7 +6,7 @@ import { MatchTimeline } from "@/components/domain/match-timeline";
 import { OddsDisplay } from "@/components/domain/odds-display";
 import { PageHeader } from "@/components/domain/page-header";
 import { ProbabilityBar } from "@/components/domain/probability-bar";
-import { FootballPredictionPanel } from "@/components/domain/football-prediction-panel";
+import { FootballPredictionSlot } from "@/components/domain/football-prediction-slot";
 import { FootballValuePanel } from "@/components/domain/football-value-panel";
 import { PrototypeNotice } from "@/components/domain/prototype-notice";
 import { QueryBoundary } from "@/components/domain/query-boundary";
@@ -18,12 +18,13 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { CardSkeleton } from "@/components/ui/skeleton";
 import { isCataloguePrototypeModel } from "@/lib/football/catalogue";
+import { shouldFetchFootballPrediction } from "@/lib/football/prediction-query";
 import { footballAnalystPath } from "@/lib/football/routes";
 import { formatAbsolute, formatKickoff } from "@/lib/format/dates";
 import { formatKickoffOrUnknown, formatMatchup } from "@/lib/format/identity";
 import { matchStatusLabels, sportLabels } from "@/lib/format/labels";
 import { formatPoints, formatScore } from "@/lib/format/numbers";
-import { useFootballPrediction, useFootballValue, useMatch } from "@/lib/query/hooks";
+import { useFootballValue, useMatch } from "@/lib/query/hooks";
 import type { HistoricalMatchIdentity, MatchDetail } from "@/types/api";
 import { isHistoricalMatchIdentity } from "@/types/api";
 import Link from "next/link";
@@ -86,42 +87,52 @@ function MatchDetailContent({ match }: { match: MatchDetail }) {
           </CardHeader>
           <CardBody className="space-y-4">
             {isCataloguePrototypeModel(match.prediction?.model_version) ? (
-              <PrototypeNotice>
-                Cette prédiction catalogue ({match.prediction?.model_version}) n&apos;est pas le
-                moteur GET /football/predictions.
-              </PrototypeNotice>
-            ) : null}
-            {match.prediction ? (
               <>
-                <div className="flex flex-wrap gap-2">
-                  <AIConfidence level={match.prediction.confidence} />
-                  <Badge tone="ai">{match.prediction.model_version}</Badge>
-                  {match.value_preview ? <ValueBadge preview={match.value_preview} /> : null}
-                </div>
-                <ProbabilityBar outcomes={match.prediction.outcomes} />
-                <p className="text-xs text-faint">
-                  Cutoff des données {formatAbsolute(match.prediction.cutoff_at)} · calibrateur{" "}
-                  {match.prediction.calibrator_version} · features{" "}
-                  {match.prediction.feature_set_version}
-                </p>
-                <div>
-                  <h3 className="text-sm font-medium">Facteurs explicatifs</h3>
-                  <ul className="mt-2 space-y-2 text-sm text-muted">
-                    {match.prediction.factors.map((factor) => (
-                      <li key={factor.id}>
-                        <span className="text-foreground">{factor.label}.</span> {factor.detail}
-                        {factor.quality.availability === "unavailable" ? (
-                          <span className="text-warning"> (donnée indisponible)</span>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                <PrototypeNotice>
+                  Cette prédiction catalogue ({match.prediction?.model_version}) n&apos;est pas le
+                  moteur GET /football/predictions.
+                </PrototypeNotice>
+                {match.prediction ? (
+                  <>
+                    <div className="flex flex-wrap gap-2">
+                      <AIConfidence level={match.prediction.confidence} />
+                      <Badge tone="ai">{match.prediction.model_version}</Badge>
+                      {match.value_preview ? <ValueBadge preview={match.value_preview} /> : null}
+                    </div>
+                    <ProbabilityBar outcomes={match.prediction.outcomes} />
+                    <p className="text-xs text-faint">
+                      Cutoff des données {formatAbsolute(match.prediction.cutoff_at)} · calibrateur{" "}
+                      {match.prediction.calibrator_version} · features{" "}
+                      {match.prediction.feature_set_version}
+                    </p>
+                    <div>
+                      <h3 className="text-sm font-medium">Facteurs explicatifs</h3>
+                      <ul className="mt-2 space-y-2 text-sm text-muted">
+                        {match.prediction.factors.map((factor) => (
+                          <li key={factor.id}>
+                            <span className="text-foreground">{factor.label}.</span> {factor.detail}
+                            {factor.quality.availability === "unavailable" ? (
+                              <span className="text-warning"> (donnée indisponible)</span>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </>
+                ) : (
+                  <Unavailable
+                    label="Prédiction"
+                    reason="Aucune version de modèle n'est publiée pour ce match."
+                  />
+                )}
               </>
             ) : (
-              <Unavailable
-                label="Prédiction"
-                reason="Aucune version de modèle n'est publiée pour ce match."
+              <FootballPredictionSlot
+                matchId={match.id}
+                enabled={shouldFetchFootballPrediction({
+                  status: match.status,
+                  catalogueModelVersion: match.prediction?.model_version,
+                })}
               />
             )}
           </CardBody>
@@ -256,16 +267,13 @@ function IdentityField({
 }
 
 function FootballEngineSections({ matchId }: { matchId: string }) {
-  const prediction = useFootballPrediction(matchId);
   const value = useFootballValue(matchId);
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Card>
         <CardBody>
-          <QueryBoundary query={prediction} skeleton={<CardSkeleton rows={5} />}>
-            {(payload) => <FootballPredictionPanel prediction={payload} />}
-          </QueryBoundary>
+          <FootballPredictionSlot matchId={matchId} enabled />
         </CardBody>
       </Card>
       <Card>

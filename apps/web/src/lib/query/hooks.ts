@@ -102,13 +102,17 @@ export function useFootballAiPicks(filters?: AiPicksFilters) {
   });
 }
 
-export function useFootballPrediction(matchId: string, cutoffAt?: string) {
+export function useFootballPrediction(
+  matchId: string,
+  cutoffAt?: string,
+  options?: { enabled?: boolean },
+) {
   const { source, scenario } = useSource();
 
   return useQuery({
     queryKey: queryKeys.footballPredictions.detail(scenario, matchId, cutoffAt),
     queryFn: () => source.getFootballPrediction(matchId, cutoffAt),
-    enabled: Boolean(matchId),
+    enabled: Boolean(matchId) && (options?.enabled ?? true),
   });
 }
 
