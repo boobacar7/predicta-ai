@@ -11,6 +11,7 @@ from app.core.config import Settings
 REPO = Path(__file__).resolve().parents[3]
 STAGING_COMPOSE = REPO / "infra" / "containers" / "compose.staging.yml"
 STAGING_ENV = REPO / "infra" / "containers" / ".env.staging.example"
+STAGING_COMPOSE_DOC = REPO / "docs" / "infra" / "staging-compose.md"
 PREPARE_SCRIPT = REPO / "infra" / "containers" / "prepare-staging-football-data.sh"
 ENTRYPOINT = REPO / "apps" / "api" / "docker-entrypoint.sh"
 API_DOCKERFILE = REPO / "apps" / "api" / "Dockerfile"
@@ -52,6 +53,31 @@ def test_staging_env_example_is_fail_closed_and_secret_free() -> None:
     assert "BEGIN PRIVATE" not in text
     assert "ghp_" not in text
     assert "aws_secret" not in text.lower()
+
+
+def test_staging_ingestion_passes_odds_api_token_without_embedding_it() -> None:
+    compose = yaml.safe_load(STAGING_COMPOSE.read_text(encoding="utf-8"))
+    env = compose["services"]["ingestion"]["environment"]
+    assert env["PREDICTA_INGESTION_ENV"] == "staging"
+    assert env["PREDICTA_INGESTION_DATA_MODE"] == "live"
+    assert env["PREDICTA_INGESTION_ENABLE_LIVE"] == "${PREDICTA_INGESTION_ENABLE_LIVE:-false}"
+    assert env["SPORTMONKS_API_TOKEN"] == "${SPORTMONKS_API_TOKEN:-}"
+    assert env["THE_ODDS_API_KEY"] == "${THE_ODDS_API_KEY:-}"
+    assert env["PREDICTA_INGESTION_THE_ODDS_API_KEY"] == "${PREDICTA_INGESTION_THE_ODDS_API_KEY:-}"
+    text = STAGING_COMPOSE.read_text(encoding="utf-8")
+    assert "sk_live" not in text
+    assert "odds_test_secret" not in text
+
+
+def test_staging_compose_docs_document_ingest_odds_command() -> None:
+    text = STAGING_COMPOSE_DOC.read_text(encoding="utf-8")
+    assert "ingestion ingest-football --league all" in text
+    assert "ingestion ingest-odds --league serie-a" in text
+    assert "-e THE_ODDS_API_KEY" in text
+    assert "-e PREDICTA_INGESTION_ENABLE_LIVE=true" in text
+    assert "--as-of" in text
+    assert "unmatched_odds_event" in text
+    assert "/problems/odds-unavailable" in text
 
 
 def test_staging_compose_bind_mounts_worker_var_into_api_data_paths() -> None:

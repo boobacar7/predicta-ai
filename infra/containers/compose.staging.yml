@@ -119,6 +119,8 @@ services:
       PREDICTA_INGESTION_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-predicta}:${POSTGRES_PASSWORD:-predicta}@postgres:5432/${POSTGRES_DB:-predicta}
       PREDICTA_INGESTION_RAW_STORE_PATH: /data/football/raw
       SPORTMONKS_API_TOKEN: ${SPORTMONKS_API_TOKEN:-}
+      THE_ODDS_API_KEY: ${THE_ODDS_API_KEY:-}
+      PREDICTA_INGESTION_THE_ODDS_API_KEY: ${PREDICTA_INGESTION_THE_ODDS_API_KEY:-}
     volumes:
       - ${PREDICTA_FOOTBALL_DATASETS_HOST:-../../workers/ingestion/var}:/data/football/datasets
       - ${PREDICTA_FOOTBALL_REGISTRY_HOST:-../../workers/ml/var/registry}:/data/football/registry:ro
