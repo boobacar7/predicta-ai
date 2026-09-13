@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { CardSkeleton } from "@/components/ui/skeleton";
 import { StatTile } from "@/components/ui/stat-tile";
 import { describePage, summarizeAiPicks } from "@/features/picks/selectors";
-import { useFilters } from "@/lib/filters/context";
+import { FOOTBALL_PATHS } from "@/lib/football/routes";
 import { football1x2Labels } from "@/lib/format/labels";
 import {
   formatCount,
@@ -25,7 +25,7 @@ import { useFootballAiPicks } from "@/lib/query/hooks";
 import type { AiPick, AiPicksResult } from "@/types/api";
 import { useMemo, useState } from "react";
 
-const meta = pageMeta["/ai-picks"];
+const meta = pageMeta[FOOTBALL_PATHS.aiPicks];
 const PAGE_SIZE = 6;
 
 /**
@@ -40,15 +40,12 @@ const PAGE_SIZE = 6;
  * makes the engine re-evaluate eligibility and report the rejected selections.
  */
 export function AiPicksView() {
-  const { sport } = useFilters();
   const [date, setDate] = useState("");
   const [league, setLeague] = useState("all");
   const [minEdge, setMinEdge] = useState<number | null>(null);
   const [minEv, setMinEv] = useState<number | null>(null);
   const [page, setPage] = useState(0);
   const [detail, setDetail] = useState<AiPick | null>(null);
-
-  const engineCoversSport = sport === "all" || sport === "football";
 
   const filters = useMemo(
     () => ({
@@ -62,13 +59,11 @@ export function AiPicksView() {
     [date, league, minEdge, minEv, page],
   );
 
-  const query = useFootballAiPicks(engineCoversSport ? filters : undefined);
+  const query = useFootballAiPicks(filters);
 
   // League options come from the unfiltered result for the same date, so the
   // list does not collapse to the single league already selected.
-  const optionsQuery = useFootballAiPicks(
-    engineCoversSport ? { date: date || undefined, limit: 100 } : undefined,
-  );
+  const optionsQuery = useFootballAiPicks({ date: date || undefined, limit: 100 });
   const leagueOptions = useMemo(
     () => leaguesIn(optionsQuery.data?.data),
     [optionsQuery.data?.data],
@@ -78,25 +73,6 @@ export function AiPicksView() {
     apply(value);
     setPage(0);
   };
-
-  if (!engineCoversSport) {
-    return (
-      <div className="space-y-6">
-        <PageHeader eyebrow={meta.eyebrow} title={meta.title} description={meta.description} />
-        <div
-          role="status"
-          className="rounded-2xl border border-dashed border-border-strong px-6 py-16 text-center"
-        >
-          <h2 className="text-lg font-medium">Moteur limité au football</h2>
-          <p className="mx-auto mt-2 max-w-md text-sm text-muted">
-            La version <span className="font-mono">ai-picks-0.1</span> ne couvre que le football.
-            Aucune opportunité n&apos;est produite pour le filtre de sport actif, et aucune n&apos;est
-            simulée.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">

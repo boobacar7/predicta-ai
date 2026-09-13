@@ -13,7 +13,7 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () =>
     new URLSearchParams(navigation.matchId ? { match_id: navigation.matchId } : undefined),
   useRouter: () => ({ replace: navigation.replace }),
-  usePathname: () => "/value-finder",
+  usePathname: () => "/football/value",
 }));
 
 async function renderPage(options: Parameters<typeof renderWithProviders>[1] = {}) {

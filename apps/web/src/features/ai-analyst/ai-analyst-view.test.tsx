@@ -20,7 +20,7 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () =>
     new URLSearchParams(navigation.matchId ? { match_id: navigation.matchId } : undefined),
   useRouter: () => ({ replace: navigation.replace }),
-  usePathname: () => "/ai-analyst",
+  usePathname: () => "/football/ai-analyst",
 }));
 
 async function renderPage(
@@ -132,7 +132,7 @@ describe("AiAnalystView", () => {
   });
 
   it("distinguishes an empty result from an error", async () => {
-    await renderPage({ scenario: "empty" });
+    await renderPage({ scenario: "empty", matchId: LINCOLN_ANALYST_MATCH_ID });
 
     expect(await screen.findByText("Aucune analyse disponible")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Réessayer" })).not.toBeInTheDocument();
@@ -183,22 +183,29 @@ describe("AiAnalystView", () => {
     expect(screen.getAllByText(/-16,7/).length).toBeGreaterThan(0);
   });
 
-  it("does not invent coverage for another sport", async () => {
+  it("still loads football when a leftover sport filter is tennis", async () => {
     renderWithProviders(<AiAnalystView />, { sport: "tennis" });
 
-    expect(await screen.findByText("Analyste limité au football")).toBeInTheDocument();
-    expect(screen.queryByText("Favori du modèle · Domicile")).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Lincoln Red Imps vs Inter Club d'Escaldes" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Analyste limité au football")).not.toBeInTheDocument();
   });
 
-  it("exposes a labelled match selector", async () => {
+  it("writes the selected match_id into the analyst URL", async () => {
     const user = userEvent.setup();
     await renderPage();
 
-    await screen.findByLabelText("Match");
-    await user.selectOptions(screen.getByLabelText("Match"), LINCOLN_ANALYST_MATCH_ID);
+    const select = await screen.findByLabelText("Match");
+    const other = [...select.querySelectorAll("option")].find(
+      (option) => option.value && option.value !== LINCOLN_ANALYST_MATCH_ID,
+    );
+    expect(other?.value).toBeTruthy();
+    await user.selectOptions(select, other!.value);
 
     await waitFor(() => {
       expect(navigation.replace).toHaveBeenCalled();
     });
+    expect(String(navigation.replace.mock.calls.at(-1)?.[0])).toContain(`match_id=${other!.value}`);
   });
 });

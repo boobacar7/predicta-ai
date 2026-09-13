@@ -1,6 +1,6 @@
 "use client";
 
-import { SportFilter } from "@/components/domain/filters";
+import { EnvelopeDataModeBadge } from "@/components/domain/envelope-data-mode";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,11 +11,9 @@ import {
 } from "@/components/ui/dropdown";
 import { MOCK_SCENARIOS, useMockScenarioControl } from "@/data/mock/scenario-context";
 import { getDataSourceKind } from "@/lib/config";
-import { useFilters } from "@/lib/filters/context";
 import { Menu } from "lucide-react";
 
 export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
-  const { sport, setSport } = useFilters();
   const showScenarioPicker = getDataSourceKind() !== "http";
 
   return (
@@ -30,9 +28,15 @@ export function TopBar({ onOpenNav }: { onOpenNav: () => void }) {
         >
           <Menu className="size-5" />
         </Button>
-        <SportFilter value={sport} onChange={setSport} />
+        <span
+          className="h-8 rounded-full bg-ai-soft px-3 text-xs font-medium leading-8 text-foreground"
+          aria-label="Sport verrouillé : football"
+        >
+          Football
+        </span>
       </div>
-      <div className="flex shrink-0 items-center gap-1">
+      <div className="flex shrink-0 items-center gap-2">
+        <EnvelopeDataModeBadge />
         <ThemeToggle />
         {showScenarioPicker ? <ScenarioPicker /> : null}
       </div>

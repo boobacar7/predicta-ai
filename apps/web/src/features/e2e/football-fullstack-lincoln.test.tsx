@@ -16,7 +16,7 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () =>
     new URLSearchParams(navigation.matchId ? { match_id: navigation.matchId } : undefined),
   useRouter: () => ({ replace: navigation.replace }),
-  usePathname: () => "/e2e",
+  usePathname: () => "/football/value",
 }));
 
 describe("Lincoln fullstack football journey", () => {
@@ -32,10 +32,10 @@ describe("Lincoln fullstack football journey", () => {
     expect(
       await screen.findByRole("heading", { name: "Lincoln Red Imps vs Inter Club d'Escaldes" }),
     ).toBeInTheDocument();
+    expect(await screen.findByText(/ne constitue pas une recommandation/)).toBeInTheDocument();
     expect(screen.getAllByText("+56,3 %").length).toBeGreaterThan(0);
-    expect(screen.getByText(/ne constitue pas une recommandation/)).toBeInTheDocument();
     expect(screen.getByText(/mth_football-sportmonks-19719892/)).toBeInTheDocument();
-    expect(screen.queryByText("fb-ens-2026.08.1")).not.toBeInTheDocument();
+    expect(screen.getAllByText(/n'est pas le moteur football/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/football-elo-v1-candidate/).length).toBeGreaterThan(0);
   });
 
@@ -54,7 +54,7 @@ describe("Lincoln fullstack football journey", () => {
     expect(screen.queryByText("Chronologie")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Ouvrir dans l'AI Analyst/ })).toHaveAttribute(
       "href",
-      "/ai-analyst?match_id=mth_football-sportmonks-19719892",
+      "/football/ai-analyst?match_id=mth_football-sportmonks-19719892",
     );
   });
 
@@ -63,7 +63,9 @@ describe("Lincoln fullstack football journey", () => {
 
     expect(await screen.findByRole("heading", { name: "Value Finder", level: 1 })).toBeInTheDocument();
     expect(await screen.findByText("Information de valeur")).toBeInTheDocument();
-    expect(screen.getAllByText("Lincoln Red Imps vs Inter Club d'Escaldes").length).toBeGreaterThan(0);
+    expect(
+      await screen.findAllByText("Lincoln Red Imps vs Inter Club d'Escaldes"),
+    ).not.toHaveLength(0);
     expect(screen.getByText("-16,7 %")).toBeInTheDocument();
     expect(screen.getByText("+56,3 %")).toBeInTheDocument();
     expect(screen.queryByText("Northgate FC · Harbor Athletic")).not.toBeInTheDocument();

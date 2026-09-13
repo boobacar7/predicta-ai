@@ -1,8 +1,6 @@
-import { AiPicksView } from "@/features/picks";
-import type { Metadata } from "next";
+import { FOOTBALL_PATHS } from "@/lib/football/routes";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "AI Picks" };
-
-export default function AiPicksPage() {
-  return <AiPicksView />;
+export default function AiPicksRedirectPage() {
+  redirect(FOOTBALL_PATHS.aiPicks);
 }

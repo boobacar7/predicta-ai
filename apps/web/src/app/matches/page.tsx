@@ -1,8 +1,6 @@
-import { MatchCenterView } from "@/features/matches";
-import type { Metadata } from "next";
+import { FOOTBALL_PATHS } from "@/lib/football/routes";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Match Center" };
-
-export default function MatchesPage() {
-  return <MatchCenterView />;
+export default function MatchesRedirectPage() {
+  redirect(FOOTBALL_PATHS.matches);
 }

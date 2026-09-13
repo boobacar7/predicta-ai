@@ -8,7 +8,7 @@ describe("DashboardView", () => {
     renderWithProviders(<DashboardView />);
 
     expect(await screen.findByRole("heading", { name: "Dashboard", level: 1 })).toBeInTheDocument();
-    expect(screen.queryByText("fb-ens-2026.08.1")).not.toBeInTheDocument();
+    expect((await screen.findAllByText(/n'est pas le moteur football/)).length).toBeGreaterThan(0);
     expect(screen.getByText("Log loss").parentElement).toHaveTextContent("Indisponible");
     expect(screen.getByText("ROI théorique").parentElement).toHaveTextContent("Indisponible");
   });
@@ -34,5 +34,22 @@ describe("DashboardView", () => {
 
     expect(await screen.findByText("Modèle candidat")).toBeInTheDocument();
     expect(screen.getAllByText(/football-elo-v1-candidate/).length).toBeGreaterThan(0);
+  });
+
+  it("points teasers at canonical /football routes", async () => {
+    renderWithProviders(<DashboardView />);
+
+    expect(await screen.findByRole("link", { name: "Tout le calendrier" })).toHaveAttribute(
+      "href",
+      "/football/matches",
+    );
+    expect(screen.getByRole("link", { name: "Tous les picks" })).toHaveAttribute(
+      "href",
+      "/football/ai-picks",
+    );
+    expect(screen.getByRole("link", { name: "Toutes les issues" })).toHaveAttribute(
+      "href",
+      "/football/value",
+    );
   });
 });

@@ -20,7 +20,7 @@ interface FiltersContextValue {
 const FiltersContext = createContext<FiltersContextValue | null>(null);
 
 export function FiltersProvider({
-  initialSport = "all",
+  initialSport = "football",
   children,
 }: {
   initialSport?: SportFilterValue;

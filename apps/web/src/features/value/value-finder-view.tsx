@@ -10,19 +10,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { DialogContent, DialogRoot, DialogTrigger } from "@/components/ui/dialog";
 import { CardSkeleton } from "@/components/ui/skeleton";
-import { LINCOLN_MATCH_ID } from "@/data/mock/football-engine";
 import { type FootballValueSort } from "@/features/value/selectors";
 import { isDataSourceError } from "@/lib/api/errors";
-import { useFilters } from "@/lib/filters/context";
+import { footballMatchOptions } from "@/lib/football/match-options";
+import { FOOTBALL_PATHS, P1_SPORT, footballAnalystPath, footballMatchPath } from "@/lib/football/routes";
+import { useFootballMatchId } from "@/lib/football/use-match-id";
 import { formatMatchup } from "@/lib/format/identity";
 import { pageMeta } from "@/lib/navigation";
-import { useFootballValue, useMatch } from "@/lib/query/hooks";
+import { useFootballAiPicks, useFootballValue, useMatch, useMatches } from "@/lib/query/hooks";
 import { isHistoricalMatchIdentity } from "@/types/api";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
-const meta = pageMeta["/value-finder"];
+const meta = pageMeta[FOOTBALL_PATHS.value];
 
 const sortOptions: Array<{ value: FootballValueSort; label: string }> = [
   { value: "selection", label: "HOME / DRAW / AWAY" },
@@ -40,16 +41,26 @@ const sortOptions: Array<{ value: FootballValueSort; label: string }> = [
  * only reorders those rows.
  */
 export function ValueFinderView() {
-  const { sport } = useFilters();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const matchId = searchParams.get("match_id") ?? LINCOLN_MATCH_ID;
-  const engineCoversSport = sport === "all" || sport === "football";
+  const { matchId, pending } = useFootballMatchId();
   const [sort, setSort] = useState<FootballValueSort>("selection");
 
-  const query = useFootballValue(engineCoversSport ? matchId : "");
-  const identityQuery = useMatch(engineCoversSport ? matchId : "");
+  const query = useFootballValue(matchId);
+  const identityQuery = useMatch(matchId);
+  const matches = useMatches({ sport: P1_SPORT });
+  const picks = useFootballAiPicks({ limit: 50 });
+
+  const options = useMemo(
+    () =>
+      footballMatchOptions({
+        matches: matches.data?.data.items,
+        picks: picks.data?.data.items,
+        currentId: matchId,
+      }),
+    [matches.data?.data.items, picks.data?.data.items, matchId],
+  );
 
   const onMatchChange = useCallback(
     (next: string) => {
@@ -60,7 +71,21 @@ export function ValueFinderView() {
     [pathname, router, searchParams],
   );
 
-  if (!engineCoversSport) {
+  if (pending) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          eyebrow={meta.eyebrow}
+          title={meta.title}
+          description={meta.description}
+          actions={<FormulaDialog />}
+        />
+        <CardSkeleton rows={6} />
+      </div>
+    );
+  }
+
+  if (!matchId) {
     return (
       <div className="space-y-6">
         <PageHeader
@@ -70,8 +95,8 @@ export function ValueFinderView() {
           actions={<FormulaDialog />}
         />
         <EmptyState
-          title="Value Engine limité au football"
-          description="GET /football/value n'évalue que le football 1X2. Aucune analyse n'est simulée pour le sport actif."
+          title="Aucun match à évaluer"
+          description="Le Value Engine n'a aucun identifiant football à afficher. Passez un match_id ou attendez une publication."
         />
       </div>
     );
@@ -86,7 +111,7 @@ export function ValueFinderView() {
           description={meta.description}
           actions={<FormulaDialog />}
         />
-        <MatchPicker value={matchId} onChange={onMatchChange} />
+        <MatchPicker value={matchId} onChange={onMatchChange} options={options} />
         <EmptyState
           title="Aucune analyse de valeur"
           description="Le Value Engine n'a publié aucune analyse pour cet identifiant. Ce n'est pas une erreur masquée par des données mock."
@@ -104,7 +129,7 @@ export function ValueFinderView() {
         actions={<FormulaDialog />}
       />
 
-      <MatchPicker value={matchId} onChange={onMatchChange} />
+      <MatchPicker value={matchId} onChange={onMatchChange} options={options} />
 
       <QueryBoundary query={query} skeleton={<CardSkeleton rows={6} />}>
         {(analysis, envelope) => {
@@ -156,7 +181,7 @@ export function ValueFinderView() {
               <FootballValuePanel analysis={analysis} sort={sort} />
 
               <Link
-                href={`/matches/${analysis.match_id}`}
+                href={footballMatchPath(analysis.match_id)}
                 className="inline-block text-sm text-ai-strong hover:underline"
               >
                 Voir le match
@@ -165,7 +190,7 @@ export function ValueFinderView() {
                 ·
               </span>
               <Link
-                href={`/ai-analyst?match_id=${analysis.match_id}`}
+                href={footballAnalystPath(analysis.match_id)}
                 className="inline-block text-sm text-ai-strong hover:underline"
               >
                 Ouvrir dans l&apos;AI Analyst
@@ -178,14 +203,26 @@ export function ValueFinderView() {
   );
 }
 
-function MatchPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+function MatchPicker({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: ReadonlyArray<{ id: string; label: string }>;
+}) {
   return (
     <section
       aria-label="Match évalué"
       className="rounded-2xl border border-border bg-surface px-4 py-3"
     >
       <SelectFilter label="Match" value={value} onChange={onChange}>
-        <option value={LINCOLN_MATCH_ID}>Lincoln Red Imps vs Inter Club d&apos;Escaldes</option>
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
       </SelectFilter>
     </section>
   );

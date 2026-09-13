@@ -1,10 +1,6 @@
-import { DashboardView } from "@/features/dashboard";
-import type { Metadata } from "next";
+import { FOOTBALL_PATHS } from "@/lib/football/routes";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Dashboard",
-};
-
-export default function HomePage() {
-  return <DashboardView />;
+export default function HomeRedirectPage() {
+  redirect(FOOTBALL_PATHS.dashboard);
 }

@@ -13,23 +13,21 @@ import { Unavailable } from "@/components/domain/unavailable";
 import { Card, CardBody } from "@/components/ui/card";
 import { CardSkeleton } from "@/components/ui/skeleton";
 import { StatTile } from "@/components/ui/stat-tile";
-import { LINCOLN_MATCH_ID, FOOTBALL_MODEL_VERSION } from "@/data/mock/football-engine";
 import { footballValueRows } from "@/lib/football/value-rows";
-import { useFilters } from "@/lib/filters/context";
+import { FOOTBALL_PATHS, P1_SPORT } from "@/lib/football/routes";
 import { football1x2Labels } from "@/lib/format/labels";
 import { formatCount, formatPoints, formatSignedPercent, NO_VALUE_LABEL, UNAVAILABLE_LABEL } from "@/lib/format/numbers";
 import { pageMeta } from "@/lib/navigation";
 import { useFootballAiPicks, useFootballValue, useMatches } from "@/lib/query/hooks";
 import Link from "next/link";
 
-const meta = pageMeta["/"];
+const meta = pageMeta[FOOTBALL_PATHS.dashboard];
 
 export function DashboardView() {
-  const { sport } = useFilters();
-  const football = sport === "all" || sport === "football";
-  const catalogue = useMatches({ sport });
+  const catalogue = useMatches({ sport: P1_SPORT });
   const picks = useFootballAiPicks({ limit: 2 });
-  const value = useFootballValue(football ? LINCOLN_MATCH_ID : "");
+  const valueMatchId = picks.data?.data.items[0]?.match_id ?? "";
+  const value = useFootballValue(valueMatchId);
 
   return (
     <div className="space-y-8">
@@ -39,7 +37,7 @@ export function DashboardView() {
         <MetricCard
           label="Matchs du jour"
           value={catalogue.isPending ? NO_VALUE_LABEL : formatCount(catalogue.data?.data.items.length ?? null)}
-          hint="Catalogue de navigation, pas le moteur football"
+          hint="Catalogue de navigation football, pas le moteur"
         />
         <MetricCard
           label="Log loss"
@@ -55,17 +53,19 @@ export function DashboardView() {
         />
       </section>
 
-      {football ? (
-        <CandidateModelNotice version={FOOTBALL_MODEL_VERSION} status="candidate" />
-      ) : (
-        <EmptyState
-          title="Moteur football uniquement"
-          description="Prediction, Value Engine, AI Picks et AI Analyst n'évaluent pas ce sport. Rien n'est inventé pour le remplir."
+      {picks.data?.data.items[0] ? (
+        <CandidateModelNotice
+          version={picks.data.data.items[0].model_version}
+          status={picks.data.data.items[0].model_status}
         />
-      )}
+      ) : null}
 
       <section className="space-y-4">
-        <SectionHeading title="Matchs du jour" href="/matches" linkLabel="Tout le calendrier" />
+        <SectionHeading
+          title="Matchs du jour"
+          href={FOOTBALL_PATHS.matches}
+          linkLabel="Tout le calendrier"
+        />
         <PrototypeNotice>
           Le calendrier reste un catalogue de navigation. Les identifiants et probabilités fb-ens-*
           ne sont pas le moteur football-elo-v1-candidate.
@@ -81,7 +81,7 @@ export function DashboardView() {
           isEmpty={(result) => result.items.length === 0}
           empty={{
             title: "Aucun match pour ce filtre",
-            description: "Élargissez le filtre sport ou consultez une autre date dans le Match Center.",
+            description: "Consultez une autre date dans le Match Center.",
           }}
         >
           {(result) => (
@@ -96,37 +96,34 @@ export function DashboardView() {
 
       <div className="grid gap-8 lg:grid-cols-2">
         <section className="space-y-4">
-          <SectionHeading title="AI Picks" href="/ai-picks" linkLabel="Tous les picks" />
-          {football ? (
-            <QueryBoundary
-              query={picks}
-              skeleton={<CardSkeleton rows={4} />}
-              isEmpty={(result) => result.items.length === 0}
-              empty={{
-                title: "Aucun pick publié",
-                description: "Aucun signal ne satisfait les critères documentés pour ce filtre.",
-              }}
-            >
-              {(result, envelope) => (
-                <div className="space-y-4">
-                  <DataModeNotice dataMode={envelope.data_mode} />
-                  {result.items.slice(0, 2).map((pick) => (
-                    <AiPickCard key={`${pick.match_id}-${pick.selection}`} pick={pick} />
-                  ))}
-                </div>
-              )}
-            </QueryBoundary>
-          ) : (
-            <Unavailable
-              label="AI Picks"
-              reason="Le moteur n'évalue que le football 1X2."
-            />
-          )}
+          <SectionHeading title="AI Picks" href={FOOTBALL_PATHS.aiPicks} linkLabel="Tous les picks" />
+          <QueryBoundary
+            query={picks}
+            skeleton={<CardSkeleton rows={4} />}
+            isEmpty={(result) => result.items.length === 0}
+            empty={{
+              title: "Aucun pick publié",
+              description: "Aucun signal ne satisfait les critères documentés pour le football.",
+            }}
+          >
+            {(result, envelope) => (
+              <div className="space-y-4">
+                <DataModeNotice dataMode={envelope.data_mode} />
+                {result.items.slice(0, 2).map((pick) => (
+                  <AiPickCard key={`${pick.match_id}-${pick.selection}`} pick={pick} />
+                ))}
+              </div>
+            )}
+          </QueryBoundary>
         </section>
 
         <section className="space-y-4">
-          <SectionHeading title="Value Finder" href="/value-finder" linkLabel="Toutes les issues" />
-          {football ? (
+          <SectionHeading
+            title="Value Finder"
+            href={FOOTBALL_PATHS.value}
+            linkLabel="Toutes les issues"
+          />
+          {valueMatchId ? (
             <QueryBoundary query={value} skeleton={<CardSkeleton rows={4} />}>
               {(analysis, envelope) => (
                 <div className="space-y-3">
@@ -155,21 +152,19 @@ export function DashboardView() {
                 </div>
               )}
             </QueryBoundary>
+          ) : picks.isPending ? (
+            <CardSkeleton rows={4} />
           ) : (
-            <Unavailable
-              label="Value Engine"
-              reason="GET /football/value n'évalue que le football 1X2."
+            <EmptyState
+              title="Aucune analyse de valeur"
+              description="Aucun match football n'est encore publié pour le Value Engine."
             />
           )}
         </section>
       </div>
 
       <section className="space-y-4">
-        <SectionHeading
-          title="Performance des modèles"
-          href="/performance"
-          linkLabel="Détail"
-        />
+        <h2 className="text-lg font-medium">Performance des modèles</h2>
         <Unavailable
           label="Métriques de performance"
           reason="Aucune API stable ne publie encore le log loss, le Brier ou le ROI du modèle candidat football-elo-v1-candidate."

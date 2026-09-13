@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { StatTile } from "@/components/ui/stat-tile";
 import { formatAbsolute } from "@/lib/format/dates";
+import { footballMatchPath } from "@/lib/football/routes";
 import { formatKickoffOrUnknown, formatMatchup } from "@/lib/format/identity";
 import Link from "next/link";
 import { football1x2Labels } from "@/lib/format/labels";
@@ -89,7 +90,7 @@ export function AiPickCard({ pick, onOpenDetail }: { pick: AiPick; onOpenDetail?
               </button>
             ) : null}
             <Link
-              href={`/matches/${pick.match_id}`}
+              href={footballMatchPath(pick.match_id)}
               className="text-sm text-muted hover:text-foreground hover:underline"
             >
               Voir le match

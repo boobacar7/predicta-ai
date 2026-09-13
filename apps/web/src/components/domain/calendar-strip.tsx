@@ -12,6 +12,21 @@ export function CalendarStrip({
 }) {
   return (
     <div role="tablist" aria-label="Date" className="flex gap-2 overflow-x-auto pb-1">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={value === ""}
+        onClick={() => onChange("")}
+        className={cn(
+          "min-w-16 rounded-2xl border px-3 py-2 text-center",
+          value === ""
+            ? "border-ai/40 bg-ai-soft text-foreground"
+            : "border-border bg-surface text-muted hover:bg-surface-hover",
+        )}
+      >
+        <span className="block text-[10px] uppercase tracking-[0.16em]">Dates</span>
+        <span className="mt-1 block text-sm font-medium">Toutes</span>
+      </button>
       {days.map((day) => {
         const iso = `${day}T12:00:00.000Z`;
         const selected = day === value;

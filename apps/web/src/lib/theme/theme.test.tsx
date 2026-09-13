@@ -14,7 +14,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ replace: vi.fn() }),
-  usePathname: () => "/value-finder",
+  usePathname: () => "/football/value",
 }));
 
 describe("theme persistence", () => {

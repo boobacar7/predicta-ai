@@ -1,6 +1,7 @@
 "use client";
 
 import { CalendarStrip } from "@/components/domain/calendar-strip";
+import { EmptyState } from "@/components/domain/empty-state";
 import { LeagueFilter, StatusFilter } from "@/components/domain/filters";
 import { MatchCard } from "@/components/domain/match-card";
 import { PageHeader } from "@/components/domain/page-header";
@@ -9,33 +10,37 @@ import { QueryBoundary } from "@/components/domain/query-boundary";
 import { Input } from "@/components/ui/input";
 import { CardSkeleton } from "@/components/ui/skeleton";
 import { searchMatches, upcomingDays } from "@/features/matches/selectors";
-import { useFilters } from "@/lib/filters/context";
+import { P1_SPORT } from "@/lib/football/routes";
 import { pageMeta } from "@/lib/navigation";
 import { useLeagues, useMatches } from "@/lib/query/hooks";
 import type { MatchStatus } from "@/types/api";
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 
-const meta = pageMeta["/matches"];
-const days = upcomingDays(7);
+const meta = pageMeta["/football/matches"];
 
 export function MatchCenterView() {
-  const { sport } = useFilters();
-  const [date, setDate] = useState(days[0]);
+  const days = useMemo(() => upcomingDays(7), []);
+  const [date, setDate] = useState("");
   const [leagueId, setLeagueId] = useState("all");
   const [status, setStatus] = useState<MatchStatus | "all">("all");
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
 
-  const leagues = useLeagues({ sport });
-  const matches = useMatches({ sport, date, league_id: leagueId, status });
+  const leagues = useLeagues({ sport: P1_SPORT });
+  const matches = useMatches({
+    sport: P1_SPORT,
+    date: date || undefined,
+    league_id: leagueId,
+    status,
+  });
 
   return (
     <div className="space-y-6">
       <PageHeader eyebrow={meta.eyebrow} title={meta.title} description={meta.description} />
 
       <PrototypeNotice>
-        Le Match Center est un catalogue de navigation. Un identifiant mth_* historique charge
-        l&apos;identité canonique et le moteur football lorsqu&apos;ils existent.
+        Le Match Center est un catalogue de navigation football. Un identifiant mth_* historique
+        charge l&apos;identité canonique et le moteur football lorsqu&apos;ils existent.
       </PrototypeNotice>
 
       <CalendarStrip days={days} value={date} onChange={setDate} />
@@ -73,14 +78,14 @@ export function MatchCenterView() {
 
           if (items.length === 0) {
             return (
-              <p
-                role="status"
-                className="rounded-2xl border border-dashed border-border-strong px-6 py-16 text-center text-sm text-muted"
-              >
-                {result.items.length === 0
-                  ? "Aucun événement ne correspond à cette date, ce sport, cette compétition ou ce statut."
-                  : `Aucune équipe ne correspond à « ${deferredSearch.trim()} » parmi les ${result.items.length} événements de cette sélection.`}
-              </p>
+              <EmptyState
+                title="Aucun match"
+                description={
+                  result.items.length === 0
+                    ? "Aucun événement de football ne correspond à cette date, cette compétition ou ce statut."
+                    : `Aucune équipe ne correspond à « ${deferredSearch.trim()} » parmi les ${result.items.length} événements de cette sélection.`
+                }
+              />
             );
           }
 
