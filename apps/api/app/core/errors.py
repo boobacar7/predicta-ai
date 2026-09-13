@@ -57,6 +57,36 @@ class ValidationProblem(ApiError):
         )
 
 
+class UnprocessableError(ApiError):
+    def __init__(self, detail: str, *, type_uri: str, title: str = "Unprocessable Entity") -> None:
+        super().__init__(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            title=title,
+            detail=detail,
+            type_uri=type_uri,
+        )
+
+
+class ConflictError(ApiError):
+    def __init__(self, detail: str, *, type_uri: str, title: str = "Conflict") -> None:
+        super().__init__(
+            status_code=status.HTTP_409_CONFLICT,
+            title=title,
+            detail=detail,
+            type_uri=type_uri,
+        )
+
+
+class ServiceUnavailableError(ApiError):
+    def __init__(self, detail: str, *, type_uri: str, title: str = "Service Unavailable") -> None:
+        super().__init__(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            title=title,
+            detail=detail,
+            type_uri=type_uri,
+        )
+
+
 def problem_response(
     *,
     request: Request,

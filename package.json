@@ -9,10 +9,15 @@
     "lint:web": "npm run lint --prefix apps/web",
     "typecheck:web": "npm run typecheck --prefix apps/web",
     "test:web": "npm run test --prefix apps/web",
-    "verify:web": "npm run typecheck:web && npm run lint:web && npm run test:web && npm run build:web",
+    "generate:web-api-types": "npm run generate:api-types --prefix apps/web",
+    "verify:openapi": "npm run generate:web-api-types && git diff --exit-code -- apps/web/src/types/generated/api.ts",
+    "verify:web": "npm run verify:openapi && npm run typecheck:web && npm run lint:web && npm run test:web && npm run build:web",
     "test:api": "npm run test --prefix apps/api",
     "verify:api": "npm run verify --prefix apps/api",
     "test:ingestion": "npm run test --prefix workers/ingestion",
-    "verify:ingestion": "npm run verify --prefix workers/ingestion"
+    "verify:ingestion": "npm run verify --prefix workers/ingestion",
+    "test:ml": "npm run test --prefix workers/ml",
+    "verify:ml": "npm run verify --prefix workers/ml",
+    "verify:all": "npm run verify:api && npm run verify:ingestion && npm run verify:ml && npm run verify:web"
   }
 }

@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 from app.core.clock import to_rfc3339
 
@@ -16,6 +16,7 @@ InsightKind = Literal["model", "data", "value", "caution"]
 FactorDirection = Literal["home", "away", "neutral"]
 FactorWeight = Literal["low", "medium", "high"]
 AnalystRole = Literal["user", "analyst"]
+FootballModelStatus = Literal["candidate", "champion"]
 
 
 class ApiModel(BaseModel):
@@ -430,3 +431,32 @@ class ListResult[T](ApiModel):
 
 class Envelope[T](EnvelopeMetadata):
     data: T
+
+
+class FootballModelPrediction(ApiModel):
+    """Calibrated 1X2 probabilities from a versioned football model. Never a certainty or bet."""
+
+    match_id: str = Field(min_length=1, max_length=128)
+    sport: Literal["football"] = "football"
+    market: Literal["1X2"] = "1X2"
+    home_probability: float = Field(gt=0, lt=1)
+    draw_probability: float = Field(gt=0, lt=1)
+    away_probability: float = Field(gt=0, lt=1)
+    model_version: str = Field(min_length=1, max_length=128)
+    dataset_version: str = Field(min_length=1, max_length=128)
+    feature_schema_version: str = Field(min_length=1, max_length=128)
+    model_status: FootballModelStatus
+    cutoff_at: datetime
+    cutoff_policy: str = Field(min_length=1, max_length=64)
+    generated_at: datetime
+
+    @field_serializer("cutoff_at", "generated_at")
+    def _timestamps(self, value: datetime) -> str:
+        return to_rfc3339(value)
+
+    @model_validator(mode="after")
+    def probabilities_form_simplex(self) -> Self:
+        total = self.home_probability + self.draw_probability + self.away_probability
+        if abs(total - 1.0) > 1e-9:
+            raise ValueError("home_probability, draw_probability and away_probability must sum to 1.")
+        return self

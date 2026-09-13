@@ -27,6 +27,12 @@ describe("retryability", () => {
       expect(new DataSourceError({ kind }).retryable).toBe(false);
     }
   });
+
+  it("refuses a retry for a 4xx problem even when the kind is server", () => {
+    expect(new DataSourceError({ kind: "server", status: 422 }).retryable).toBe(false);
+    expect(new DataSourceError({ kind: "server", status: 409 }).retryable).toBe(false);
+    expect(new DataSourceError({ kind: "server", status: 503 }).retryable).toBe(true);
+  });
 });
 
 describe("default messages", () => {

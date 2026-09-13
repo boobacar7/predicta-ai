@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
 from predicta_ingestion.canonical.enums import DataMode, ResourceType
@@ -60,14 +61,31 @@ class IngestionPipeline:
         self._odds = OddsNormalizer(clock)
 
     def run(self, provider: SportsProvider, request: ProviderRequest) -> IngestionReport:
+        envelopes = provider.fetch(request)
+        return self.ingest_envelopes(
+            provider.name,
+            request.resource,
+            envelopes,
+            since=request.since,
+            until=request.until,
+        )
+
+    def ingest_envelopes(
+        self,
+        provider_name: str,
+        resource: ResourceType,
+        envelopes: list[Any],
+        *,
+        since: datetime | None = None,
+        until: datetime | None = None,
+    ) -> IngestionReport:
         expected_mode = DataMode(self._settings.resolved_data_mode())
         report = IngestionReport(
-            provider=provider.name,
-            resource=request.resource,
+            provider=provider_name,
+            resource=resource,
             data_mode=expected_mode,
             dry_run=self._dry_run,
         )
-        envelopes = provider.fetch(request)
         report.records_read = len(envelopes)
         for envelope in envelopes:
             if self._dry_run:
@@ -82,37 +100,107 @@ class IngestionPipeline:
                 if stored.duplicate:
                     report.duplicates += 1
                     continue
-            try:
-                payload = self._validator.validate(stored, expected_mode=expected_mode)
-                batch = self._normalize(stored, payload)
-                quarantined = self._resolver.resolve(batch, data_mode=expected_mode)
-                report.quarantined.extend(quarantined)
-                if self._dry_run:
-                    persist = PersistResult(
-                        inserted=len(batch.sports)
-                        + len(batch.leagues)
-                        + len(batch.teams)
-                        + len(batch.matches)
-                    )
-                else:
-                    self._sink.record_raw(stored)
-                    persist = self._sink.persist(batch)
-                    self._sink.persist_identity(self._resolver.bindings())
-                report.records_accepted += persist.inserted
-                report.duplicates += persist.duplicates
-                report.persist = persist
-            except ValidationError as exc:
-                item = QuarantineItem(
-                    reason_code=exc.reason_code,
-                    detail=exc.detail,
-                    provider=provider.name,
-                    entity_type=request.resource.value,
-                    data_mode=expected_mode,
-                    raw_payload_id=stored.id,
-                    created_at=self._clock.now(),
-                )
-                report.quarantined.append(item)
+            self._ingest_stored(stored, report, expected_mode, provider_name, resource, since=since, until=until)
+        if not self._dry_run:
+            for item in report.quarantined:
+                self._record_quarantine(item)
         return report
+
+    def reprocess_stored(
+        self,
+        stored_items: list[StoredRaw],
+        *,
+        provider_name: str,
+        resource: ResourceType,
+    ) -> IngestionReport:
+        """Normalize already persisted raw payloads without rewriting the immutable store."""
+        expected_mode = DataMode(self._settings.resolved_data_mode())
+        report = IngestionReport(
+            provider=provider_name,
+            resource=resource,
+            data_mode=expected_mode,
+            dry_run=self._dry_run,
+        )
+        report.records_read = len(stored_items)
+        for stored in stored_items:
+            self._ingest_stored(stored, report, expected_mode, provider_name, resource)
+        if not self._dry_run:
+            for item in report.quarantined:
+                self._record_quarantine(item)
+        return report
+
+    def _ingest_stored(
+        self,
+        stored: StoredRaw,
+        report: IngestionReport,
+        expected_mode: DataMode,
+        provider_name: str,
+        resource: ResourceType,
+        *,
+        since: datetime | None = None,
+        until: datetime | None = None,
+    ) -> None:
+        try:
+            payload = self._validator.validate(stored, expected_mode=expected_mode)
+            batch = self._normalize(stored, payload)
+            batch = _filter_matches(batch, since=since, until=until)
+            report.quarantined.extend(self._consume_normalizer_quarantine())
+            quarantined = self._resolver.resolve(batch, data_mode=expected_mode)
+            report.quarantined.extend(quarantined)
+            persist = self._persist(stored, batch)
+            report.records_accepted += persist.inserted
+            report.duplicates += persist.duplicates
+            report.persist = persist
+        except ValidationError as exc:
+            item = QuarantineItem(
+                reason_code=exc.reason_code,
+                detail=exc.detail,
+                provider=provider_name,
+                entity_type=resource.value,
+                data_mode=expected_mode,
+                raw_payload_id=stored.id,
+                created_at=self._clock.now(),
+            )
+            report.quarantined.append(item)
+
+    def _persist(self, stored: StoredRaw, batch: CanonicalBatch) -> PersistResult:
+        if self._dry_run:
+            if isinstance(self._sink, MemoryCanonicalSink):
+                return self._sink.persist(batch)
+            memory = getattr(self._sink, "memory", None)
+            if isinstance(memory, MemoryCanonicalSink):
+                return memory.persist(batch)
+            return PersistResult(
+                inserted=len(batch.sports)
+                + len(batch.leagues)
+                + len(batch.teams)
+                + len(batch.matches)
+                + len(batch.odds)
+            )
+        self._sink.record_raw(stored)
+        persist = self._sink.persist(batch)
+        self._sink.persist_identity(self._resolver.bindings())
+        return persist
+
+    def _consume_normalizer_quarantine(self) -> list[QuarantineItem]:
+        items = list(self._sportmonks.quarantined) + list(self._odds.quarantined)
+        self._sportmonks.quarantined = []
+        self._odds.quarantined = []
+        return items
+
+    def _record_quarantine(self, item: QuarantineItem) -> None:
+        recorder = getattr(self._sink, "record_quarantine", None)
+        if not callable(recorder):
+            return
+        recorder(
+            reason_code=item.reason_code,
+            detail=item.detail,
+            provider=item.provider,
+            entity_type=item.entity_type,
+            data_mode=item.data_mode.value,
+            raw_payload_id=item.raw_payload_id,
+            provider_entity_id=item.provider_entity_id,
+        )
 
     def _normalize(self, stored: Any, payload: dict[str, Any]) -> CanonicalBatch:
         provider = stored.envelope.provider
@@ -124,9 +212,29 @@ class IngestionPipeline:
             return self._basketball.normalize(stored, payload)
         if "tennis" in provider:
             return self._tennis.normalize(stored, payload)
-        if "odds" in provider:
+        if provider == "the_odds_api" or "odds" in provider:
             return self._odds.normalize(stored, payload)
         raise ValidationError("unknown_provider", f"No normalizer registered for {provider}.")
+
+
+def _filter_matches(
+    batch: CanonicalBatch,
+    *,
+    since: datetime | None,
+    until: datetime | None,
+) -> CanonicalBatch:
+    if since is None and until is None:
+        return batch
+    matches = []
+    for match in batch.matches:
+        if since is not None and match.kickoff_at < since:
+            continue
+        if until is not None and match.kickoff_at > until:
+            continue
+        matches.append(match)
+    if matches == batch.matches:
+        return batch
+    return batch.model_copy(update={"matches": matches})
 
 
 def build_default_pipeline(settings: Settings, clock: Clock, raw_root: Any | None = None) -> IngestionPipeline:

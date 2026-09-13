@@ -177,6 +177,7 @@ def test_cli_main_exits_when_live_disabled(monkeypatch: pytest.MonkeyPatch) -> N
         lambda: Settings(_env_file=None, env="test", data_mode="mock", enable_live=False),
     )
     assert main(["ingest-football", "--league", "premier-league"]) == 1
+    assert main(["ingest-history", "--league", "MLS"]) == 1
 
 
 def test_cli_never_falls_back_to_mock(clock, live_settings: Settings, tmp_path) -> None:

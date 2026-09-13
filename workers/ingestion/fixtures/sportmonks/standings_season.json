@@ -1,0 +1,32 @@
+{
+  "data": [
+    {
+      "id": 9001,
+      "participant_id": 4005,
+      "sport_id": 1,
+      "league_id": 779,
+      "season_id": 18002,
+      "stage_id": 1,
+      "group_id": null,
+      "round_id": 12,
+      "standing_rule_id": 1,
+      "position": 1,
+      "result": "equal",
+      "points": 21
+    },
+    {
+      "id": 9002,
+      "participant_id": 4003,
+      "sport_id": 1,
+      "league_id": 779,
+      "season_id": 18002,
+      "stage_id": 1,
+      "group_id": null,
+      "round_id": 12,
+      "standing_rule_id": 1,
+      "position": 2,
+      "result": "down",
+      "points": 18
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+[
+  {
+    "id": "epl_incomplete_draw_missing",
+    "sport_key": "soccer_epl",
+    "commence_time": "2026-09-08T18:00:00Z",
+    "home_team": "Helix FC",
+    "away_team": "Meridian Athletic",
+    "bookmakers": [
+      {
+        "key": "marathonbet",
+        "title": "Marathon Bet",
+        "last_update": "2026-09-08T16:00:00Z",
+        "markets": [
+          {
+            "key": "h2h",
+            "outcomes": [
+              { "name": "Helix FC", "price": 1.70 },
+              { "name": "Meridian Athletic", "price": 4.80 }
+            ]
+          }
+        ]
+      },
+      {
+        "key": "missing_book",
+        "title": "Absent Book",
+        "markets": [
+          {
+            "key": "h2h",
+            "outcomes": [
+              { "name": "Helix FC", "price": 1.75 },
+              { "name": "Draw", "price": 3.80 },
+              { "name": "Meridian Athletic", "price": 4.50 }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]

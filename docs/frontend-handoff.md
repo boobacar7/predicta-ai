@@ -118,12 +118,98 @@ Résolus par [`contracts/openapi.yaml`](../contracts/openapi.yaml) :
 - les enveloppes, erreurs RFC 9457, filtres, enums, disponibilités et fraîcheurs
   sont définis.
 
-Reste une tâche frontend volontairement séparée : remplacer
-`src/types/api.ts`, encore manuscrit, par les types générés depuis OpenAPI puis
-exécuter le typecheck et les tests. Les composants et la `DataSource` n'ont pas
-besoin d'être redessinés.
-- AI Analyst : session mock déterministe, aucun appel LLM.
+`AiPick`, `AiPickExclusion`, `AiPicksMetadata`, `AiPicksResult`,
+`HistoricalMatchIdentity` et les types `FootballAiAnalyst*` sont des alias de
+`src/types/generated/api.ts`, régénéré par `npm run generate:api-types`
+depuis `contracts/openapi.yaml`. Le reste de `api.ts` reste manuscrit
+tant que la migration OpenAPI n'est pas totale.
+
+`GET /api/v1/football/ai-analyst/{match_id}` alimente `/ai-analyst`.
+`AiAnalystView` lit `FootballAiAnalystReport` via
+`getFootballAiAnalyst`. `model_favorite` et `value.value_selection` sont
+affichés dans deux blocs distincts : « Favori du modèle » et « Valeur
+détectée ». Le second n'est jamais présenté comme un pick.
+
+Ressource : `football_ai_analyst`. HTTP :
+
+```
+NEXT_PUBLIC_PREDICTA_HTTP_RESOURCES=football_ai_analyst
+NEXT_PUBLIC_PREDICTA_API_BASE_URL=http://localhost:8000/api/v1
+```
+
+Le défaut reste mock. L'UI affiche « Mock data » uniquement lorsque
+`data_mode === "mock"`.
+
+### Identité de match — consommé depuis `c31a367`
+
+`GET /api/v1/football/ai-picks` publie `home_team`, `away_team` (nullables)
+et `kickoff_at` (requis). `/ai-picks` affiche `Home vs Away`, la ligue et
+le coup d'envoi. `Information indisponible` n'apparaît que lorsque le
+libellé est réellement `null`.
+
+`GET /api/v1/matches/{match_id}` peut renvoyer `MatchDetail` ou
+`HistoricalMatchIdentity`. `MatchDetailView` discrimine via
+`resource_scope === "structural_identity"` et n'invente ni score, ni
+chronologie, ni statistiques pour un id d'archive.
+
+Pour lire l'API réelle plutôt que les fixtures :
+
+```
+NEXT_PUBLIC_PREDICTA_HTTP_RESOURCES=football_ai_picks,matches
+NEXT_PUBLIC_PREDICTA_API_BASE_URL=http://localhost:8000/api/v1
+```
+
+Le défaut reste `mock` pour le développement local sans parquet. Chaque
+réponse porte encore `data_mode` ; l'UI affiche « Mock data » uniquement
+lorsque l'enveloppe le dit.
+
+### Value Finder — Value Engine canonique
+
+`/value-finder` lit `GET /api/v1/football/value/{match_id}` via
+`getFootballValue`. Il n'y a pas de liste agrégée dans le contrat : la
+page inspecte un match à la fois (Lincoln par défaut). Le tri HOME/DRAW/AWAY
+est un affinage local, étiqueté comme tel. L'interface ne recalcule
+jamais implicite, no-vig, edge ou EV.
+
+`GET /value` reste une ressource catalogue prototype (`value`). Elle n'alimente
+plus l'expérience football principale.
+
+Ressources moteur :
+
+```
+NEXT_PUBLIC_PREDICTA_HTTP_RESOURCES=football_predictions,football_value,football_ai_picks,football_ai_analyst,matches
+NEXT_PUBLIC_PREDICTA_API_BASE_URL=http://localhost:8000/api/v1
+```
+
+Le Dashboard compose AI Picks, Value Engine et le catalogue de navigation.
+Les métriques fb-ens-* ne sont plus présentées comme le modèle football.
+Performance et Statistiques restent des surfaces prototype, explicitement
+libellées, tant qu'aucune API football stable n'existe pour ces données.
+
+## Thèmes
+
+Dark est le défaut. Light est une alternative persistée dans
+`localStorage` (`predicta-theme`). Le toggle (soleil / lune) est dans le
+header. Les composants consomment les tokens sémantiques de
+`globals.css` (`--background`, `--foreground`, `--card`, `--ai`,
+`--value`, `--warning`, `--risk`, …). Les graphiques lisent ces tokens
+via `useChartColors`. Le thème ne change aucune donnée métier.
+
+## Limites restantes
+
+- AI Analyst : même endpoint HTTP ; narrator déterministe par défaut.
+  Un LLM optionnel (`analyst.provider=llm-v0.1`) ne produit que la
+  narration, derrière le backend.
 - Profil : placeholder, phase 10.
+- Univers AI Picks V0.1 : un match candidat côté backend.
+- Performance football : pas d'API stable pour log loss / Brier / ROI du
+  candidat. La page le dit explicitement.
+- Statistiques / ligues / équipes / joueurs : catalogue prototype.
+- `GET /dashboard`, `GET /value`, `GET /performance`, `GET /picks` :
+  encore dans le DataSource pour le prototype, plus utilisés comme
+  source moteur football.
+- `MatchDetail` et `ValueOpportunity` restent des DTO manuscrits pour le
+  catalogue. Les flux football utilisent les schémas OpenAPI générés.
 
 ## Non fait volontairement
 

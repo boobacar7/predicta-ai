@@ -1,8 +1,5 @@
-import { AnalystView } from "@/features/analyst";
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "AI Analyst" };
-
-export default function AnalystPage() {
-  return <AnalystView />;
+export default function AnalystRedirectPage() {
+  redirect("/ai-analyst");
 }

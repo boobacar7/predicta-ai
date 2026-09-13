@@ -1,0 +1,86 @@
+{
+  "calibration_method": "sigmoid",
+  "code_version": "0.1.0+e8b76d7",
+  "dataset_sha256": "0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5",
+  "dataset_version": "football-1x2-history-0.3",
+  "ensemble_used": false,
+  "feature_schema_version": "football-1x2-features-0.3",
+  "model_version": "football-1x2-model-0.1",
+  "random_seed": 42,
+  "selected_model": "elo",
+  "test": {
+    "elo": {
+      "accuracy": 0.48320413436692505,
+      "brier_score": 0.6158857490851429,
+      "calibration_method": "sigmoid",
+      "ece": 0.06286755379601495,
+      "log_loss": 1.0280194466282804,
+      "n": 387
+    },
+    "frequency": {
+      "accuracy": 0.4573643410852713,
+      "brier_score": 0.6445106914714755,
+      "calibration_method": "raw",
+      "ece": 0.013299856473644567,
+      "log_loss": 1.0670602906884283,
+      "n": 387
+    },
+    "lightgbm": {
+      "accuracy": 0.5012919896640827,
+      "brier_score": 0.6228836282916301,
+      "calibration_method": "sigmoid",
+      "ece": 0.03803563597907115,
+      "log_loss": 1.0384976992180865,
+      "n": 387
+    },
+    "poisson": {
+      "accuracy": 0.4625322997416021,
+      "brier_score": 0.631182429381321,
+      "calibration_method": "sigmoid",
+      "ece": 0.026091785568340426,
+      "log_loss": 1.04808588547745,
+      "n": 387
+    },
+    "xgboost": {
+      "accuracy": 0.4883720930232558,
+      "brier_score": 0.6229484118915433,
+      "calibration_method": "sigmoid",
+      "ece": 0.035555510799948745,
+      "log_loss": 1.038236346783099,
+      "n": 387
+    }
+  },
+  "walk_forward_mean": {
+    "elo": {
+      "accuracy": 0.505557017692654,
+      "brier_score": 0.6080294923930744,
+      "ece": 0.02911605101743237,
+      "log_loss": 1.0178873455826467
+    },
+    "frequency": {
+      "accuracy": 0.4421750972343257,
+      "brier_score": 0.6464325759770154,
+      "ece": 0.01759171919401002,
+      "log_loss": 1.068523977817917
+    },
+    "lightgbm": {
+      "accuracy": 0.4734591416168568,
+      "brier_score": 0.6402403586989006,
+      "ece": 0.0875265661350696,
+      "log_loss": 1.0778372668109004
+    },
+    "poisson": {
+      "accuracy": 0.4730338143278481,
+      "brier_score": 0.6326996822962873,
+      "ece": 0.047335380168200936,
+      "log_loss": 1.0505069010978907
+    },
+    "xgboost": {
+      "accuracy": 0.48201466678116395,
+      "brier_score": 0.631422946567339,
+      "ece": 0.06620714337759621,
+      "log_loss": 1.0598069774436203
+    }
+  },
+  "walk_forward_ranking": ["elo", "poisson", "xgboost", "frequency", "lightgbm"]
+}

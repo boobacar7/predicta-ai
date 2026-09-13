@@ -1,11 +1,16 @@
 import { HttpClient, type HttpClientOptions } from "@/data/http/client";
 import type {
+  AiPicksFilters,
+  AiPicksResult,
   AnalystSession,
+  FootballAiAnalystReport,
+  FootballModelPrediction,
+  FootballValueAnalysis,
   CatalogFilters,
   DashboardSnapshot,
   League,
   LeagueDetail,
-  MatchDetail,
+  MatchDetailResponse,
   MatchFilters,
   MatchSummary,
   PerformanceReport,
@@ -26,9 +31,8 @@ import type { DataSource, ListResult } from "@/types/datasource";
  * is inert until a resource is pointed at `http` through configuration, so it can
  * be wired endpoint by endpoint without touching a single view.
  *
- * Known divergence to reconcile when `contracts/openapi.yaml` lands: the API list
- * has no aggregate dashboard route, so `GET /dashboard` is assumed here. It is the
- * only path in this file not already documented in the contract.
+ * Catalogue routes (`/dashboard`, `/matches`, `/value`, `/performance`) remain
+ * the prototype surface. Football engines are the `/football/*` paths.
  */
 export class HttpDataSource implements DataSource {
   readonly kind = "http" as const;
@@ -60,11 +64,29 @@ export class HttpDataSource implements DataSource {
   }
 
   getMatch(id: string) {
-    return this.client.get<MatchDetail>(`/matches/${encodeURIComponent(id)}`);
+    return this.client.get<MatchDetailResponse>(`/matches/${encodeURIComponent(id)}`);
   }
 
   getPicks(filters: MatchFilters = {}) {
     return this.client.get<ListResult<Pick>>("/picks", matchParams(filters));
+  }
+
+  getFootballAiPicks(filters: AiPicksFilters = {}) {
+    return this.client.get<AiPicksResult>("/football/ai-picks", aiPicksParams(filters));
+  }
+
+  getFootballPrediction(matchId: string, cutoffAt?: string) {
+    return this.client.get<FootballModelPrediction>(
+      `/football/predictions/${encodeURIComponent(matchId)}`,
+      { cutoff_at: cutoffAt },
+    );
+  }
+
+  getFootballValue(matchId: string, cutoffAt?: string) {
+    return this.client.get<FootballValueAnalysis>(
+      `/football/value/${encodeURIComponent(matchId)}`,
+      { cutoff_at: cutoffAt },
+    );
   }
 
   getValue(filters: MatchFilters = {}) {
@@ -97,6 +119,13 @@ export class HttpDataSource implements DataSource {
       question: question ?? null,
     });
   }
+
+  getFootballAiAnalyst(matchId: string, cutoffAt?: string) {
+    return this.client.get<FootballAiAnalystReport>(
+      `/football/ai-analyst/${encodeURIComponent(matchId)}`,
+      { cutoff_at: cutoffAt },
+    );
+  }
 }
 
 function catalogParams(filters: CatalogFilters) {
@@ -109,5 +138,20 @@ function matchParams(filters: MatchFilters) {
     league_id: filters.league_id,
     date: filters.date,
     status: filters.status,
+  };
+}
+
+/**
+ * Parameter names are the engine's own, not the generic match filter names:
+ * the route takes `league` (a name) rather than `league_id`, and has no `sport`.
+ */
+function aiPicksParams(filters: AiPicksFilters) {
+  return {
+    date: filters.date,
+    league: filters.league,
+    limit: filters.limit,
+    offset: filters.offset,
+    min_edge: filters.min_edge,
+    min_ev: filters.min_ev,
   };
 }

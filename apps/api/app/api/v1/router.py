@@ -1,9 +1,13 @@
-from datetime import date
+from datetime import date, datetime
+from decimal import Decimal
+from typing import Annotated
 
 from fastapi import APIRouter, Query, Request
 
+from app.ai_picks.models import AiPicksQuery
 from app.api.deps import envelope, filter_market, get_container, paginate
 from app.core.container import AppContainer
+from app.match_identity.models import HistoricalMatchIdentity
 from app.schemas import AnalystRequest, MatchStatus, SportCode
 
 router = APIRouter()
@@ -93,7 +97,9 @@ def get_matches(
 
 @router.get("/matches/{match_id}")
 def get_match(request: Request, match_id: str) -> dict[str, object]:
-    return envelope(request, _container(request).matches.get_match(match_id))
+    resource = _container(request).match_resolution().get(match_id)
+    data_mode = resource.data_mode if isinstance(resource, HistoricalMatchIdentity) else None
+    return envelope(request, resource, data_mode=data_mode)
 
 
 @router.get("/matches/{match_id}/stats")
@@ -122,6 +128,62 @@ def get_match_prediction(
     return envelope(request, filter_market(match, market, "prediction"))
 
 
+@router.get("/football/predictions/{match_id}")
+def get_football_model_prediction(
+    request: Request,
+    match_id: str,
+    cutoff_at: Annotated[datetime | None, Query()] = None,
+) -> dict[str, object]:
+    prediction, data_mode = _container(request).football_predictions().predict_with_provenance(
+        match_id,
+        cutoff_at,
+    )
+    return envelope(request, prediction, data_mode=data_mode)
+
+
+@router.get("/football/value/{match_id}")
+def get_football_match_value(
+    request: Request,
+    match_id: str,
+    cutoff_at: Annotated[datetime | None, Query()] = None,
+) -> dict[str, object]:
+    analysis = _container(request).football_values().evaluate(match_id, cutoff_at)
+    return envelope(request, analysis, data_mode=analysis.metadata.data_mode)
+
+
+@router.get("/football/ai-analyst/{match_id}")
+def get_football_ai_analyst(
+    request: Request,
+    match_id: str,
+    cutoff_at: Annotated[datetime | None, Query()] = None,
+) -> dict[str, object]:
+    report = _container(request).football_ai_analyst().explain(match_id, cutoff_at)
+    return envelope(request, report, data_mode=report.analyst.data_quality.data_mode)
+
+
+@router.get("/football/ai-picks")
+def get_football_ai_picks(
+    request: Request,
+    date: date | None = None,
+    league: str | None = Query(default=None, min_length=1, max_length=128),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    min_edge: Annotated[Decimal | None, Query(ge=-1, lt=1)] = None,
+    min_ev: Annotated[Decimal | None, Query(ge=-1)] = None,
+) -> dict[str, object]:
+    result = _container(request).football_ai_picks().list_picks(
+        AiPicksQuery(
+            match_date=date,
+            league=league,
+            limit=limit,
+            offset=offset,
+            minimum_edge=min_edge,
+            minimum_ev=min_ev,
+        )
+    )
+    return envelope(request, result)
+
+
 @router.get("/picks")
 def get_picks(
     request: Request,
@@ -146,6 +208,8 @@ def get_value(
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ) -> dict[str, object]:
+    """Catalog prototype. Football product value uses GET /football/value/{match_id}."""
+
     items = _container(request).values.list_values(sport=sport, league_id=league_id, match_date=date, status=status)
     return envelope(request, paginate(items, limit=limit, offset=offset))
 

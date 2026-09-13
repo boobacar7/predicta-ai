@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Protocol
 
 from predicta_ingestion.canonical.enums import DataMode, SportCode
 from predicta_ingestion.ids import canonical_id
-from predicta_ingestion.raw.envelope import RawEnvelope
+from predicta_ingestion.raw.envelope import RawEnvelope, stable_checksum_bytes
 
 
 class StoredRaw:
@@ -31,18 +32,35 @@ class FilesystemRawStore:
     def __init__(self, root: Path) -> None:
         self._root = root
         self._checksums: dict[tuple[str, str], str] = {}
+        self._index_existing()
 
     def put(self, envelope: RawEnvelope) -> StoredRaw:
         checksum = envelope.checksum_sha256
         existing = self._checksums.get((envelope.provider, checksum))
         if existing is not None:
             stored = self.get(existing)
-            if stored is None:
-                raise RuntimeError("Checksum index refers to a missing raw payload.")
-            return StoredRaw(raw_id=existing, envelope=stored.envelope, storage_uri=stored.storage_uri, duplicate=True)
+            if stored is not None:
+                return StoredRaw(
+                    raw_id=existing,
+                    envelope=stored.envelope,
+                    storage_uri=stored.storage_uri,
+                    duplicate=True,
+                )
+
+        raw_id = canonical_id("raw", envelope.provider, envelope.resource, checksum[:12])
+        existing_path = self._find_path(raw_id)
+        if existing_path is not None:
+            self._checksums[(envelope.provider, checksum)] = raw_id
+            stored = self.get(raw_id)
+            if stored is not None:
+                return StoredRaw(
+                    raw_id=raw_id,
+                    envelope=stored.envelope,
+                    storage_uri=str(existing_path),
+                    duplicate=True,
+                )
 
         collected = envelope.collected_at
-        raw_id = canonical_id("raw", envelope.provider, envelope.resource, checksum[:12])
         relative = (
             Path(envelope.data_mode.value)
             / envelope.provider
@@ -54,7 +72,8 @@ class FilesystemRawStore:
         path = self._root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.exists():
-            raise RuntimeError(f"Raw payload path is immutable and already exists: {path}")
+            self._checksums[(envelope.provider, checksum)] = raw_id
+            return StoredRaw(raw_id=raw_id, envelope=envelope, storage_uri=str(path), duplicate=True)
         payload = {
             "id": raw_id,
             "provider": envelope.provider,
@@ -90,3 +109,27 @@ class FilesystemRawStore:
 
     def exists_checksum(self, provider: str, checksum: str) -> bool:
         return (provider, checksum) in self._checksums
+
+    def _index_existing(self) -> None:
+        if not self._root.exists():
+            return
+        for path in self._root.rglob("*.json"):
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+                continue
+            provider = payload.get("provider")
+            raw_id = payload.get("id")
+            stored_checksum = payload.get("checksum_sha256")
+            body = payload.get("body_utf8")
+            if not isinstance(provider, str) or not isinstance(raw_id, str):
+                continue
+            if isinstance(stored_checksum, str):
+                self._checksums[(provider, stored_checksum)] = raw_id
+            if isinstance(body, str):
+                current = hashlib.sha256(stable_checksum_bytes(body.encode("utf-8"))).hexdigest()
+                self._checksums[(provider, current)] = raw_id
+
+    def _find_path(self, raw_id: str) -> Path | None:
+        matches = list(self._root.rglob(f"{raw_id}.json"))
+        return matches[0] if matches else None

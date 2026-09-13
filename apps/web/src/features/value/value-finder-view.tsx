@@ -1,41 +1,99 @@
 "use client";
 
-import { DataFreshness } from "@/components/domain/data-freshness";
+import { DataModeNotice } from "@/components/domain/data-mode-notice";
+import { EmptyState } from "@/components/domain/empty-state";
+import { SelectFilter } from "@/components/domain/filters";
+import { FootballValuePanel } from "@/components/domain/football-value-panel";
 import { PageHeader } from "@/components/domain/page-header";
 import { QueryBoundary } from "@/components/domain/query-boundary";
-import { ValueBadge } from "@/components/domain/value-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
 import { DialogContent, DialogRoot, DialogTrigger } from "@/components/ui/dialog";
 import { CardSkeleton } from "@/components/ui/skeleton";
-import { StatTile } from "@/components/ui/stat-tile";
-import { sortValueOpportunities, type ValueSort } from "@/features/value/selectors";
+import { LINCOLN_MATCH_ID } from "@/data/mock/football-engine";
+import { type FootballValueSort } from "@/features/value/selectors";
+import { isDataSourceError } from "@/lib/api/errors";
 import { useFilters } from "@/lib/filters/context";
-import { formatAbsolute } from "@/lib/format/dates";
-import {
-  formatDecimalOdds,
-  formatPoints,
-  formatProbability,
-  formatSignedPercent,
-} from "@/lib/format/numbers";
+import { formatMatchup } from "@/lib/format/identity";
 import { pageMeta } from "@/lib/navigation";
-import { useValueOpportunities } from "@/lib/query/hooks";
-import type { ValueOpportunity } from "@/types/api";
+import { useFootballValue, useMatch } from "@/lib/query/hooks";
+import { isHistoricalMatchIdentity } from "@/types/api";
 import Link from "next/link";
-import { useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useState } from "react";
 
-const meta = pageMeta["/value"];
+const meta = pageMeta["/value-finder"];
 
-const sortOptions: Array<{ value: ValueSort; label: string }> = [
-  { value: "edge", label: "Edge no-vig" },
-  { value: "expected_value", label: "EV" },
-  { value: "kickoff", label: "Coup d'envoi" },
+const sortOptions: Array<{ value: FootballValueSort; label: string }> = [
+  { value: "selection", label: "HOME / DRAW / AWAY" },
+  { value: "edge", label: "Edge" },
+  { value: "ev", label: "EV" },
+  { value: "probability", label: "Probabilité modèle" },
+  { value: "odds", label: "Cote" },
 ];
 
+/**
+ * Value Finder, backed by `GET /football/value/{match_id}`.
+ *
+ * The contract has no list route. The page inspects one match at a time and
+ * copies the three 1X2 rows the Value Engine already calculated. Local sort
+ * only reorders those rows.
+ */
 export function ValueFinderView() {
   const { sport } = useFilters();
-  const [sort, setSort] = useState<ValueSort>("edge");
-  const query = useValueOpportunities({ sport });
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const matchId = searchParams.get("match_id") ?? LINCOLN_MATCH_ID;
+  const engineCoversSport = sport === "all" || sport === "football";
+  const [sort, setSort] = useState<FootballValueSort>("selection");
+
+  const query = useFootballValue(engineCoversSport ? matchId : "");
+  const identityQuery = useMatch(engineCoversSport ? matchId : "");
+
+  const onMatchChange = useCallback(
+    (next: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("match_id", next);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+
+  if (!engineCoversSport) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          eyebrow={meta.eyebrow}
+          title={meta.title}
+          description={meta.description}
+          actions={<FormulaDialog />}
+        />
+        <EmptyState
+          title="Value Engine limité au football"
+          description="GET /football/value n'évalue que le football 1X2. Aucune analyse n'est simulée pour le sport actif."
+        />
+      </div>
+    );
+  }
+
+  if (query.isError && isDataSourceError(query.error) && query.error.kind === "not_found") {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          eyebrow={meta.eyebrow}
+          title={meta.title}
+          description={meta.description}
+          actions={<FormulaDialog />}
+        />
+        <MatchPicker value={matchId} onChange={onMatchChange} />
+        <EmptyState
+          title="Aucune analyse de valeur"
+          description="Le Value Engine n'a publié aucune analyse pour cet identifiant. Ce n'est pas une erreur masquée par des données mock."
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -46,97 +104,90 @@ export function ValueFinderView() {
         actions={<FormulaDialog />}
       />
 
-      <label className="flex w-fit flex-col gap-1 text-xs text-muted">
-        Trier par
-        <select
-          value={sort}
-          onChange={(event) => setSort(event.target.value as ValueSort)}
-          className="h-9 rounded-xl border border-border bg-surface-elevated px-3 text-sm text-foreground"
-        >
-          {sortOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </label>
+      <MatchPicker value={matchId} onChange={onMatchChange} />
 
-      <QueryBoundary
-        query={query}
-        skeleton={<CardSkeleton rows={6} />}
-        isEmpty={(result) => result.items.length === 0}
-        empty={{
-          title: "Aucun écart de value",
-          description:
-            "Aucune cote exploitable n'est associée à une probabilité calibrée pour ce filtre. C'est un résultat, pas une erreur.",
+      <QueryBoundary query={query} skeleton={<CardSkeleton rows={6} />}>
+        {(analysis, envelope) => {
+          const identity = identityQuery.data?.data;
+          const matchup = !identity
+            ? analysis.match_id
+            : isHistoricalMatchIdentity(identity)
+              ? formatMatchup(identity.home_team, identity.away_team).text
+              : `${identity.home.name} vs ${identity.away.name}`;
+
+          return (
+            <div className="space-y-5">
+              <DataModeNotice
+                dataMode={envelope.data_mode}
+                source={analysis.metadata.odds_source}
+              />
+
+              <Card>
+                <CardBody className="space-y-1">
+                  <p className="text-xs uppercase tracking-[0.16em] text-faint">Match évalué</p>
+                  <p className="text-lg font-medium">{matchup}</p>
+                  <p className="text-xs text-muted">
+                    Identifiant <span className="font-mono">{analysis.match_id}</span>
+                  </p>
+                </CardBody>
+              </Card>
+
+              <section
+                aria-label="Affinage local des issues"
+                className="space-y-2 rounded-2xl border border-border bg-surface px-4 py-3"
+              >
+                <p className="text-xs uppercase tracking-[0.14em] text-faint">
+                  Affinage local · non supporté par{" "}
+                  <span className="font-mono">GET /football/value/{"{match_id}"}</span>
+                </p>
+                <SelectFilter
+                  label="Trier par"
+                  value={sort}
+                  onChange={(value) => setSort(value as FootballValueSort)}
+                >
+                  {sortOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </SelectFilter>
+              </section>
+
+              <FootballValuePanel analysis={analysis} sort={sort} />
+
+              <Link
+                href={`/matches/${analysis.match_id}`}
+                className="inline-block text-sm text-ai-strong hover:underline"
+              >
+                Voir le match
+              </Link>
+              <span className="mx-2 text-faint" aria-hidden="true">
+                ·
+              </span>
+              <Link
+                href={`/ai-analyst?match_id=${analysis.match_id}`}
+                className="inline-block text-sm text-ai-strong hover:underline"
+              >
+                Ouvrir dans l&apos;AI Analyst
+              </Link>
+            </div>
+          );
         }}
-      >
-        {(result) => (
-          <div className="grid gap-4">
-            {sortValueOpportunities(result.items, sort).map((item) => (
-              <OpportunityCard key={item.id} item={item} />
-            ))}
-          </div>
-        )}
       </QueryBoundary>
     </div>
   );
 }
 
-function OpportunityCard({ item }: { item: ValueOpportunity }) {
+function MatchPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   return (
-    <Card>
-      <CardBody className="space-y-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs text-faint">{item.match.league.name}</p>
-            <h2 className="text-lg font-medium">
-              {item.match.home.name} · {item.match.away.name}
-            </h2>
-            <p className="text-sm text-muted">
-              {item.market} · {item.selection_label}
-            </p>
-          </div>
-          <ValueBadge
-            preview={{
-              selection: item.selection,
-              edge: item.edge_no_vig,
-              expected_value: item.expected_value,
-              formula_version: item.formula_version,
-              quality: item.quality,
-            }}
-          />
-        </div>
-
-        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <StatTile
-            label="P calibrée"
-            value={formatProbability(item.calibrated_probability)}
-            tone="ai"
-          />
-          <StatTile label="Cote" value={formatDecimalOdds(item.decimal_odds)} />
-          <StatTile label="Implicite" value={formatProbability(item.implied_probability_raw)} />
-          <StatTile label="No-vig" value={formatProbability(item.no_vig_probability)} />
-          <StatTile label="Edge no-vig" value={formatPoints(item.edge_no_vig)} tone="value" />
-          <StatTile label="EV" value={formatSignedPercent(item.expected_value)} tone="value" />
-        </dl>
-
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <DataFreshness quality={item.quality} />
-          <p className="text-xs text-faint">
-            Overround {formatPoints(item.overround)} · formule {item.formula_version}
-            {item.odds_observed_at ? ` · cote observée le ${formatAbsolute(item.odds_observed_at)}` : ""}
-          </p>
-        </div>
-
-        <Link
-          href={`/matches/${item.match.id}`}
-          className="inline-block text-sm text-ai-strong hover:underline"
-        >
-          Voir le match
-        </Link>
-      </CardBody>
-    </Card>
+    <section
+      aria-label="Match évalué"
+      className="rounded-2xl border border-border bg-surface px-4 py-3"
+    >
+      <SelectFilter label="Match" value={value} onChange={onChange}>
+        <option value={LINCOLN_MATCH_ID}>Lincoln Red Imps vs Inter Club d&apos;Escaldes</option>
+      </SelectFilter>
+    </section>
   );
 }
 
@@ -150,14 +201,15 @@ function FormulaDialog() {
       <DialogContent title="Value Engine">
         <ul className="space-y-2 text-sm leading-6 text-muted">
           <li>Probabilité implicite brute = 1 / cote décimale</li>
-          <li>Overround = somme(1 / cote_i) − 1</li>
+          <li>Overround = somme des implicites brutes</li>
           <li>Probabilité no-vig = implicite_i / somme des implicites</li>
-          <li>Edge = probabilité calibrée − probabilité implicite retenue</li>
-          <li>EV = (probabilité calibrée × cote décimale) − 1</li>
+          <li>Edge = probabilité modèle − probabilité implicite brute</li>
+          <li>EV = (probabilité modèle × cote décimale) − 1</li>
         </ul>
         <p className="mt-4 text-xs text-faint">
-          Ces valeurs sont calculées et versionnées par le Value Engine côté serveur.
-          L&apos;interface les affiche telles quelles et ne recalcule aucune référence métier.
+          Ces valeurs sont calculées et versionnées par{" "}
+          <span className="font-mono">GET /football/value/{"{match_id}"}</span>. L&apos;interface
+          les affiche telles quelles et ne recalcule aucune référence métier.
         </p>
       </DialogContent>
     </DialogRoot>

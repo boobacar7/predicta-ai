@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from predicta_ingestion.canonical.models import CanonicalBatch, League, Match, Sport, Team
+from predicta_ingestion.canonical.models import CanonicalBatch, League, Match, OddsSnapshot, Sport, Team
 from predicta_ingestion.clock import Clock
 from predicta_ingestion.identity.resolver import IdentityBinding
 from predicta_ingestion.ids import stable_entity_id
@@ -110,6 +110,9 @@ class SqlCanonicalSink:
         for match in batch.matches:
             self._upsert_match(match, now)
             result.inserted += 1
+        for snapshot in batch.odds:
+            self._insert_odds(snapshot, now)
+            result.inserted += 1
         return result
 
     def record_run(
@@ -204,13 +207,15 @@ class SqlCanonicalSink:
     def _upsert_league(self, league: League, now: object) -> None:
         self._execute(
             """
-            INSERT INTO leagues (id, sport_id, name, country, season, tier, created_at)
-            VALUES (:id, :sport_id, :name, :country, :season, :tier, :created_at)
+            INSERT INTO leagues (id, sport_id, name, country, season, tier, slug, provider_season_id, created_at)
+            VALUES (:id, :sport_id, :name, :country, :season, :tier, :slug, :provider_season_id, :created_at)
             ON CONFLICT (id) DO UPDATE SET
                 name = EXCLUDED.name,
                 country = EXCLUDED.country,
                 season = EXCLUDED.season,
-                tier = EXCLUDED.tier
+                tier = EXCLUDED.tier,
+                slug = EXCLUDED.slug,
+                provider_season_id = EXCLUDED.provider_season_id
             """,
             {
                 "id": league.id,
@@ -219,6 +224,8 @@ class SqlCanonicalSink:
                 "country": league.country,
                 "season": league.season,
                 "tier": league.tier,
+                "slug": league.competition_id,
+                "provider_season_id": league.provider_season_id,
                 "created_at": now,
             },
         )
@@ -231,8 +238,7 @@ class SqlCanonicalSink:
             ON CONFLICT (id) DO UPDATE SET
                 name = EXCLUDED.name,
                 short_name = EXCLUDED.short_name,
-                abbreviation = EXCLUDED.abbreviation,
-                league_id = EXCLUDED.league_id
+                abbreviation = EXCLUDED.abbreviation
             """,
             {
                 "id": team.id,
@@ -290,6 +296,64 @@ class SqlCanonicalSink:
                 "updated_at": now,
             },
         )
+
+    def _insert_odds(self, snapshot: OddsSnapshot, now: object) -> None:
+        provenance = snapshot.provenance
+        freshness = None if provenance.freshness is None else provenance.freshness.value
+        self._execute(
+            """
+            INSERT INTO odds_snapshots (
+                id, provider_id, match_id, market, bookmaker, provider, observed_at,
+                available_at, collected_at, source, freshness, data_mode, raw_payload_id,
+                overround, created_at
+            )
+            SELECT
+                :id, :provider_id, :match_id, :market, :bookmaker, :provider, :observed_at,
+                :available_at, :collected_at, :source, :freshness, :data_mode, :raw_payload_id,
+                :overround, :created_at
+            WHERE EXISTS (SELECT 1 FROM matches WHERE id = :existing_match_id)
+            ON CONFLICT (id) DO NOTHING
+            """,
+            {
+                "id": snapshot.id,
+                "provider_id": provenance.provider_id,
+                "match_id": snapshot.match_id,
+                "existing_match_id": snapshot.match_id,
+                "market": snapshot.market,
+                "bookmaker": snapshot.bookmaker,
+                "provider": provenance.provider,
+                "observed_at": provenance.available_at,
+                "available_at": provenance.available_at,
+                "collected_at": provenance.collected_at,
+                "source": provenance.source,
+                "freshness": freshness,
+                "data_mode": provenance.data_mode.value,
+                "raw_payload_id": provenance.raw_payload_id,
+                "overround": None,
+                "created_at": now,
+            },
+        )
+        for selection in snapshot.selections:
+            self._execute(
+                """
+                INSERT INTO odds_selections (
+                    snapshot_id, selection, label, decimal_odds,
+                    implied_probability_raw, no_vig_probability
+                )
+                SELECT :snapshot_id, :selection, :label, :decimal_odds, :implied, :no_vig
+                WHERE EXISTS (SELECT 1 FROM odds_snapshots WHERE id = :existing_snapshot_id)
+                ON CONFLICT (snapshot_id, selection) DO NOTHING
+                """,
+                {
+                    "snapshot_id": snapshot.id,
+                    "existing_snapshot_id": snapshot.id,
+                    "selection": selection.selection,
+                    "label": selection.label,
+                    "decimal_odds": selection.decimal_odds,
+                    "implied": None,
+                    "no_vig": None,
+                },
+            )
 
     def _execute(self, sql: str, params: dict[str, Any]) -> None:
         if self._executor is not None:

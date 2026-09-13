@@ -1,8 +1,9 @@
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 
+from dotenv import load_dotenv
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -11,13 +12,14 @@ AppEnv = Literal["development", "test", "staging", "production"]
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES_DIR = PACKAGE_ROOT / "fixtures" / "mock"
+SKIP_DOTENV_ENV = "PREDICTA_INGESTION_SKIP_DOTENV"
+ENV_FILE_ENV = "PREDICTA_INGESTION_ENV_FILE"
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="PREDICTA_INGESTION_",
-        env_file=".env",
-        env_file_encoding="utf-8",
+        env_file=None,
         extra="ignore",
     )
 
@@ -31,11 +33,13 @@ class Settings(BaseSettings):
     http_timeout_seconds: float = 20.0
     http_max_retries: int = 3
     sportmonks_base_url: str = "https://api.sportmonks.com/v3/football"
-    api_football_key: str = ""
-    sportmonks_key: str = ""
-    the_odds_api_key: str = ""
-    balldontlie_key: str = ""
-    api_tennis_key: str = ""
+    the_odds_api_base_url: str = "https://api.the-odds-api.com"
+    the_odds_api_regions: str = "eu"
+    api_football_key: str = Field(default="", repr=False)
+    sportmonks_key: str = Field(default="", repr=False)
+    the_odds_api_key: str = Field(default="", repr=False)
+    balldontlie_key: str = Field(default="", repr=False)
+    api_tennis_key: str = Field(default="", repr=False)
 
     @field_validator("api_football_key", "sportmonks_key", "the_odds_api_key", "balldontlie_key", "api_tennis_key")
     @classmethod
@@ -43,29 +47,85 @@ class Settings(BaseSettings):
         return value.strip()
 
     @model_validator(mode="after")
-    def accept_unprefixed_sportmonks_token(self) -> "Settings":
-        if self.sportmonks_key:
-            return self
-        unprefixed = (os.environ.get("SPORTMONKS_API_TOKEN") or "").strip()
-        if unprefixed:
-            self.sportmonks_key = unprefixed
+    def accept_unprefixed_tokens(self) -> "Settings":
+        if not self.sportmonks_key:
+            unprefixed = (os.environ.get("SPORTMONKS_API_TOKEN") or "").strip()
+            if unprefixed:
+                self.sportmonks_key = unprefixed
+        if not self.the_odds_api_key:
+            unprefixed_odds = (os.environ.get("THE_ODDS_API_KEY") or "").strip()
+            if unprefixed_odds:
+                self.the_odds_api_key = unprefixed_odds
         return self
 
     @property
     def is_production(self) -> bool:
         return self.env == "production"
 
+    @property
+    def is_deployed(self) -> bool:
+        return self.env in ("staging", "production")
+
     def resolved_data_mode(self) -> DataMode:
         if not self.enable_live:
             return "mock"
         return self.data_mode
 
+    @model_validator(mode="after")
+    def refuse_mock_in_deployed_envs(self) -> Self:
+        if self.env in ("staging", "production") and self.data_mode == "mock":
+            raise ValueError(f"data_mode=mock is forbidden when PREDICTA_INGESTION_ENV={self.env}.")
+        if self.enable_live and self.data_mode == "mock":
+            raise ValueError("Live ingestion cannot run with data_mode=mock.")
+        if self.data_mode == "live" and not self.enable_live:
+            raise ValueError(
+                "data_mode=live requires PREDICTA_INGESTION_ENABLE_LIVE=true; refusing to relabel as mock."
+            )
+        return self
+
+
+def local_env_candidates(*, env_file: Path | None = None) -> list[Path]:
+    """Resolve .env locations from the package/CLI, never from a hardcoded machine path."""
+    if env_file is not None:
+        return [env_file]
+    explicit = (os.environ.get(ENV_FILE_ENV) or "").strip()
+    if explicit:
+        return [Path(explicit)]
+    cwd_env = Path.cwd() / ".env"
+    package_env = PACKAGE_ROOT / ".env"
+    if cwd_env.resolve() == package_env.resolve():
+        return [package_env]
+    return [package_env, cwd_env]
+
+
+def load_local_env(*, env_file: Path | None = None) -> tuple[Path, ...]:
+    """Load a local .env into os.environ without overriding explicit process variables.
+
+    `SPORTMONKS_API_TOKEN` is unprefixed, so pydantic-settings will not map it unless
+    it is present in the process environment. dotenv fills that gap. Existing env vars
+    always win (`override=False`).
+    """
+    if env_file is None and _skip_dotenv():
+        return ()
+    loaded: list[Path] = []
+    seen: set[Path] = set()
+    for candidate in local_env_candidates(env_file=env_file):
+        if not candidate.is_file():
+            continue
+        resolved = candidate.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        load_dotenv(resolved, override=False)
+        loaded.append(resolved)
+    return tuple(loaded)
+
+
+def _skip_dotenv() -> bool:
+    return (os.environ.get(SKIP_DOTENV_ENV) or "").strip().lower() in {"1", "true", "yes"}
+
 
 @lru_cache
 def get_settings() -> Settings:
-    settings = Settings()
-    if settings.is_production and settings.data_mode == "mock":
-        raise RuntimeError("data_mode=mock is forbidden when PREDICTA_INGESTION_ENV=production.")
-    if settings.enable_live and settings.data_mode == "mock":
-        raise RuntimeError("Live ingestion cannot run with data_mode=mock.")
-    return settings
+    load_local_env()
+    return Settings()

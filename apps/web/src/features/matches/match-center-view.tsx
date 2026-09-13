@@ -4,6 +4,7 @@ import { CalendarStrip } from "@/components/domain/calendar-strip";
 import { LeagueFilter, StatusFilter } from "@/components/domain/filters";
 import { MatchCard } from "@/components/domain/match-card";
 import { PageHeader } from "@/components/domain/page-header";
+import { PrototypeNotice } from "@/components/domain/prototype-notice";
 import { QueryBoundary } from "@/components/domain/query-boundary";
 import { Input } from "@/components/ui/input";
 import { CardSkeleton } from "@/components/ui/skeleton";
@@ -31,6 +32,11 @@ export function MatchCenterView() {
   return (
     <div className="space-y-6">
       <PageHeader eyebrow={meta.eyebrow} title={meta.title} description={meta.description} />
+
+      <PrototypeNotice>
+        Le Match Center est un catalogue de navigation. Un identifiant mth_* historique charge
+        l&apos;identité canonique et le moteur football lorsqu&apos;ils existent.
+      </PrototypeNotice>
 
       <CalendarStrip days={days} value={date} onChange={setDate} />
 

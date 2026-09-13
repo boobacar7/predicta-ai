@@ -1,6 +1,18 @@
+import { getAnalystReportFixture } from "@/data/mock/ai-analyst";
+import {
+  aiPickExclusions,
+  aiPicks,
+  aiPicksMetadata,
+  mockCandidateKickoffs,
+} from "@/data/mock/ai-picks";
+import { historicalMatchIdentities } from "@/data/mock/historical-identity";
 import { createAnalystSession } from "@/data/mock/analyst";
 import { leagues, players, sports, teams } from "@/data/mock/catalog";
 import { MOCK_NOW_ISO } from "@/data/mock/clock";
+import {
+  getFootballPredictionFixture,
+  getFootballValueFixture,
+} from "@/data/mock/football-engine";
 import { matches, matchSummaries } from "@/data/mock/matches";
 import { insights, performanceReport } from "@/data/mock/performance";
 import {
@@ -12,6 +24,8 @@ import {
 import { picks, valueOpportunities } from "@/data/mock/signals";
 import { DataSourceError } from "@/lib/api/errors";
 import type {
+  AiPick,
+  AiPicksFilters,
   CatalogFilters,
   Envelope,
   LeagueDetail,
@@ -134,6 +148,11 @@ export class MockDataSource implements DataSource {
   async getMatch(id: string) {
     await this.begin();
 
+    const historical = historicalMatchIdentities.find((item) => item.match_id === id);
+    if (historical) {
+      return envelope(historical);
+    }
+
     const match = matches.find((item) => item.id === id);
     if (!match) throw notFound("Match");
 
@@ -150,12 +169,103 @@ export class MockDataSource implements DataSource {
     return envelope(list(items));
   }
 
+  /**
+   * Mirrors the engine's own semantics, verified against a live response:
+   * `date` matches the candidate kickoff, `league` matches its name
+   * case-insensitively, thresholds move selections into `exclusions` rather
+   * than dropping them, ranks are global, and `total` counts every eligible
+   * opportunity before pagination.
+   */
+  async getFootballAiPicks(filters: AiPicksFilters = {}) {
+    await this.begin();
+
+    const limit = filters.limit ?? 20;
+    const offset = filters.offset ?? 0;
+    const minimumEdge = filters.min_edge ?? aiPicksMetadata.minimum_edge;
+    const minimumEv = filters.min_ev ?? aiPicksMetadata.minimum_ev;
+
+    const inScope = (matchId: string, league: string) => {
+      if (filters.league && league.toLowerCase() !== filters.league.toLowerCase()) return false;
+      if (filters.date && !mockCandidateKickoffs[matchId]?.startsWith(filters.date)) return false;
+      return true;
+    };
+
+    const candidates = isEmptyScenario(this.scenario)
+      ? []
+      : aiPicks.filter((item) => inScope(item.match_id, item.league));
+
+    const thresholdExclusions = candidates
+      .filter((item) => item.ev < minimumEv || item.edge < minimumEdge)
+      .map((item) => belowThreshold(item, minimumEv));
+
+    const eligible = candidates
+      .filter((item) => item.ev >= minimumEv && item.edge >= minimumEdge)
+      .map((item, index) => ({ ...item, rank: index + 1 }));
+
+    const exclusions = [
+      ...aiPickExclusions.filter((item) => inScope(item.match_id, item.league)),
+      ...thresholdExclusions,
+    ];
+
+    return envelope({
+      items: eligible.slice(offset, offset + limit),
+      exclusions,
+      total: eligible.length,
+      limit,
+      offset,
+      metadata: {
+        ...aiPicksMetadata,
+        minimum_edge: minimumEdge,
+        minimum_ev: minimumEv,
+        eligible_opportunities: eligible.length,
+        excluded_opportunities: exclusions.length,
+      },
+    });
+  }
+
+  async getFootballPrediction(matchId: string, cutoffAt?: string) {
+    await this.begin();
+    this.assertFootballCutoff(cutoffAt);
+
+    if (isEmptyScenario(this.scenario)) {
+      throw notFound("Prédiction football");
+    }
+
+    const prediction = getFootballPredictionFixture(matchId);
+    if (!prediction) {
+      throw notFound("Prédiction football");
+    }
+
+    return envelope(prediction);
+  }
+
+  async getFootballValue(matchId: string, cutoffAt?: string) {
+    await this.begin();
+    this.assertFootballCutoff(cutoffAt);
+
+    if (isEmptyScenario(this.scenario)) {
+      throw notFound("Analyse value football");
+    }
+
+    const analysis = getFootballValueFixture(matchId);
+    if (!analysis) {
+      throw notFound("Analyse value football");
+    }
+
+    return envelope(analysis);
+  }
+
   async getValue(filters: MatchFilters = {}) {
     await this.begin();
 
-    const items = applyValueScenario(valueOpportunities, this.scenario).filter((item) =>
-      matchesSport(item.match.sport, filters.sport),
-    );
+    const items = applyValueScenario(valueOpportunities, this.scenario).filter((item) => {
+      if (!matchesSport(item.match.sport, filters.sport)) return false;
+      if (filters.league_id && filters.league_id !== "all" && item.match.league.id !== filters.league_id) {
+        return false;
+      }
+      if (filters.date && !item.match.kickoff_at.startsWith(filters.date)) return false;
+      return true;
+    });
 
     return envelope(list(items));
   }
@@ -273,6 +383,59 @@ export class MockDataSource implements DataSource {
     return envelope(data);
   }
 
+  async getFootballAiAnalyst(matchId: string, cutoffAt?: string) {
+    await this.begin();
+
+    if (this.scenario === "empty") {
+      throw new DataSourceError({
+        kind: "not_found",
+        status: 404,
+        message: "Aucune analyse n'est publiée pour ce match.",
+        problem: {
+          type: "/problems/not-found",
+          title: "Not Found",
+          status: 404,
+          detail: "Aucune analyse n'est publiée pour ce match.",
+          request_id: "req_mock_ui_prototype",
+        },
+      });
+    }
+
+    if (matchId === "mth_analyst_conflict") {
+      throw problemError(409, "/problems/temporal-leakage", "Temporal leakage", "Le cutoff demandé est postérieur au point-in-time validé.");
+    }
+
+    if (matchId === "mth_analyst_unprocessable") {
+      throw problemError(422, "/problems/pit-features-unavailable", "PIT features unavailable", "Les features point-in-time sont absentes pour ce cutoff.");
+    }
+
+    if (matchId === "mth_analyst_unavailable") {
+      throw problemError(503, "/problems/model-artefact-not-found", "Model artefact not found", "L'artefact du modèle n'est pas disponible.");
+    }
+
+    if (cutoffAt === "not-a-timestamp") {
+      throw problemError(400, "/problems/validation", "Validation Error", "cutoff_at n'est pas un horodatage RFC 3339.");
+    }
+
+    const report = getAnalystReportFixture(matchId);
+    if (!report) {
+      throw new DataSourceError({
+        kind: "not_found",
+        status: 404,
+        message: "Analyse introuvable dans les fixtures mock.",
+        problem: {
+          type: "/problems/not-found",
+          title: "Not Found",
+          status: 404,
+          detail: "Analyse introuvable dans les fixtures mock.",
+          request_id: "req_mock_ui_prototype",
+        },
+      });
+    }
+
+    return envelope(report);
+  }
+
   async getAnalystSession(matchId: string, question?: string) {
     await this.begin();
 
@@ -292,6 +455,53 @@ export class MockDataSource implements DataSource {
       throw new DataSourceError({ kind: "mock_scenario" });
     }
   }
+
+  private assertFootballCutoff(cutoffAt?: string) {
+    if (cutoffAt === "not-a-timestamp") {
+      throw problemError(
+        400,
+        "/problems/validation",
+        "Validation Error",
+        "cutoff_at n'est pas un horodatage RFC 3339.",
+      );
+    }
+  }
+}
+
+/**
+ * Reproduces the engine's exclusion precedence: expected value is judged before
+ * edge, so a selection failing both is reported on the EV rule.
+ */
+function belowThreshold(pick: AiPick, minimumEv: number) {
+  const onEv = pick.ev < minimumEv;
+
+  return {
+    match_id: pick.match_id,
+    league: pick.league,
+    market: pick.market,
+    selection: pick.selection,
+    status: "excluded",
+    reason: onEv ? "below_minimum_ev" : "below_minimum_edge",
+    detail: onEv
+      ? "Expected value is below the requested minimum."
+      : "Edge is below the requested minimum.",
+  } as const;
+}
+
+function problemError(status: number, type: string, title: string, detail: string): DataSourceError {
+  return new DataSourceError({
+    kind: status === 404 ? "not_found" : "server",
+    status,
+    message: detail,
+    requestId: "req_mock_ui_prototype",
+    problem: {
+      type,
+      title,
+      status,
+      detail,
+      request_id: "req_mock_ui_prototype",
+    },
+  });
 }
 
 function notFound(entity: string): DataSourceError {

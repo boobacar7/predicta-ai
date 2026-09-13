@@ -1,191 +1,180 @@
 "use client";
 
+import { AiPickCard } from "@/components/domain/ai-pick-card";
+import { CandidateModelNotice } from "@/components/domain/model-status";
+import { DataModeNotice } from "@/components/domain/data-mode-notice";
 import { EmptyState } from "@/components/domain/empty-state";
-import { InsightCard } from "@/components/domain/insight-card";
 import { MatchCard } from "@/components/domain/match-card";
 import { MetricCard } from "@/components/domain/metric-card";
 import { PageHeader } from "@/components/domain/page-header";
-import { PredictionCard } from "@/components/domain/prediction-card";
+import { PrototypeNotice } from "@/components/domain/prototype-notice";
 import { QueryBoundary } from "@/components/domain/query-boundary";
-import { ValueBadge } from "@/components/domain/value-badge";
-import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatTile } from "@/components/ui/stat-tile";
+import { Unavailable } from "@/components/domain/unavailable";
+import { Card, CardBody } from "@/components/ui/card";
 import { CardSkeleton } from "@/components/ui/skeleton";
-import { selectDashboard, type FreshnessSummary } from "@/features/dashboard/selectors";
+import { StatTile } from "@/components/ui/stat-tile";
+import { LINCOLN_MATCH_ID, FOOTBALL_MODEL_VERSION } from "@/data/mock/football-engine";
+import { footballValueRows } from "@/lib/football/value-rows";
 import { useFilters } from "@/lib/filters/context";
-import { formatAbsolute } from "@/lib/format/dates";
-import { availabilityLabels } from "@/lib/format/labels";
-import {
-  formatCount,
-  formatMetric,
-  formatProbability,
-  formatSignedPercent,
-} from "@/lib/format/numbers";
+import { football1x2Labels } from "@/lib/format/labels";
+import { formatCount, formatPoints, formatSignedPercent, NO_VALUE_LABEL, UNAVAILABLE_LABEL } from "@/lib/format/numbers";
 import { pageMeta } from "@/lib/navigation";
-import { useDashboard } from "@/lib/query/hooks";
+import { useFootballAiPicks, useFootballValue, useMatches } from "@/lib/query/hooks";
 import Link from "next/link";
 
 const meta = pageMeta["/"];
 
 export function DashboardView() {
   const { sport } = useFilters();
-  const query = useDashboard();
+  const football = sport === "all" || sport === "football";
+  const catalogue = useMatches({ sport });
+  const picks = useFootballAiPicks({ limit: 2 });
+  const value = useFootballValue(football ? LINCOLN_MATCH_ID : "");
 
   return (
     <div className="space-y-8">
       <PageHeader eyebrow={meta.eyebrow} title={meta.title} description={meta.description} />
-      <QueryBoundary
-        query={query}
-        skeleton={
-          <div className="grid gap-4 md:grid-cols-3">
-            <CardSkeleton />
-            <CardSkeleton />
-            <CardSkeleton />
-          </div>
-        }
-      >
-        {(snapshot, envelope) => {
-          const view = selectDashboard(snapshot, sport);
 
-          return (
-            <div className="space-y-8">
-              <p className="text-sm text-muted">{view.headline}.</p>
+      <section aria-label="Résumé de la journée" className="grid gap-4 md:grid-cols-3">
+        <MetricCard
+          label="Matchs du jour"
+          value={catalogue.isPending ? NO_VALUE_LABEL : formatCount(catalogue.data?.data.items.length ?? null)}
+          hint="Catalogue de navigation, pas le moteur football"
+        />
+        <MetricCard
+          label="Log loss"
+          value={UNAVAILABLE_LABEL}
+          hint="Métrique de performance du modèle candidat non publiée"
+          tone="ai"
+        />
+        <MetricCard
+          label="ROI théorique"
+          value={UNAVAILABLE_LABEL}
+          hint="Pas encore disponible via une API football stable"
+          tone="value"
+        />
+      </section>
 
-              <section aria-label="Résumé de la journée" className="grid gap-4 md:grid-cols-3">
-                <MetricCard
-                  label="Matchs du jour"
-                  value={formatCount(view.matches.length)}
-                  hint="Événements correspondant au filtre sport"
-                />
-                <MetricCard
-                  label="Log loss"
-                  value={formatMetric(view.modelHealth.log_loss)}
-                  hint={view.modelHealth.model_version}
-                  tone="ai"
-                />
-                <MetricCard
-                  label="ROI théorique"
-                  value={formatSignedPercent(view.modelHealth.theoretical_roi)}
-                  hint="Backtest, pas un rendement promis"
-                  tone="value"
-                />
-              </section>
+      {football ? (
+        <CandidateModelNotice version={FOOTBALL_MODEL_VERSION} status="candidate" />
+      ) : (
+        <EmptyState
+          title="Moteur football uniquement"
+          description="Prediction, Value Engine, AI Picks et AI Analyst n'évaluent pas ce sport. Rien n'est inventé pour le remplir."
+        />
+      )}
 
-              <FreshnessPanel freshness={view.freshness} generatedAt={envelope.generated_at} />
-
-              <section className="space-y-4">
-                <SectionHeading title="Matchs du jour" href="/matches" linkLabel="Tout le calendrier" />
-                {view.matches.length === 0 ? (
-                  <EmptyState
-                    title="Aucun match pour ce filtre"
-                    description="Élargissez le filtre sport ou consultez une autre date dans le Match Center."
-                  />
-                ) : (
-                  <div className="grid gap-4 xl:grid-cols-2">
-                    {view.matches.map((match) => (
-                      <MatchCard key={match.id} match={match} />
-                    ))}
-                  </div>
-                )}
-              </section>
-
-              <div className="grid gap-8 lg:grid-cols-2">
-                <section className="space-y-4">
-                  <SectionHeading title="AI Picks" href="/picks" linkLabel="Tous les picks" />
-                  {view.picks.length === 0 ? (
-                    <EmptyState
-                      title="Aucun pick publié"
-                      description="Aucun signal ne satisfait les critères documentés pour ce filtre."
-                    />
-                  ) : (
-                    view.picks
-                      .slice(0, 2)
-                      .map((pick) => <PredictionCard key={pick.id} pick={pick} />)
-                  )}
-                </section>
-
-                <section className="space-y-4">
-                  <SectionHeading title="Value Finder" href="/value" linkLabel="Tous les écarts" />
-                  {view.valueOpportunities.length === 0 ? (
-                    <EmptyState
-                      title="Aucun écart publié"
-                      description="Aucune cote exploitable n'est associée à une probabilité calibrée."
-                    />
-                  ) : (
-                    view.valueOpportunities.slice(0, 2).map((item) => (
-                      <Card key={item.id}>
-                        <CardBody className="space-y-3">
-                          <div className="flex flex-wrap items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="text-xs text-faint">{item.match.league.name}</p>
-                              <p className="truncate text-sm font-medium">
-                                {item.match.home.name} · {item.match.away.name}
-                              </p>
-                              <p className="text-xs text-muted">{item.selection_label}</p>
-                            </div>
-                            <ValueBadge
-                              preview={{
-                                selection: item.selection,
-                                edge: item.edge_no_vig,
-                                expected_value: item.expected_value,
-                                formula_version: item.formula_version,
-                                quality: item.quality,
-                              }}
-                            />
-                          </div>
-                        </CardBody>
-                      </Card>
-                    ))
-                  )}
-                </section>
-              </div>
-
-              <section className="grid gap-8 lg:grid-cols-2">
-                <div className="space-y-4">
-                  <h2 className="text-lg font-medium">Notes d&apos;analyste</h2>
-                  {view.insights.length === 0 ? (
-                    <EmptyState
-                      title="Aucune note"
-                      description="Aucune note méthodologique n'accompagne cette journée."
-                    />
-                  ) : (
-                    view.insights.map((insight) => (
-                      <InsightCard key={insight.id} insight={insight} />
-                    ))
-                  )}
-                </div>
-
-                <div className="space-y-4">
-                  <SectionHeading
-                    title="Performance des modèles"
-                    href="/performance"
-                    linkLabel="Détail et calibration"
-                  />
-                  <Card>
-                    <CardBody>
-                      <dl className="grid grid-cols-2 gap-3">
-                        <StatTile
-                          label="Accuracy"
-                          value={formatProbability(view.modelHealth.accuracy)}
-                        />
-                        <StatTile label="Brier" value={formatMetric(view.modelHealth.brier_score)} />
-                        <StatTile label="ECE" value={formatMetric(view.modelHealth.ece)} />
-                        <StatTile
-                          label="Prédictions"
-                          value={formatCount(view.modelHealth.prediction_count)}
-                        />
-                      </dl>
-                      <p className="mt-3 text-xs text-faint">
-                        {view.modelHealth.window_label} · {view.modelHealth.model_version}
-                      </p>
-                    </CardBody>
-                  </Card>
-                </div>
-              </section>
+      <section className="space-y-4">
+        <SectionHeading title="Matchs du jour" href="/matches" linkLabel="Tout le calendrier" />
+        <PrototypeNotice>
+          Le calendrier reste un catalogue de navigation. Les identifiants et probabilités fb-ens-*
+          ne sont pas le moteur football-elo-v1-candidate.
+        </PrototypeNotice>
+        <QueryBoundary
+          query={catalogue}
+          skeleton={
+            <div className="grid gap-4 xl:grid-cols-2">
+              <CardSkeleton />
+              <CardSkeleton />
             </div>
-          );
-        }}
-      </QueryBoundary>
+          }
+          isEmpty={(result) => result.items.length === 0}
+          empty={{
+            title: "Aucun match pour ce filtre",
+            description: "Élargissez le filtre sport ou consultez une autre date dans le Match Center.",
+          }}
+        >
+          {(result) => (
+            <div className="grid gap-4 xl:grid-cols-2">
+              {result.items.map((match) => (
+                <MatchCard key={match.id} match={match} />
+              ))}
+            </div>
+          )}
+        </QueryBoundary>
+      </section>
+
+      <div className="grid gap-8 lg:grid-cols-2">
+        <section className="space-y-4">
+          <SectionHeading title="AI Picks" href="/ai-picks" linkLabel="Tous les picks" />
+          {football ? (
+            <QueryBoundary
+              query={picks}
+              skeleton={<CardSkeleton rows={4} />}
+              isEmpty={(result) => result.items.length === 0}
+              empty={{
+                title: "Aucun pick publié",
+                description: "Aucun signal ne satisfait les critères documentés pour ce filtre.",
+              }}
+            >
+              {(result, envelope) => (
+                <div className="space-y-4">
+                  <DataModeNotice dataMode={envelope.data_mode} />
+                  {result.items.slice(0, 2).map((pick) => (
+                    <AiPickCard key={`${pick.match_id}-${pick.selection}`} pick={pick} />
+                  ))}
+                </div>
+              )}
+            </QueryBoundary>
+          ) : (
+            <Unavailable
+              label="AI Picks"
+              reason="Le moteur n'évalue que le football 1X2."
+            />
+          )}
+        </section>
+
+        <section className="space-y-4">
+          <SectionHeading title="Value Finder" href="/value-finder" linkLabel="Toutes les issues" />
+          {football ? (
+            <QueryBoundary query={value} skeleton={<CardSkeleton rows={4} />}>
+              {(analysis, envelope) => (
+                <div className="space-y-3">
+                  <DataModeNotice
+                    dataMode={envelope.data_mode}
+                    source={analysis.metadata.odds_source}
+                  />
+                  <p className="text-xs text-muted">
+                    Analyse {analysis.match_id}. Cette donnée est informative et ne constitue pas
+                    une recommandation.
+                  </p>
+                  {footballValueRows(analysis).map((row) => (
+                    <Card key={row.selection}>
+                      <CardBody className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm">
+                          {football1x2Labels[row.selection]}
+                          <span className="ml-2 font-mono text-xs text-faint">{row.selection}</span>
+                        </p>
+                        <dl className="flex gap-4">
+                          <StatTile label="Edge" value={formatPoints(row.edge)} />
+                          <StatTile label="EV" value={formatSignedPercent(row.ev)} tone="value" />
+                        </dl>
+                      </CardBody>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </QueryBoundary>
+          ) : (
+            <Unavailable
+              label="Value Engine"
+              reason="GET /football/value n'évalue que le football 1X2."
+            />
+          )}
+        </section>
+      </div>
+
+      <section className="space-y-4">
+        <SectionHeading
+          title="Performance des modèles"
+          href="/performance"
+          linkLabel="Détail"
+        />
+        <Unavailable
+          label="Métriques de performance"
+          reason="Aucune API stable ne publie encore le log loss, le Brier ou le ROI du modèle candidat football-elo-v1-candidate."
+        />
+      </section>
     </div>
   );
 }
@@ -206,56 +195,5 @@ function SectionHeading({
         {linkLabel}
       </Link>
     </div>
-  );
-}
-
-/** Availability breakdown of the day's payload, so gaps are visible up front. */
-function FreshnessPanel({
-  freshness,
-  generatedAt,
-}: {
-  freshness: FreshnessSummary;
-  generatedAt: string;
-}) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Fraîcheur des données</CardTitle>
-        <p className="text-xs text-faint">Instantané généré le {formatAbsolute(generatedAt)}</p>
-      </CardHeader>
-      <CardBody>
-        {freshness.total === 0 ? (
-          <p className="text-sm text-muted">
-            Aucun événement à évaluer pour ce filtre. Aucune complétude n&apos;est estimée.
-          </p>
-        ) : (
-          <>
-            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <StatTile
-                label={availabilityLabels.available}
-                value={formatCount(freshness.counts.available)}
-              />
-              <StatTile
-                label={availabilityLabels.partial}
-                value={formatCount(freshness.counts.partial)}
-              />
-              <StatTile
-                label={availabilityLabels.stale}
-                value={formatCount(freshness.counts.stale)}
-              />
-              <StatTile
-                label={availabilityLabels.unavailable}
-                value={formatCount(freshness.counts.unavailable)}
-              />
-            </dl>
-            <p className="mt-3 text-xs text-faint">
-              {freshness.degraded
-                ? "Une partie des événements du jour est partielle ou périmée. Les valeurs concernées restent signalées individuellement."
-                : `Les ${formatCount(freshness.total)} événements du jour sont annoncés disponibles par la source.`}
-            </p>
-          </>
-        )}
-      </CardBody>
-    </Card>
   );
 }

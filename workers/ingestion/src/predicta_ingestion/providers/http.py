@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Protocol
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -10,6 +12,8 @@ from predicta_ingestion.providers.errors import ProviderAuthError, ProviderRateL
 from predicta_ingestion.secrets import redact_text, redact_url, strip_secret_headers
 
 Sleeper = Callable[[float], None]
+logger = logging.getLogger("predicta_ingestion.providers.http")
+_REQUEST_ID_HEADERS = ("x-request-id", "request-id", "x-correlation-id")
 
 
 @dataclass(frozen=True)
@@ -56,6 +60,7 @@ class RetryingJsonClient:
         timeout_seconds: float = 20.0,
         max_retries: int = 3,
         sleeper: Sleeper | None = None,
+        send_authorization: bool = True,
     ) -> None:
         self._provider = provider
         self._token = token
@@ -63,9 +68,12 @@ class RetryingJsonClient:
         self._timeout = timeout_seconds
         self._max_retries = max_retries
         self._sleep = sleeper or __import__("time").sleep
+        self._send_authorization = send_authorization
 
     def get(self, url: str) -> HttpResponse:
-        headers = {"Accept": "application/json", "Authorization": self._token}
+        headers = {"Accept": "application/json"}
+        if self._send_authorization:
+            headers["Authorization"] = self._token
         last_error: Exception | None = None
         for attempt in range(self._max_retries + 1):
             try:
@@ -83,6 +91,7 @@ class RetryingJsonClient:
                 self._sleep(self._backoff(attempt, None))
                 continue
 
+            self._log_response(url, response)
             if response.status_code in {401, 403}:
                 raise ProviderAuthError(self._provider)
             if response.status_code == 429:
@@ -92,11 +101,29 @@ class RetryingJsonClient:
                 continue
             if response.status_code >= 500:
                 if attempt >= self._max_retries:
-                    raise ProviderUnavailable(self._provider, f"HTTP {response.status_code}")
+                    raise ProviderUnavailable(
+                        self._provider,
+                        describe_http_error(
+                            method="GET",
+                            url=url,
+                            status=response.status_code,
+                            headers=response.headers,
+                            token=self._token,
+                        ),
+                    )
                 self._sleep(self._backoff(attempt, response.headers))
                 continue
             if response.status_code >= 400:
-                raise ProviderUnavailable(self._provider, f"HTTP {response.status_code}")
+                raise ProviderUnavailable(
+                    self._provider,
+                    describe_http_error(
+                        method="GET",
+                        url=url,
+                        status=response.status_code,
+                        headers=response.headers,
+                        token=self._token,
+                    ),
+                )
             return HttpResponse(
                 status_code=response.status_code,
                 body=response.body,
@@ -110,8 +137,50 @@ class RetryingJsonClient:
         exponential = min(8.0, 0.5 * (2**attempt))
         return float(max(retry_after, exponential))
 
+    def _log_response(self, url: str, response: HttpResponse) -> None:
+        redacted = redact_url(url, self._token)
+        endpoint = urlsplit(redacted).path or "/"
+        request_id = request_id_from_headers(response.headers)
+        if request_id:
+            request_id = redact_text(request_id, self._token)
+        logger.debug(
+            "GET %s endpoint=%s status=%s request_id=%s",
+            redacted,
+            endpoint,
+            response.status_code,
+            request_id or "-",
+        )
+
     def _safe(self, exc: BaseException) -> Exception:
         return Exception(redact_text(str(exc), self._token))
+
+
+def describe_http_error(
+    *,
+    method: str,
+    url: str,
+    status: int,
+    headers: dict[str, str],
+    token: str,
+) -> str:
+    redacted = redact_url(url, token)
+    endpoint = urlsplit(redacted).path or "/"
+    request_id = request_id_from_headers(headers)
+    if request_id:
+        request_id = redact_text(request_id, token)
+    detail = f"HTTP {status} {method} {endpoint}"
+    if request_id:
+        return f"{detail} request_id={request_id}"
+    return detail
+
+
+def request_id_from_headers(headers: dict[str, str]) -> str | None:
+    lowered = {key.lower(): value for key, value in headers.items()}
+    for key in _REQUEST_ID_HEADERS:
+        value = lowered.get(key)
+        if value:
+            return value
+    return None
 
 
 def _retry_after_seconds(headers: dict[str, str]) -> float:

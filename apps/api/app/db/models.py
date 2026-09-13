@@ -93,6 +93,8 @@ class League(Base):
     country: Mapped[str] = mapped_column(String(128), nullable=False)
     season: Mapped[str] = mapped_column(String(32), nullable=False)
     tier: Mapped[int] = mapped_column(Integer, nullable=False)
+    slug: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    provider_season_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     sport: Mapped[Sport] = relationship(back_populates="leagues")
@@ -275,19 +277,23 @@ class OddsSnapshot(Base):
             "observed_at",
             name="uq_odds_snapshot_natural",
         ),
+        UniqueConstraint("provider", "provider_id", name="uq_odds_snapshot_provider_id"),
+        CheckConstraint("data_mode IN ('mock', 'live')", name="ck_odds_snapshots_data_mode"),
+        CheckConstraint("available_at >= collected_at", name="ck_odds_snapshots_available_at"),
     )
 
     id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    provider_id: Mapped[str] = mapped_column(String(255), nullable=False)
     match_id: Mapped[str] = mapped_column(ForeignKey("matches.id"), nullable=False, index=True)
     market: Mapped[str] = mapped_column(String(64), nullable=False)
     bookmaker: Mapped[str] = mapped_column(String(128), nullable=False)
     provider: Mapped[str] = mapped_column(String(128), nullable=False)
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
-    available_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    collected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    source: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    available_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    collected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    source: Mapped[str] = mapped_column(String(128), nullable=False)
     freshness: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    data_mode: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    data_mode: Mapped[str] = mapped_column(String(16), nullable=False)
     raw_payload_id: Mapped[str | None] = mapped_column(ForeignKey("raw_payloads.id"), nullable=True)
     overround: Mapped[float | None] = mapped_column(Numeric(18, 10), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -297,7 +303,10 @@ class OddsSnapshot(Base):
 
 class OddsSelection(Base):
     __tablename__ = "odds_selections"
-    __table_args__ = (CheckConstraint("decimal_odds IS NULL OR decimal_odds > 1", name="ck_odds_gt_one"),)
+    __table_args__ = (
+        CheckConstraint("decimal_odds IS NULL OR decimal_odds > 1", name="ck_odds_gt_one"),
+        UniqueConstraint("snapshot_id", "selection", name="uq_odds_snapshot_selection"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     snapshot_id: Mapped[str] = mapped_column(ForeignKey("odds_snapshots.id"), nullable=False, index=True)
@@ -442,7 +451,7 @@ class ModelMetric(Base):
     theoretical_roi: Mapped[float | None] = mapped_column(Numeric(18, 10), nullable=True)
     theoretical_max_drawdown: Mapped[float | None] = mapped_column(Numeric(18, 10), nullable=True)
     prediction_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     model_version: Mapped[ModelVersion] = relationship(back_populates="metrics")
@@ -521,8 +530,8 @@ class AiAnalysis(Base):
 
     id: Mapped[str] = mapped_column(String(128), primary_key=True)
     match_id: Mapped[str] = mapped_column(ForeignKey("matches.id"), nullable=False, index=True)
-    fact_pack: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    messages: Mapped[list] = mapped_column(JSONB, nullable=False)
+    fact_pack: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    messages: Mapped[list[Any]] = mapped_column(JSONB, nullable=False)
     llm_model: Mapped[str] = mapped_column(String(128), nullable=False)
     prompt_version: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

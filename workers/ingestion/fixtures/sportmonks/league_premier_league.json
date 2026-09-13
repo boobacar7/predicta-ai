@@ -25,6 +25,48 @@
       "is_current": true,
       "starting_at": "2026-08-14",
       "ending_at": "2027-05-23"
-    }
+    },
+    "seasons": [
+      {
+        "id": 23611,
+        "sport_id": 1,
+        "league_id": 8,
+        "name": "2023/2024",
+        "finished": true,
+        "is_current": false,
+        "starting_at": "2023-08-11",
+        "ending_at": "2024-05-19"
+      },
+      {
+        "id": 23612,
+        "sport_id": 1,
+        "league_id": 8,
+        "name": "2024/2025",
+        "finished": true,
+        "is_current": false,
+        "starting_at": "2024-08-16",
+        "ending_at": "2025-05-25"
+      },
+      {
+        "id": 23613,
+        "sport_id": 1,
+        "league_id": 8,
+        "name": "2025/2026",
+        "finished": true,
+        "is_current": false,
+        "starting_at": "2025-08-15",
+        "ending_at": "2026-05-24"
+      },
+      {
+        "id": 23614,
+        "sport_id": 1,
+        "league_id": 8,
+        "name": "2026/2027",
+        "finished": false,
+        "is_current": true,
+        "starting_at": "2026-08-14",
+        "ending_at": "2027-05-23"
+      }
+    ]
   }
 }

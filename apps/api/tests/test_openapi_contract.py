@@ -5,6 +5,7 @@ from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 from tests.conftest import make_client
+from tests.live_assets import requires_football_http
 
 CONTRACT = Path(__file__).resolve().parents[3] / "contracts" / "openapi.yaml"
 
@@ -43,6 +44,10 @@ def test_openapi_paths_are_implemented() -> None:
         "/matches/{match_id}/stats",
         "/matches/{match_id}/odds",
         "/matches/{match_id}/prediction",
+        "/football/predictions/{match_id}",
+        "/football/value/{match_id}",
+        "/football/ai-picks",
+        "/football/ai-analyst/{match_id}",
         "/picks",
         "/value",
         "/performance",
@@ -77,3 +82,17 @@ def test_responses_match_openapi_envelopes() -> None:
         ).json(),
     )
     _validate("ProblemDetails", client.get("/api/v1/players/missing").json())
+
+
+@requires_football_http
+def test_football_product_responses_match_openapi_envelopes() -> None:
+    client = make_client()
+    _validate(
+        "FootballValueAnalysisEnvelope",
+        client.get("/api/v1/football/value/mth_football-sportmonks-19719892").json(),
+    )
+    _validate("AiPicksEnvelope", client.get("/api/v1/football/ai-picks").json())
+    _validate(
+        "FootballAiAnalystEnvelope",
+        client.get("/api/v1/football/ai-analyst/mth_football-sportmonks-19719892").json(),
+    )

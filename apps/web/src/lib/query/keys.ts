@@ -1,4 +1,4 @@
-import type { CatalogFilters, MatchFilters, MockScenario } from "@/types/api";
+import type { AiPicksFilters, CatalogFilters, MatchFilters, MockScenario } from "@/types/api";
 
 /**
  * Centralised query key factory.
@@ -40,6 +40,35 @@ export function normalizeCatalogFilters(filters: CatalogFilters = {}): Normalize
   };
 }
 
+export type NormalizedAiPicksFilters = Readonly<{
+  date: string;
+  league: string;
+  limit: number;
+  offset: number;
+  min_edge: number | null;
+  min_ev: number | null;
+}>;
+
+/**
+ * `min_edge` and `min_ev` normalise to `null`, never `0`.
+ *
+ * Omitting a threshold lets the engine apply its own default, which is not the
+ * same request as pinning it to zero, and the two must not share a cache entry.
+ */
+export function normalizeAiPicksFilters(filters: AiPicksFilters = {}): NormalizedAiPicksFilters {
+  return {
+    date: filters.date ?? "",
+    league: filters.league?.trim() ?? "",
+    limit: filters.limit ?? DEFAULT_AI_PICKS_LIMIT,
+    offset: filters.offset ?? 0,
+    min_edge: filters.min_edge ?? null,
+    min_ev: filters.min_ev ?? null,
+  };
+}
+
+/** Matches the `AiPicksLimit` default declared in contracts/openapi.yaml. */
+export const DEFAULT_AI_PICKS_LIMIT = 20;
+
 const root = (scenario: MockScenario) => ["predicta", scenario] as const;
 
 export const queryKeys = {
@@ -71,6 +100,12 @@ export const queryKeys = {
       [...root(scenario), "picks", "list", normalizeMatchFilters(filters)] as const,
   },
 
+  footballAiPicks: {
+    all: (scenario: MockScenario) => [...root(scenario), "football-ai-picks"] as const,
+    list: (scenario: MockScenario, filters?: AiPicksFilters) =>
+      [...root(scenario), "football-ai-picks", "list", normalizeAiPicksFilters(filters)] as const,
+  },
+
   value: {
     all: (scenario: MockScenario) => [...root(scenario), "value"] as const,
     list: (scenario: MockScenario, filters?: MatchFilters) =>
@@ -97,5 +132,23 @@ export const queryKeys = {
     all: (scenario: MockScenario) => [...root(scenario), "analyst"] as const,
     session: (scenario: MockScenario, matchId: string, question?: string) =>
       [...root(scenario), "analyst", "session", matchId, question ?? ""] as const,
+  },
+
+  footballAiAnalyst: {
+    all: (scenario: MockScenario) => [...root(scenario), "football-ai-analyst"] as const,
+    detail: (scenario: MockScenario, matchId: string, cutoffAt?: string) =>
+      [...root(scenario), "football-ai-analyst", "detail", matchId, cutoffAt ?? ""] as const,
+  },
+
+  footballPredictions: {
+    all: (scenario: MockScenario) => [...root(scenario), "football-predictions"] as const,
+    detail: (scenario: MockScenario, matchId: string, cutoffAt?: string) =>
+      [...root(scenario), "football-predictions", "detail", matchId, cutoffAt ?? ""] as const,
+  },
+
+  footballValue: {
+    all: (scenario: MockScenario) => [...root(scenario), "football-value"] as const,
+    detail: (scenario: MockScenario, matchId: string, cutoffAt?: string) =>
+      [...root(scenario), "football-value", "detail", matchId, cutoffAt ?? ""] as const,
   },
 } as const;

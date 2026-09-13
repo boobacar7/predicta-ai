@@ -1,5 +1,5 @@
 from app.core.clock import Clock, parse_rfc3339
-from app.schemas import DataQuality
+from app.schemas import AvailabilityStatus, DataQuality, FreshnessLevel
 
 MOCK_SOURCE = "mock.fixtures.v1"
 MOCK_NOTE = "Fixture fictive. Ne pas interpréter comme une donnée sportive réelle."
@@ -8,10 +8,10 @@ MOCK_NOTE = "Fixture fictive. Ne pas interpréter comme une donnée sportive ré
 def quality(
     clock: Clock,
     *,
-    availability: str = "available",
+    availability: AvailabilityStatus = "available",
     source: str | None = MOCK_SOURCE,
     observed_at: str | None = "now",
-    freshness: str | None = "fresh",
+    freshness: FreshnessLevel | None = "fresh",
     note: str | None = MOCK_NOTE,
 ) -> DataQuality:
     observed = None
@@ -29,10 +29,10 @@ def quality(
         freshness = "stale"
 
     return DataQuality(
-        availability=availability,  # type: ignore[arg-type]
+        availability=availability,
         source=source,
         observed_at=observed,
-        freshness=freshness,  # type: ignore[arg-type]
+        freshness=freshness,
         note=note,
     )
 

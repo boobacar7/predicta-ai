@@ -15,8 +15,16 @@ dependencies = [
   "pydantic-settings>=2.5",
   "psycopg[binary]>=3.2",
   "python-multipart>=0.0.12",
+  "joblib>=1.4",
+  "numpy>=2.0",
+  "pandas>=2.2",
+  "pyarrow>=17",
   "pyyaml>=6.0",
   "redis>=5.1",
+  "scikit-learn>=1.5",
+  "scipy>=1.14",
+  "lightgbm>=4.5",
+  "xgboost>=2.1",
   "sqlalchemy>=2.0",
   "uvicorn[standard]>=0.32",
 ]
@@ -26,6 +34,7 @@ dev = [
   "httpx>=0.27",
   "jsonschema>=4.23",
   "mypy>=1.13",
+  "pandas-stubs>=2.2",
   "pytest>=8.3",
   "pytest-asyncio>=0.24",
   "ruff>=0.8",
@@ -36,10 +45,13 @@ dev = [
 packages = ["app"]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
+pythonpath = [".", "../../workers/ml/src", "../../workers/ingestion/src"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 filterwarnings = ["ignore::DeprecationWarning"]
+markers = [
+  "live_assets: requires gitignored PIT parquet and football-elo-v1-candidate artefact",
+]
 
 [tool.ruff]
 target-version = "py312"
@@ -56,8 +68,25 @@ strict = true
 pretty = true
 packages = ["app"]
 exclude = ["alembic"]
+mypy_path = ["../../workers/ml/src", "../../workers/ingestion/src"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
 module = ["redis", "redis.asyncio"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+  "joblib",
+  "lightgbm",
+  "lightgbm.*",
+  "pyarrow",
+  "pyarrow.*",
+  "sklearn",
+  "sklearn.*",
+  "scipy",
+  "scipy.*",
+  "xgboost",
+  "xgboost.*",
+]
 ignore_missing_imports = true

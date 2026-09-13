@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-_QUERY_SECRET_KEYS = {"api_token", "api-token", "api_key", "access_token", "token"}
+_QUERY_SECRET_KEYS = {"api_token", "api-token", "api_key", "apikey", "access_token", "token"}
 _HEADER_SECRET_KEYS = {"authorization", "x-rapidapi-key", "x-api-key", "api-key"}
 
 
@@ -13,6 +13,7 @@ def redact_text(value: str, secret: str | None = None) -> str:
     if secret:
         redacted = redacted.replace(secret, "[redacted]")
     redacted = re.sub(r"(?i)(api_token=)[^&\s]+", r"\1[redacted]", redacted)
+    redacted = re.sub(r"(?i)(apikey=)[^&\s]+", r"\1[redacted]", redacted)
     redacted = re.sub(r"(?i)(authorization:\s*)\S+", r"\1[redacted]", redacted)
     return redacted
 

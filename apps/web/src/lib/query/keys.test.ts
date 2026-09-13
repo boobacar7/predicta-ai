@@ -61,3 +61,79 @@ describe("hierarchy", () => {
     expect(detail.slice(0, all.length)).toEqual([...all]);
   });
 });
+
+describe("AI Picks keys", () => {
+  it("separates an omitted threshold from an explicit zero", () => {
+    const omitted = queryKeys.footballAiPicks.list("success", {});
+    const zero = queryKeys.footballAiPicks.list("success", { min_edge: 0 });
+
+    // Letting the engine apply its default is a different request from pinning
+    // the threshold to zero, so the two must not share a cache entry.
+    expect(omitted).not.toEqual(zero);
+  });
+
+  it("normalises equivalent filter objects to the same key", () => {
+    const explicit = queryKeys.footballAiPicks.list("success", {
+      date: undefined,
+      league: "  Continental Premier  ",
+      limit: 20,
+      offset: 0,
+    });
+    const terse = queryKeys.footballAiPicks.list("success", { league: "Continental Premier" });
+
+    expect(explicit).toEqual(terse);
+  });
+
+  it("separates pages, so paging never reuses the previous page", () => {
+    const first = queryKeys.footballAiPicks.list("success", { offset: 0 });
+    const second = queryKeys.footballAiPicks.list("success", { offset: 6 });
+
+    expect(first).not.toEqual(second);
+  });
+
+  it("keeps scenarios apart and stays under the resource prefix", () => {
+    const success = queryKeys.footballAiPicks.list("success");
+    const empty = queryKeys.footballAiPicks.list("empty");
+
+    expect(success).not.toEqual(empty);
+    expect(success.slice(0, 3)).toEqual([...queryKeys.footballAiPicks.all("success")]);
+  });
+});
+
+describe("Football prediction and value keys", () => {
+  it("separates match ids and optional cutoffs", () => {
+    const lincoln = queryKeys.footballPredictions.detail(
+      "success",
+      "mth_football-sportmonks-19719892",
+    );
+    const other = queryKeys.footballPredictions.detail("success", "mth_other");
+    const cutoff = queryKeys.footballPredictions.detail(
+      "success",
+      "mth_football-sportmonks-19719892",
+      "2026-07-07T16:00:00Z",
+    );
+
+    expect(lincoln).not.toEqual(other);
+    expect(lincoln).not.toEqual(cutoff);
+    expect(lincoln.slice(0, 3)).toEqual([...queryKeys.footballPredictions.all("success")]);
+    expect(
+      queryKeys.footballValue.detail("success", "mth_football-sportmonks-19719892").slice(0, 3),
+    ).toEqual([...queryKeys.footballValue.all("success")]);
+  });
+});
+
+describe("AI Analyst keys", () => {
+  it("separates match ids and optional cutoffs", () => {
+    const lincoln = queryKeys.footballAiAnalyst.detail("success", "mth_football-sportmonks-19719892");
+    const other = queryKeys.footballAiAnalyst.detail("success", "mth_other");
+    const cutoff = queryKeys.footballAiAnalyst.detail(
+      "success",
+      "mth_football-sportmonks-19719892",
+      "2026-07-07T16:00:00Z",
+    );
+
+    expect(lincoln).not.toEqual(other);
+    expect(lincoln).not.toEqual(cutoff);
+    expect(lincoln.slice(0, 3)).toEqual([...queryKeys.footballAiAnalyst.all("success")]);
+  });
+});

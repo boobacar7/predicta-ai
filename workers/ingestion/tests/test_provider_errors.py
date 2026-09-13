@@ -2,8 +2,9 @@ import pytest
 
 from predicta_ingestion.canonical.enums import ResourceType
 from predicta_ingestion.providers.errors import LiveIngestionDisabled, ProviderNotConfigured
-from predicta_ingestion.providers.live import ApiFootballProvider, TheOddsApiProvider
+from predicta_ingestion.providers.live import ApiFootballProvider
 from predicta_ingestion.providers.protocols import ProviderRequest
+from predicta_ingestion.providers.the_odds_api import TheOddsApiProvider
 
 
 def test_live_adapter_disabled_without_flag() -> None:
@@ -14,8 +15,8 @@ def test_live_adapter_disabled_without_flag() -> None:
     assert health.connected is False
 
 
-def test_live_adapter_without_key_is_not_configured() -> None:
-    provider = TheOddsApiProvider(enable_live=True, api_key="")
+def test_live_adapter_without_key_is_not_configured(clock) -> None:
+    provider = TheOddsApiProvider(enable_live=True, api_key="", clock=clock)
     with pytest.raises(ProviderNotConfigured):
         provider.fetch(ProviderRequest(resource=ResourceType.ODDS))
 

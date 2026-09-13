@@ -86,6 +86,34 @@ describe("api base url", () => {
 });
 
 describe("mock fixtures must not reach real users", () => {
+  it("refuses mock data on a staging deployment", () => {
+    expect(() => buildConfig({ ...base, NEXT_PUBLIC_PREDICTA_ENV: "staging" })).toThrow(
+      /blocked in staging/,
+    );
+  });
+
+  it("refuses a staging hybrid build even with the production mock flag", () => {
+    expect(() =>
+      buildConfig({
+        NEXT_PUBLIC_PREDICTA_ENV: "staging",
+        NEXT_PUBLIC_PREDICTA_DATA_SOURCE: "http",
+        NEXT_PUBLIC_PREDICTA_MOCK_RESOURCES: "analyst",
+        NEXT_PUBLIC_PREDICTA_API_BASE_URL: "https://api.staging.example.test/api/v1",
+        NEXT_PUBLIC_PREDICTA_ALLOW_MOCK_IN_PROD: "true",
+      }),
+    ).toThrow(/blocked in staging/);
+  });
+
+  it("allows a staging build once every resource reads from the api", () => {
+    const config = buildConfig({
+      NEXT_PUBLIC_PREDICTA_ENV: "staging",
+      NEXT_PUBLIC_PREDICTA_DATA_SOURCE: "http",
+      NEXT_PUBLIC_PREDICTA_API_BASE_URL: "https://api.staging.example.test/api/v1",
+    });
+
+    expect(config.resourceModes.matches).toBe("http");
+  });
+
   it("refuses mock data on a production deployment", () => {
     expect(() =>
       buildConfig({ ...base, NEXT_PUBLIC_PREDICTA_ENV: "production" }),

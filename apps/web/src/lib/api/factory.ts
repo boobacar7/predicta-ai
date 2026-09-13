@@ -51,6 +51,11 @@ export function createDataSource({
     getMatches: (filters) => from("matches").getMatches(filters),
     getMatch: (id) => from("matches").getMatch(id),
     getPicks: (filters) => from("picks").getPicks(filters),
+    getFootballAiPicks: (filters) => from("football_ai_picks").getFootballAiPicks(filters),
+    getFootballPrediction: (matchId, cutoffAt) =>
+      from("football_predictions").getFootballPrediction(matchId, cutoffAt),
+    getFootballValue: (matchId, cutoffAt) =>
+      from("football_value").getFootballValue(matchId, cutoffAt),
     getValue: (filters) => from("value").getValue(filters),
     getPerformance: () => from("performance").getPerformance(),
     getTeams: (filters) => from("teams").getTeams(filters),
@@ -59,6 +64,8 @@ export function createDataSource({
     getPlayer: (id) => from("players").getPlayer(id),
     getAnalystSession: (matchId, question) =>
       from("analyst").getAnalystSession(matchId, question),
+    getFootballAiAnalyst: (matchId, cutoffAt) =>
+      from("football_ai_analyst").getFootballAiAnalyst(matchId, cutoffAt),
   };
 }
 

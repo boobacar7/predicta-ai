@@ -79,7 +79,7 @@ Le store filesystem (`FilesystemRawStore`) écrit :
 {root}/{data_mode}/{provider}/{yyyy}/{mm}/{dd}/{raw_id}.json
 ```
 
-Le fichier n'est jamais écrasé. Un checksum SHA-256 identique court-circuite l'écriture (déduplication). `data_mode=mock` et `live` sont des arbres disjoints.
+Le fichier n'est jamais écrasé. Un checksum SHA-256 identique court-circuite l'écriture (déduplication), y compris après réouverture du process : le store indexe les JSON déjà présents et recalcule le checksum courant à partir du body. Les métadonnées volatiles Sportmonks (`rate_limit`, `subscription`, `pagination.next_cursor`) sont exclues du checksum. `data_mode=mock` et `live` sont des arbres disjoints.
 
 PostgreSQL table `raw_payloads` : id, provider, resource_type, checksum, storage_uri, collected_at, data_mode. Pas de payload complet en base.
 
@@ -117,6 +117,7 @@ starting_at (UTC)          → Match.kickoff_at / event_at
 state_id                   → Match.status
 participants.meta.location → home/away teams
 scores[description=CURRENT] → home_score / away_score (finished/live only)
+season.name / season_id   → League.season
 ```
 
 Un match `scheduled` n'emporte pas de score, même si le JSON contient `0`.
@@ -124,14 +125,36 @@ Un résultat `finished` a `available_at` strictement après le coup d'envoi
 (`kickoff + 3h`, ou `collected_at` s'il est plus tôt). Le PIT refuse ce
 résultat comme feature pre-match.
 
+Découverte d'historique :
+
+```text
+GET /seasons?filters=seasonLeagues:{leagueId}
+GET /fixtures?include=participants;scores;league.country;season;venue;state&filters=fixtureLeagues:{leagueId};fixtureSeasons:{seasonId}
+```
+
+Une fenêtre `--date-from` / `--date-to` utilise l'endpoint documenté
+`GET /fixtures/between/{start}/{end}` (max 100 jours) avec les mêmes filtres.
+
+MLS (Sportmonks id 779) est ingérée pour toutes les saisons réellement retournées.
+Les ligues européennes V1 sont limitées par défaut aux 3 saisons les plus récentes.
+`--season`, `--date-from`, `--date-to` et `--all-seasons` restreignent le run.
+Une saison absente de la réponse provider n'est pas inventée.
+
+Une fixture invalide (placeholder, scores manquants, même équipe des deux côtés)
+va en quarantaine **individuellement** ; les voisines valides de la page sont
+normalisées.
+
 ## 7. Résolution d'identités
 
-Ordre :
+Ordre déterministe, sans fuzzy matching :
 
-1. Lookup exact `provider, entity_type, provider_entity_id`.
-2. Sinon lookup secondaire nom normalisé + sport + ligue (égalité stricte après normalisation Unicode).
-3. Si 0 candidat : créer un canonical id déterministe et insérer le mapping.
-4. Si ≥ 2 candidats : quarantaine `ambiguous_identity`.
+1. Lookup exact `(provider, entity_type, provider_entity_id)`.
+2. Mapping historique explicite (alias de slug MLS ou id provider documenté).
+3. Nom normalisé (`slugify`, égalité stricte) **uniquement s'il existe un seul** canonical pour cette compétition.
+4. Si 0 candidat : créer un canonical id déterministe.
+5. Si ≥ 2 candidats : quarantaine `ambiguous_identity`.
+
+Les ligues Sportmonks sont identifiées par `{league_id}:{season}` : MLS `779` en 2024 et `779` en 2025 ne se marchent pas dessus.
 
 Les IDs déterministes sont des slugs stables, pas un hash opaque, afin de rester lisibles (`tm_football_arsenal_epl`). Un suffixe numérique n'est ajouté qu'après collision réelle.
 
@@ -154,10 +177,15 @@ Les tables de faits volumineuses sont append-only. Un classement n'est pas écra
 
 Reproductibilité d'un dataset :
 
-1. figer `cutoff_at`;
-2. lire via `PointInTimeStore`;
-3. hasher les canonical ids + `available_at` max par type;
-4. enregistrer le hash à côté de la version de code.
+1. figer `cutoff_at` (kickoff du match cible) ;
+2. lire via `PointInTimeStore` ;
+3. construire `build_ml_dataset(competition, seasons, cutoff_policy)` ;
+4. hasher les canonical ids + `available_at` max par type ;
+5. enregistrer le hash à côté de `dataset_version` (`football-1x2-history-0.3`).
+
+Correction d'un payload Sportmonks : le raw d'origine reste immuable. Un payload
+corrigé (checksum différent) crée un nouvel enregistrement raw et un upsert
+canonique du match. `raw_payload_id` pointe vers le raw le plus récemment accepté.
 
 ## 10. Point-in-time (contrat ML)
 
@@ -179,7 +207,21 @@ data_mode filtré explicitement par l'appelant
 
 Une composition publiée après le coup d'envoi n'entre pas dans les features pre-match. Un résultat du match cible n'est jamais accessible pour ce match.
 
-Le DATA layer expose les observations ; il ne calcule pas Elo, xG agrégé ou form ratings. Ces features appartiennent au worker ML, qui doit utiliser exclusivement ce reader.
+Les features de forme football (`predicta_ingestion.ml.features`) n'utilisent que des
+matchs dont `event_at < kickoff` et `available_at < kickoff`. Fenêtres rolling 5 et
+10. Un résultat pas encore disponible est exclu. Le match cible n'entre jamais
+dans sa propre fenêtre.
+
+Le rating Elo pré-match (`predicta_ingestion.ml.elo`) est une reconstruction
+historique **globale**, pas un entraînement : une seule timeline, clé
+`canonical_team_id`, toutes compétitions. Snapshot au `event_at`, mise à jour
+uniquement à `available_at`. Si `available_at` de A est `>=` kickoff de B, le
+résultat de A n'influence pas B. À timestamp égal, les snapshots précèdent les
+updates (`kind` 0 puis 1), puis `match_id`. Paramètres : initial 1500, K=20,
+avantage domicile +80. Le rating après le match N n'est jamais réinjecté dans N.
+
+Les classements Sportmonks ne sont **pas** des features du dataset
+`football-1x2-history-0.3`. Un snapshot saisonnier courant n'est pas Point-in-Time.
 
 ## 11. Cotes et Value Engine
 
@@ -220,13 +262,57 @@ Sans `PREDICTA_INGESTION_ENABLE_LIVE=true` et sans `SPORTMONKS_API_TOKEN`,
 la commande lève `LiveIngestionDisabled` ou `ProviderNotConfigured`.
 Aucun fallback mock.
 
+Live The Odds API (football 1X2), opt-in séparé :
+
+```bash
+python -m predicta_ingestion ingest-odds --league premier-league --dry-run
+python -m predicta_ingestion ingest-odds --league premier-league --as-of 2026-09-08T15:55:00Z
+```
+
+Sans clé (`PREDICTA_INGESTION_THE_ODDS_API_KEY` ou `THE_ODDS_API_KEY`), le fetch
+lève `ProviderNotConfigured`. Aucun fallback mock. La CI n'appelle pas le provider.
+Voir [odds-provider.md](data/odds-provider.md).
+
+Historique + dataset PIT :
+
+```bash
+python -m predicta_ingestion ingest-history --league MLS --dry-run
+python -m predicta_ingestion ingest-history --league mls --season 2024 --date-from 2024-03-01 --date-to 2024-11-30
+python -m predicta_ingestion build-ml-dataset --league MLS --write-dataset ./var/football-1x2-history.json
+```
+
+`--dry-run` ne écrit ni PostgreSQL ni le store raw. Le rapport d'ingestion liste
+les saisons **découvertes** (réponse provider) et celles **sélectionnées**, avec
+`finished_count`, `future_count`, `duplicate_count`, `quarantined_count`,
+`team_count` et un `standings_probes` (lecture seule, jamais persisté).
+
+Extension multi-compétitions (dry-run uniquement, pas d'ingestion massive) :
+
+```bash
+python -m predicta_ingestion ingest-history --league premier-league --dry-run
+python -m predicta_ingestion ingest-history --league ligue-1 --dry-run
+python -m predicta_ingestion ingest-history --league la-liga --dry-run
+python -m predicta_ingestion ingest-history --league bundesliga --dry-run
+python -m predicta_ingestion ingest-history --league serie-a --dry-run
+python -m predicta_ingestion ingest-history --league champions-league --dry-run
+python -m predicta_ingestion ingest-history --league MLS --dry-run
+```
+
+L'Europe est bornée aux 3 dernières saisons Sportmonks sauf `--all-seasons`.
+La MLS conserve toutes les saisons découvertes. L'Elo multi-compétitions doit
+être reconstruit sur l'union chronologique des matchs (même `canonical_team_id`
+en ligue et en Coupe d'Europe) ; ce n'est pas un second id club.
+
+Détail ML : [ml-dataset.md](ml-dataset.md).
+
 ## 14. Handoff ML
 
 L'agent ML doit :
 
-- importer `predicta_ingestion.pit` plutôt que de joindre SQL librement;
-- versionner les définitions de features;
-- n'utiliser que `available_at < cutoff`;
-- traiter `availability=unavailable` comme donnée manquante;
+- importer `predicta_ingestion.pit` et `predicta_ingestion.ml` plutôt que de joindre SQL librement;
+- versionner les définitions de features (`football-1x2-history-0.3` / `football-1x2-features-0.3`);
+- n'utiliser que `available_at < cutoff` et `event_at < cutoff`;
+- traiter `availability=unavailable` et les ranks nuls comme donnée manquante;
 - ignorer toute ligne `data_mode=mock` dans un entraînement présenté comme réel;
-- ne pas lire `predictions` pour entraîner le même marché sans protocole dédié (fuite).
+- ne pas lire `predictions` pour entraîner le même marché sans protocole dédié (fuite);
+- ne pas réentraîner Elo / Poisson / Gradient Boosting dans le worker DATA.

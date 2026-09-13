@@ -1,0 +1,27 @@
+{
+  "data": [
+    {
+      "id": 19425001,
+      "sport_id": 1,
+      "league_id": 779,
+      "season_id": 18002,
+      "state_id": 5,
+      "name": "Columbus Crew vs FC Cincinnati",
+      "starting_at": "2025-03-08 19:30:00",
+      "placeholder": false,
+      "participants": [
+        {"id": 4009, "name": "Columbus Crew", "short_code": "CLB", "short_name": "Columbus", "meta": {"location": "home"}},
+        {"id": 4010, "name": "FC Cincinnati", "short_code": "CIN", "short_name": "Cincinnati", "meta": {"location": "away"}}
+      ],
+      "scores": [
+        {"description": "CURRENT", "score": {"goals": 2, "participant": "home"}},
+        {"description": "CURRENT", "score": {"goals": 0, "participant": "away"}}
+      ],
+      "league": {"id": 779, "name": "Major League Soccer", "country": {"id": 3483, "name": "USA"}},
+      "season": {"id": 18002, "name": "2025"},
+      "venue": {"id": 9005, "name": "Lower.com Field"},
+      "state": {"id": 5, "state": "FT", "name": "Full Time", "short_name": "FT"}
+    }
+  ],
+  "pagination": {"count": 1, "per_page": 50, "current_page": 1, "next_page": null, "has_more": false}
+}

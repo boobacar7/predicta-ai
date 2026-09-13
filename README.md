@@ -2,7 +2,7 @@
 
 PREDICTA AI est une plateforme SaaS premium d'intelligence sportive. Elle transforme des données de football, basketball et tennis en statistiques, probabilités calibrées, signaux de valeur et explications traçables.
 
-> État du projet : fondation architecturale + prototype UI mock + API FastAPI v1 (fixtures mock) + fondation DATA (abstractions d'ingestion, pas de provider live). Modèles ML non implémentés.
+> État du projet : fondation architecturale + prototype UI mock + API FastAPI v1 (fixtures mock) + ingestion Football Sportmonks + dataset 1X2 `football-1x2-history-0.3` + premier benchmark ML Football (`workers/ml`, non branché au backend).
 
 ## Principes non négociables
 
@@ -43,6 +43,10 @@ Les workers constituent des frontières extractibles, mais aucune architecture m
 - [Fournisseurs de données](docs/data-providers.md)
 - [Pipeline DATA](docs/data-pipeline.md)
 - [Qualité des données](docs/data-quality.md)
+- [Dataset ML football](docs/ml-dataset.md)
+- [Benchmark ML football 1X2](docs/ml-football-1x2.md)
+- [Validation scientifique Elo Football](docs/ml/elo-candidate-validation.md)
+- [Model card Elo Football (candidate)](docs/ml/model-card-football-elo.md)
 - [ADR 0001 — Fondation UI](docs/adr/0001-frontend-design-system.md)
 - [ADR 0003 — Fondation backend](docs/adr/0003-backend-foundation.md)
 - [ADR 0004 — Fondation DATA](docs/adr/0004-data-foundation.md)

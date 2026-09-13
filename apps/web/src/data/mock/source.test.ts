@@ -162,3 +162,163 @@ describe("data integrity", () => {
     expect(previews.every((preview) => preview.model_version && preview.cutoff_at)).toBe(true);
   });
 });
+
+/**
+ * The mock must reproduce the engine's own semantics, verified against a live
+ * response, or the UI would be built against behaviour the API does not have.
+ */
+describe("football AI picks", () => {
+  it("ranks globally and paginates without renumbering the page", async () => {
+    const all = await source().getFootballAiPicks();
+    const second = await source().getFootballAiPicks({ limit: 2, offset: 2 });
+
+    expect(all.data.items[0].rank).toBe(1);
+    expect(second.data.items).toHaveLength(2);
+    // `total` counts every eligible opportunity, not the page.
+    expect(second.data.total).toBe(all.data.total);
+    expect(second.data.offset).toBe(2);
+  });
+
+  it("filters by league name, ignoring case", async () => {
+    const result = await source().getFootballAiPicks({ league: "northern championship" });
+
+    expect(result.data.items.length).toBeGreaterThan(0);
+    expect(result.data.items.every((pick) => pick.league === "Northern Championship")).toBe(true);
+  });
+
+  it("returns an empty result for a date with no candidate", async () => {
+    const result = await source().getFootballAiPicks({ date: "1999-01-01" });
+
+    expect(result.data.items).toHaveLength(0);
+    expect(result.data.total).toBe(0);
+  });
+
+  /**
+   * A threshold must not merely hide rows. The engine re-evaluates eligibility
+   * and reports what it rejected, which is what lets the UI explain an empty page.
+   */
+  it("moves selections below a threshold into exclusions rather than dropping them", async () => {
+    const baseline = await source().getFootballAiPicks();
+    const filtered = await source().getFootballAiPicks({ min_edge: 0.05 });
+
+    expect(filtered.data.items.length).toBeLessThan(baseline.data.items.length);
+    expect(filtered.data.exclusions.length).toBeGreaterThan(baseline.data.exclusions.length);
+    expect(filtered.data.exclusions.some((item) => item.reason === "below_minimum_edge")).toBe(true);
+  });
+
+  it("echoes the thresholds it applied", async () => {
+    const result = await source().getFootballAiPicks({ min_edge: 0.02, min_ev: 0.03 });
+
+    expect(result.data.metadata.minimum_edge).toBe(0.02);
+    expect(result.data.metadata.minimum_ev).toBe(0.03);
+  });
+
+  it("reports the EV rule first when a selection fails both thresholds", async () => {
+    const result = await source().getFootballAiPicks({ min_edge: 0.9, min_ev: 0.9 });
+
+    expect(result.data.items).toHaveLength(0);
+    expect(result.data.exclusions.every((item) => item.reason !== "below_minimum_edge")).toBe(true);
+  });
+
+  it("keeps every pick on the candidate model, never claiming a promoted one", async () => {
+    const result = await source().getFootballAiPicks();
+
+    expect(result.data_mode).toBe("mock");
+    expect(result.data.items.every((pick) => pick.model_status === "candidate")).toBe(true);
+  });
+
+  it("returns no opportunity in the empty scenario", async () => {
+    const result = await source("empty").getFootballAiPicks();
+
+    expect(result.data.items).toHaveLength(0);
+    expect(result.data.total).toBe(0);
+  });
+
+  it("fails with a retryable error in the error scenario", async () => {
+    await expect(source("error").getFootballAiPicks()).rejects.toBeInstanceOf(DataSourceError);
+  });
+
+  it("publishes the identity-fixed fields the engine now returns", async () => {
+    const result = await source().getFootballAiPicks();
+    const lincoln = result.data.items.find((item) => item.rank === 1);
+
+    expect(lincoln?.home_team).toBe("Lincoln Red Imps");
+    expect(lincoln?.away_team).toBe("Inter Club d'Escaldes");
+    expect(lincoln?.league).toBe("Champions League");
+    expect(lincoln?.kickoff_at).toBe("2026-07-07T16:00:00Z");
+  });
+});
+
+describe("historical match identity", () => {
+  it("returns HistoricalMatchIdentity for an archive id, not a projected MatchDetail", async () => {
+    const result = await source().getMatch("mth_football-sportmonks-19719892");
+
+    expect(result.data).toMatchObject({
+      match_id: "mth_football-sportmonks-19719892",
+      home_team: "Lincoln Red Imps",
+      away_team: "Inter Club d'Escaldes",
+      league: "Champions League",
+      kickoff_at: "2026-07-07T16:00:00Z",
+      resource_scope: "structural_identity",
+    });
+    expect(result.data).not.toHaveProperty("timeline");
+    expect(result.data).not.toHaveProperty("score");
+  });
+});
+
+describe("football AI analyst", () => {
+  it("publishes the Lincoln case with a distinct favorite and value selection", async () => {
+    const result = await source().getFootballAiAnalyst("mth_football-sportmonks-19719892");
+
+    expect(result.data_mode).toBe("mock");
+    expect(result.data.model_favorite).toBe("HOME");
+    expect(result.data.value.value_selection).toBe("AWAY");
+    expect(result.data.value.ev).toBe(-0.167);
+    expect(result.data.prediction.model_status).toBe("candidate");
+  });
+
+  it("returns a 404 problem when the report does not exist", async () => {
+    await expect(source().getFootballAiAnalyst("mth_unknown")).rejects.toMatchObject({
+      kind: "not_found",
+      status: 404,
+    });
+  });
+});
+
+describe("football prediction and value", () => {
+  it("publishes the Lincoln candidate prediction without inferring a favorite", async () => {
+    const result = await source().getFootballPrediction("mth_football-sportmonks-19719892");
+
+    expect(result.data.model_version).toBe("football-elo-v1-candidate");
+    expect(result.data.model_status).toBe("candidate");
+    expect(result.data.home_probability).toBe(0.4165);
+    expect(result.data).not.toHaveProperty("model_favorite");
+  });
+
+  it("publishes Lincoln value with AWAY EV distinct from HOME EV", async () => {
+    const result = await source().getFootballValue("mth_football-sportmonks-19719892");
+
+    expect(result.data.value.home.ev).toBe(-0.167);
+    expect(result.data.value.away.ev).toBe(0.5630743998504424);
+    expect(result.data.metadata.data_mode).toBe("mock");
+  });
+
+  it("returns not found for an unknown match rather than a mock substitute", async () => {
+    await expect(source().getFootballPrediction("mth_unknown")).rejects.toMatchObject({
+      kind: "not_found",
+    });
+    await expect(source().getFootballValue("mth_unknown")).rejects.toMatchObject({
+      kind: "not_found",
+    });
+  });
+});
+
+describe("value catalogue filters", () => {
+  it("honours league_id and date on GET /value, the parameters the contract actually has", async () => {
+    const tennis = await source().getValue({ league_id: "lg_grand_court" });
+    expect(tennis.data.items).toHaveLength(0);
+
+    const all = await source().getValue();
+    expect(all.data.items.length).toBeGreaterThan(0);
+  });
+});

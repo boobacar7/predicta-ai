@@ -3,13 +3,15 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from predicta_ingestion.canonical.enums import MatchStatus, SportCode
+from predicta_ingestion.canonical.enums import DataMode, MatchStatus, ResourceType, SportCode
 from predicta_ingestion.canonical.models import CanonicalBatch, League, Match, Provenance, Sport, Team
 from predicta_ingestion.clock import Clock, parse_rfc3339
 from predicta_ingestion.errors import ValidationError
+from predicta_ingestion.identity.keys import league_provider_key
 from predicta_ingestion.ids import slugify, stable_entity_id
 from predicta_ingestion.providers.leagues import V1_LEAGUE_BY_SPORTMONKS_ID
 from predicta_ingestion.quality.freshness import classify_freshness
+from predicta_ingestion.quality.quarantine import QuarantineItem
 from predicta_ingestion.raw.store import StoredRaw
 
 # Finished results become PIT-visible only after kickoff plus this lag.
@@ -67,8 +69,12 @@ def parse_sportmonks_datetime(value: object) -> datetime:
 class SportmonksFootballNormalizer:
     def __init__(self, clock: Clock) -> None:
         self._clock = clock
+        self.quarantined: list[QuarantineItem] = []
 
     def normalize(self, stored: StoredRaw, payload: dict[str, Any]) -> CanonicalBatch:
+        if stored.envelope.resource is ResourceType.SEASONS:
+            return self.normalize_seasons(stored, payload)
+        self.quarantined = []
         sport = Sport(
             id=stable_entity_id("sport", SportCode.FOOTBALL.value),
             code=SportCode.FOOTBALL,
@@ -84,9 +90,85 @@ class SportmonksFootballNormalizer:
             raise ValidationError("invalid_payload", "Sportmonks payload data must be an object or a list.")
         for item in data:
             if not isinstance(item, dict):
-                raise ValidationError("invalid_payload", "Expected a fixture object.")
-            self._add_fixture(batch, stored, sport, item)
+                self.quarantined.append(
+                    self._quarantine(stored, "invalid_payload", "Expected a fixture object.", provider_entity_id=None)
+                )
+                continue
+            try:
+                self._add_fixture(batch, stored, sport, item)
+            except ValidationError as exc:
+                self.quarantined.append(
+                    self._quarantine(
+                        stored,
+                        exc.reason_code,
+                        exc.detail,
+                        provider_entity_id=str(item.get("id")) if item.get("id") is not None else None,
+                    )
+                )
         return batch
+
+    def normalize_seasons(self, stored: StoredRaw, payload: dict[str, Any]) -> CanonicalBatch:
+        """Map Sportmonks season rows to season-scoped leagues. Never treat them as fixtures."""
+        self.quarantined = []
+        sport = Sport(
+            id=stable_entity_id("sport", SportCode.FOOTBALL.value),
+            code=SportCode.FOOTBALL,
+            name="Football",
+            provenance=self._provenance(stored, provider_id="1", event_at=None),
+        )
+        batch = CanonicalBatch(sports=[sport])
+        data = payload.get("data")
+        if isinstance(data, dict):
+            rows = [data]
+        elif isinstance(data, list):
+            rows = data
+        else:
+            raise ValidationError("invalid_payload", "Sportmonks seasons data must be an object or a list.")
+        for item in rows:
+            if not isinstance(item, dict):
+                self.quarantined.append(
+                    self._quarantine(
+                        stored,
+                        "invalid_payload",
+                        "Expected a season object.",
+                        provider_entity_id=None,
+                        entity_type="league",
+                    )
+                )
+                continue
+            try:
+                self._add_season_league(batch, stored, sport, item)
+            except ValidationError as exc:
+                self.quarantined.append(
+                    self._quarantine(
+                        stored,
+                        exc.reason_code,
+                        exc.detail,
+                        provider_entity_id=str(item.get("id")) if item.get("id") is not None else None,
+                        entity_type="league",
+                    )
+                )
+        return batch
+
+    def _quarantine(
+        self,
+        stored: StoredRaw,
+        reason_code: str,
+        detail: str,
+        *,
+        provider_entity_id: str | None,
+        entity_type: str = "match",
+    ) -> QuarantineItem:
+        return QuarantineItem(
+            reason_code=reason_code,
+            detail=detail,
+            provider=stored.envelope.provider,
+            entity_type=entity_type,
+            data_mode=stored.envelope.data_mode if isinstance(stored.envelope.data_mode, DataMode) else DataMode.LIVE,
+            provider_entity_id=provider_entity_id,
+            raw_payload_id=stored.id,
+            created_at=self._clock.now(),
+        )
 
     def _provenance(
         self,
@@ -115,6 +197,36 @@ class SportmonksFootballNormalizer:
             raw_payload_id=stored.id,
         )
 
+    def _add_season_league(
+        self,
+        batch: CanonicalBatch,
+        stored: StoredRaw,
+        sport: Sport,
+        raw: dict[str, Any],
+    ) -> League:
+        league_id = raw.get("league_id")
+        if league_id is None or league_id == "":
+            raise ValidationError("missing_provider_id", "Season league_id is missing.")
+        season_name = str(raw.get("name") or "").strip()
+        if not season_name:
+            raise ValidationError("missing_season", "Season name is missing.")
+        catalog = None
+        try:
+            catalog = V1_LEAGUE_BY_SPORTMONKS_ID.get(int(str(league_id)))
+        except (TypeError, ValueError):
+            catalog = None
+        nested_league: dict[str, Any] = raw["league"] if isinstance(raw.get("league"), dict) else {}
+        league_raw: dict[str, Any] = {
+            "id": league_id,
+            "name": (catalog.name if catalog else str(nested_league.get("name") or "")),
+            "season": {"id": raw.get("id"), "name": season_name},
+        }
+        if catalog is not None:
+            league_raw["country"] = {"name": catalog.country}
+        elif isinstance(nested_league.get("country"), dict):
+            league_raw["country"] = nested_league["country"]
+        return self._add_league(batch, stored, sport, league_raw)
+
     def _add_league(self, batch: CanonicalBatch, stored: StoredRaw, sport: Sport, raw: dict[str, Any]) -> League:
         provider_id = _provider_id(raw.get("id"), field="league")
         season = _season_name(raw)
@@ -123,14 +235,24 @@ class SportmonksFootballNormalizer:
         country_name = None
         if isinstance(country_raw, dict) and country_raw.get("name"):
             country_name = str(country_raw["name"])
+        league_id = stable_entity_id("league", SportCode.FOOTBALL.value, "sportmonks", provider_id, season)
+        for existing in batch.leagues:
+            if existing.id == league_id:
+                return existing
         league = League(
-            id=stable_entity_id("league", SportCode.FOOTBALL.value, "sportmonks", provider_id, season),
+            id=league_id,
             sport_id=sport.id,
             name=str(raw.get("name") or (catalog.name if catalog else "")),
             country=country_name or (catalog.country if catalog else "Unknown"),
             season=season,
             tier=1,
-            provenance=self._provenance(stored, provider_id=provider_id, event_at=None),
+            competition_id=catalog.slug if catalog is not None else None,
+            provider_season_id=_season_provider_id(raw),
+            provenance=self._provenance(
+                stored,
+                provider_id=league_provider_key(provider_id, season),
+                event_at=None,
+            ),
         )
         if not league.name:
             raise ValidationError("invalid_payload", "League name is missing.")
@@ -163,7 +285,15 @@ class SportmonksFootballNormalizer:
         home, away = self._participants(raw)
         home_team = self._team(stored, sport, league, home)
         away_team = self._team(stored, sport, league, away)
+        if home_team.id == away_team.id:
+            raise ValidationError("same_team", "Home team and away team must be different.")
+        if league.season == "unknown":
+            raise ValidationError("missing_season", "Fixture season is missing.")
         home_score, away_score = _final_scores(raw, status)
+        if home_score is not None and home_score < 0:
+            raise ValidationError("inconsistent_score", "Home score cannot be negative.")
+        if away_score is not None and away_score < 0:
+            raise ValidationError("inconsistent_score", "Away score cannot be negative.")
         venue_raw: dict[str, Any] = raw["venue"] if isinstance(raw.get("venue"), dict) else {}
         venue = str(venue_raw.get("name") or "") or None
         available_at = _match_available_at(status=status, kickoff=kickoff, collected_at=stored.envelope.collected_at)
@@ -189,7 +319,6 @@ class SportmonksFootballNormalizer:
                 available_at=available_at,
             ),
         )
-        batch.leagues.append(league)
         batch.teams.extend([home_team, away_team])
         batch.matches.append(match)
 
@@ -276,7 +405,7 @@ def _score_for(scores: list[Any], location: str) -> int | None:
             current.append(item)
         elif description in {"2ND_HALF", "FULLTIME", "FULL_TIME", "FT"}:
             fallback.append(item)
-    chosen = (current or fallback)
+    chosen = current or fallback
     if not chosen:
         return None
     goals = chosen[0].get("score", {}).get("goals") if isinstance(chosen[0].get("score"), dict) else None
@@ -308,3 +437,12 @@ def _season_name(raw: dict[str, Any]) -> str:
     if raw.get("season_id") is not None:
         return str(raw["season_id"])
     return "unknown"
+
+
+def _season_provider_id(raw: dict[str, Any]) -> str | None:
+    season = raw.get("season")
+    if isinstance(season, dict) and season.get("id") is not None:
+        return str(season["id"])
+    if raw.get("season_id") is not None:
+        return str(raw["season_id"])
+    return None

@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-07-07T15:55:00Z",
+  "previous_timestamp": "2026-07-07T15:50:00Z",
+  "next_timestamp": "2026-07-07T16:00:00Z",
+  "data": [
+    {
+      "id": "uclq_lincoln_escaldes_20260707",
+      "sport_key": "soccer_uefa_champs_league_qualification",
+      "sport_title": "UEFA Champions League Qualification",
+      "commence_time": "2026-07-07T16:00:00Z",
+      "home_team": "Lincoln Red Imps",
+      "away_team": "Inter Club d'Escaldes",
+      "bookmakers": [
+        {
+          "key": "pinnacle",
+          "title": "Pinnacle",
+          "last_update": "2026-07-07T15:48:00Z",
+          "markets": [
+            {
+              "key": "h2h",
+              "outcomes": [
+                { "name": "Lincoln Red Imps", "price": 1.90 },
+                { "name": "Draw", "price": 3.40 },
+                { "name": "Inter Club d'Escaldes", "price": 4.20 }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

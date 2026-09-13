@@ -1,0 +1,84 @@
+{
+  "data": [
+    {
+      "id": 19424901,
+      "sport_id": 1,
+      "league_id": 779,
+      "season_id": 18001,
+      "state_id": 1,
+      "name": "Placeholder derby",
+      "starting_at": "2024-10-01 19:00:00",
+      "placeholder": true,
+      "participants": [
+        {"id": 4011, "name": "Austin FC", "short_code": "ATX", "short_name": "Austin", "meta": {"location": "home"}},
+        {"id": 4012, "name": "Houston Dynamo", "short_code": "HOU", "short_name": "Houston", "meta": {"location": "away"}}
+      ],
+      "scores": [],
+      "league": {"id": 779, "name": "Major League Soccer", "country": {"id": 3483, "name": "USA"}},
+      "season": {"id": 18001, "name": "2024"},
+      "state": {"id": 1, "state": "NS", "name": "Not Started", "short_name": "NS"}
+    },
+    {
+      "id": 19424902,
+      "sport_id": 1,
+      "league_id": 779,
+      "season_id": 18001,
+      "state_id": 5,
+      "name": "Finished without scores",
+      "starting_at": "2024-10-02 19:00:00",
+      "placeholder": false,
+      "participants": [
+        {"id": 4013, "name": "Minnesota United", "short_code": "MIN", "short_name": "Minnesota", "meta": {"location": "home"}},
+        {"id": 4014, "name": "Sporting Kansas City", "short_code": "SKC", "short_name": "SKC", "meta": {"location": "away"}}
+      ],
+      "scores": [],
+      "league": {"id": 779, "name": "Major League Soccer", "country": {"id": 3483, "name": "USA"}},
+      "season": {"id": 18001, "name": "2024"},
+      "state": {"id": 5, "state": "FT", "name": "Full Time", "short_name": "FT"}
+    },
+    {
+      "id": 19424903,
+      "sport_id": 1,
+      "league_id": 779,
+      "season_id": 18001,
+      "state_id": 5,
+      "name": "Same team both sides",
+      "starting_at": "2024-10-03 19:00:00",
+      "placeholder": false,
+      "participants": [
+        {"id": 4015, "name": "Orlando City", "short_code": "ORL", "short_name": "Orlando", "meta": {"location": "home"}},
+        {"id": 4015, "name": "Orlando City", "short_code": "ORL", "short_name": "Orlando", "meta": {"location": "away"}}
+      ],
+      "scores": [
+        {"description": "CURRENT", "score": {"goals": 1, "participant": "home"}},
+        {"description": "CURRENT", "score": {"goals": 0, "participant": "away"}}
+      ],
+      "league": {"id": 779, "name": "Major League Soccer", "country": {"id": 3483, "name": "USA"}},
+      "season": {"id": 18001, "name": "2024"},
+      "state": {"id": 5, "state": "FT", "name": "Full Time", "short_name": "FT"}
+    },
+    {
+      "id": 19424904,
+      "sport_id": 1,
+      "league_id": 779,
+      "season_id": 18001,
+      "state_id": 5,
+      "name": "Valid after quarantine neighbours",
+      "starting_at": "2024-10-04 19:00:00",
+      "placeholder": false,
+      "participants": [
+        {"id": 4016, "name": "Philadelphia Union", "short_code": "PHI", "short_name": "Philadelphia", "meta": {"location": "home"}},
+        {"id": 4017, "name": "New England Revolution", "short_code": "NE", "short_name": "New England", "meta": {"location": "away"}}
+      ],
+      "scores": [
+        {"description": "CURRENT", "score": {"goals": 2, "participant": "home"}},
+        {"description": "CURRENT", "score": {"goals": 2, "participant": "away"}}
+      ],
+      "league": {"id": 779, "name": "Major League Soccer", "country": {"id": 3483, "name": "USA"}},
+      "season": {"id": 18001, "name": "2024"},
+      "venue": {"id": 9006, "name": "Subaru Park"},
+      "state": {"id": 5, "state": "FT", "name": "Full Time", "short_name": "FT"}
+    }
+  ],
+  "pagination": {"count": 4, "per_page": 50, "current_page": 1, "next_page": null, "has_more": false}
+}

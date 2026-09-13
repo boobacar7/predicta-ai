@@ -64,6 +64,8 @@ class League(BaseModel):
     country: str
     season: str
     tier: int = 1
+    competition_id: str | None = None
+    provider_season_id: str | None = None
     provenance: Provenance
 
 

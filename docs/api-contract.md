@@ -23,12 +23,49 @@ Le préfixe est défini par le serveur OpenAPI `/api/v1`. Ainsi, le chemin OpenA
 | GET | `/api/v1/matches/{match_id}/stats` | sous-ressource canonique de statistiques |
 | GET | `/api/v1/matches/{match_id}/odds` | dernier snapshot de cotes compatible |
 | GET | `/api/v1/matches/{match_id}/prediction` | prédiction publiée et calibrée |
+| GET | `/api/v1/football/predictions/{match_id}` | probabilités 1X2 du modèle football versionné (`candidate`) |
+| GET | `/api/v1/football/value/{match_id}` | analyse PIT odds + value du marché football 1X2 |
+| GET | `/api/v1/football/ai-picks` | opportunités 1X2 filtrées et classées déterministement |
+| GET | `/api/v1/football/ai-analyst/{match_id}` | explication d'un match football 1X2 (`model_favorite` ≠ `value_selection`) ; narrator déterministe par défaut, LLM optionnel |
 | GET | `/api/v1/picks` | signaux modèle publiés |
 | GET | `/api/v1/value` | évaluations value déterministes |
 | GET | `/api/v1/performance` | santé, séries et calibration du modèle |
 | POST | `/api/v1/ai/analyze` | explication fondée sur un fact pack |
 
 Le détail d'un match embarque actuellement `stats`, `odds` et `prediction` afin d'éviter plusieurs allers-retours dans les vues existantes. Les sous-ressources utilisent les mêmes DTO backend; elles ne doivent pas être calculées différemment.
+
+`GET /matches/{match_id}` conserve ce `MatchDetail` pour les matchs du
+repository frontend. Pour un ID historique canonique présent dans le dataset
+PIT mais absent de ce repository, la même route retourne
+`HistoricalMatchIdentity` : `match_id`, IDs et noms canoniques des équipes,
+ligue, kickoff et `data_mode`. `home_team` et `away_team` sont des clés
+obligatoires mais nullables : une identité absente n'est jamais remplacée par
+un nom fictif. Cette variante ne contient volontairement ni score, ni statut,
+ni événement post-kickoff.
+
+`GET /football/predictions/{match_id}` n'utilise pas les cotes. Son
+`data_mode` d'enveloppe est celui des features PIT servies (archive
+historique Sportmonks, `live`). Il n'est jamais hardcodé et n'est pas
+hérité du OddsService. Un runtime avec `MockOddsProvider` peut donc
+exposer une prédiction `live` et une analyse value / AI Picks / AI Analyst
+`mock`. Le frontend Football consomme les cotes via value, AI Picks et
+AI Analyst, pas via cet endpoint. `GET /matches/{match_id}/prediction`
+reste le DTO catalogue fictif (`mock`).
+
+`GET /football/value/{match_id}` est le contrat backend strict du Value Engine
+0.1. Il appelle le Prediction Service existant, puis choisit le dernier
+snapshot de cotes complet tel que `available_at <= cutoff_at`. Sa réponse
+distingue les probabilités modèle, les cotes décimales, les probabilités
+implicites brutes et no-vig, puis `edge` et `ev`. Elle expose les versions du
+modèle, du dataset, du schéma de features et du moteur, ainsi que la source des
+cotes et le `data_mode`. Voir
+[`value-engine-v0.1.md`](value-engine/value-engine-v0.1.md).
+
+`GET /football/ai-analyst/{match_id}` explique ce contexte. `model_favorite`
+est l'issue de plus haute probabilité modèle. `value.selection` porte les
+métriques Value Engine de cette issue. `value.value_selection` nomme
+l'issue au plus haut EV théorique. Ce n'est pas une recommandation. Voir
+[`ai-analyst.md`](ai-analyst.md).
 
 ## Enveloppe
 
@@ -45,6 +82,7 @@ Toute réponse réussie contient :
 
 - `data_mode: mock` signifie que le payload est explicitement fictif.
 - `data_mode: live` signifie qu'il provient des sources réelles configurées; le terme ne décrit pas le statut live d'un match.
+- L'enveloppe décrit la ressource servie par l'opération, pas le runtime global. Value, AI Picks et AI Analyst portent le `data_mode` des cotes; la prédiction modèle porte celui des features PIT.
 - Le mode `hybrid` appartient uniquement à la factory frontend qui combine plusieurs requêtes. Il n'est jamais une valeur d'enveloppe.
 - `generated_at` est un timestamp RFC 3339.
 - `request_id` est identique au header `X-Request-ID`.
@@ -92,6 +130,9 @@ La v1 conserve la forme déjà consommée :
 - Overround : ratio positif ou nul.
 - Edge : différence de probabilités dans `[-1, 1]`.
 - EV : `(calibrated_probability * decimal_odds) - 1`, minimum `-1`.
+- Dans `FootballValueMarket`, `overround` est la somme des probabilités
+  implicites brutes utilisée comme dénominateur no-vig. La marge conventionnelle
+  serait `overround - 1`.
 - ROI théorique : ratio de backtest, minimum `-1`; jamais une promesse.
 - `theoretical_max_drawdown` : ratio non positif dans `[-1, 0]`; `-0.084` représente une baisse maximale théorique de 8,4 %.
 - Les comptes sont des entiers positifs ou nuls.

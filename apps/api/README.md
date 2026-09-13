@@ -41,3 +41,11 @@ Depuis la racine : `npm run verify:api`.
 ## Endpoints
 
 Préfixe public : `/api/v1`. Santé opérationnelle hors contrat : `GET /health`, `GET /ready`.
+
+Probabilités football 1X2 du candidat Elo : `GET /api/v1/football/predictions/{match_id}`.
+Analyse PIT Odds + Value football 1X2 : `GET /api/v1/football/value/{match_id}`.
+AI Picks statistiques et déterministes : `GET /api/v1/football/ai-picks`.
+AI Analyst football : `GET /api/v1/football/ai-analyst/{match_id}`.
+Le narrator par défaut est déterministe. `PREDICTA_API_ANALYST_NARRATOR=llm`
+active `LLMAnalystProvider` (mock-explainer, grounded, fallback déterministe).
+Le DTO frontend `GET /api/v1/matches/{match_id}/prediction` n'est pas modifié.

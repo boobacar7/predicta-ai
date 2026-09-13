@@ -59,3 +59,81 @@ describe("per-resource routing", () => {
     expect(result.data.items).toHaveLength(0);
   });
 });
+
+describe("AI Picks routing", () => {
+  /**
+   * `GET /picks` and `GET /football/ai-picks` are separate resources in the
+   * contract, so the engine can be pointed at the live API on its own.
+   */
+  it("routes the engine independently from the generic picks resource", async () => {
+    const source = createDataSource({ resourceModes: modes({ football_ai_picks: "http" }) });
+
+    // No API runs in tests: reaching a transport error proves the call left the fixtures.
+    const engine = await source.getFootballAiPicks().catch((error: unknown) => error);
+    const picks = await source.getPicks();
+
+    expect(engine).toBeInstanceOf(Error);
+    expect(picks.data_mode).toBe("mock");
+    expect(resolveKind(modes({ football_ai_picks: "http" }))).toBe("hybrid");
+  });
+
+  it("serves the engine from fixtures by default", async () => {
+    const source = createDataSource({ resourceModes: modes() });
+    const result = await source.getFootballAiPicks();
+
+    expect(result.data_mode).toBe("mock");
+    expect(result.data.metadata.ai_picks_version).toBe("ai-picks-0.1");
+  });
+});
+
+describe("Football prediction and value routing", () => {
+  it("routes GET /football/predictions and GET /football/value independently from legacy catalogue routes", async () => {
+    const source = createDataSource({
+      resourceModes: modes({ football_predictions: "http", football_value: "http" }),
+    });
+
+    const prediction = await source
+      .getFootballPrediction("mth_football-sportmonks-19719892")
+      .catch((error: unknown) => error);
+    const value = await source
+      .getFootballValue("mth_football-sportmonks-19719892")
+      .catch((error: unknown) => error);
+    const legacyValue = await source.getValue();
+
+    expect(prediction).toBeInstanceOf(Error);
+    expect(value).toBeInstanceOf(Error);
+    expect(legacyValue.data_mode).toBe("mock");
+  });
+
+  it("serves football prediction and value from fixtures by default", async () => {
+    const source = createDataSource({ resourceModes: modes() });
+    const prediction = await source.getFootballPrediction("mth_football-sportmonks-19719892");
+    const value = await source.getFootballValue("mth_football-sportmonks-19719892");
+
+    expect(prediction.data.model_version).toBe("football-elo-v1-candidate");
+    expect(prediction.data.model_status).toBe("candidate");
+    expect(value.data.value.away.ev).toBe(0.5630743998504424);
+    expect(value.data.value.home.ev).toBe(-0.167);
+  });
+});
+
+describe("AI Analyst routing", () => {
+  it("routes GET /football/ai-analyst independently from the legacy session", async () => {
+    const source = createDataSource({ resourceModes: modes({ football_ai_analyst: "http" }) });
+
+    const analyst = await source.getFootballAiAnalyst("mth_1").catch((error: unknown) => error);
+    const session = await source.getAnalystSession("mth_northgate_harbor");
+
+    expect(analyst).toBeInstanceOf(Error);
+    expect(session.data_mode).toBe("mock");
+  });
+
+  it("serves the football analyst from fixtures by default", async () => {
+    const source = createDataSource({ resourceModes: modes() });
+    const result = await source.getFootballAiAnalyst("mth_football-sportmonks-19719892");
+
+    expect(result.data_mode).toBe("mock");
+    expect(result.data.model_favorite).toBe("HOME");
+    expect(result.data.value.value_selection).toBe("AWAY");
+  });
+});

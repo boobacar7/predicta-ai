@@ -2,15 +2,18 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from app.core.clock import Clock
-from app.domain import value_engine as ve
 from app.fixtures.quality import quality, unavailable
 from app.schemas import (
+    AvailabilityStatus,
     CalibrationBucket,
+    FormResult,
+    FreshnessLevel,
     Insight,
     League,
     MatchDetail,
     MatchEvent,
     MatchStatistic,
+    MatchStatus,
     MatchSummary,
     ModelHealthSummary,
     OddsSelection,
@@ -24,10 +27,12 @@ from app.schemas import (
     ProbabilityOutcome,
     Scoreline,
     Sport,
+    SportCode,
     Team,
     TeamFormSide,
     UnavailableField,
 )
+from app.value_engine import calculator
 
 
 @dataclass
@@ -733,12 +738,12 @@ def attach_picks(store: FixtureStore, clock: Clock, summaries: dict[str, MatchSu
     ]
 
 
-def _team(id: str, name: str, short_name: str, abbreviation: str, sport: str, league_id: str) -> Team:
+def _team(id: str, name: str, short_name: str, abbreviation: str, sport: SportCode, league_id: str) -> Team:
     return Team(
         id=id,
         name=name,
         short_name=short_name,
-        sport=sport,  # type: ignore[arg-type]
+        sport=sport,
         league_id=league_id,
         abbreviation=abbreviation,
     )
@@ -760,21 +765,21 @@ def _odds(
     match_id: str,
     market: str,
     observed_at: str,
-    freshness: str,
+    freshness: FreshnessLevel,
     selections: Sequence[tuple[str, str, float]],
     note: str | None = None,
 ) -> OddsSnapshot:
     from app.core.clock import parse_rfc3339
 
     market_odds = [row[2] for row in selections]
-    overround = ve.to_float(ve.overround(list(market_odds)))
+    overround = float(calculator.overround(market_odds))
     items = [
         OddsSelection(
             selection=selection,
             label=label,
             decimal_odds=odds,
-            implied_probability_raw=ve.to_float(ve.implied_probability_raw(odds)),
-            no_vig_probability=ve.to_float(ve.no_vig_probability(odds, list(market_odds))),
+            implied_probability_raw=float(calculator.implied_probability(odds)),
+            no_vig_probability=float(calculator.no_vig_probability(odds, market_odds)),
             quality=quality(clock, source="mock.bookmaker.atlas"),
         )
         for selection, label, odds in selections
@@ -807,10 +812,10 @@ def _score(clock: Clock, home: int | None, away: int | None, available: bool) ->
     )
 
 
-def _form(clock: Clock, team_id: str, results: list[str]) -> TeamFormSide:
+def _form(clock: Clock, team_id: str, results: list[FormResult]) -> TeamFormSide:
     return TeamFormSide(
         team_id=team_id,
-        results=results,  # type: ignore[arg-type]
+        results=results,
         quality=quality(clock),
     )
 
@@ -870,12 +875,12 @@ def _match(
     odds: dict[str, OddsSnapshot],
     *,
     id: str,
-    sport: str,
+    sport: SportCode,
     league_id: str,
     home_id: str,
     away_id: str,
     kickoff_hours: int,
-    status: str,
+    status: MatchStatus,
     venue: str,
     score: Scoreline,
     prediction_id: str | None,
@@ -888,16 +893,16 @@ def _match(
 ) -> MatchDetail:
     prediction = predictions.get(prediction_id) if prediction_id else None
     odds_snap = odds.get(odds_id) if odds_id else None
-    freshness = "stale" if odds_snap and odds_snap.quality.freshness == "stale" else "fresh"
-    availability = "unavailable" if status == "postponed" else "available"
+    freshness: FreshnessLevel = "stale" if odds_snap and odds_snap.quality.freshness == "stale" else "fresh"
+    availability: AvailabilityStatus = "unavailable" if status == "postponed" else "available"
     return MatchDetail(
         id=id,
-        sport=sport,  # type: ignore[arg-type]
+        sport=sport,
         league=leagues[league_id],
         home=teams[home_id],
         away=teams[away_id],
         kickoff_at=clock.shift(hours=kickoff_hours, minutes=kickoff_minutes),
-        status=status,  # type: ignore[arg-type]
+        status=status,
         venue=venue,
         score=score,
         prediction_preview=None,

@@ -1,6 +1,7 @@
 "use client";
 
 import { PageHeader } from "@/components/domain/page-header";
+import { PrototypeNotice } from "@/components/domain/prototype-notice";
 import { QueryBoundary } from "@/components/domain/query-boundary";
 import { TeamComparison } from "@/components/domain/team-comparison";
 import { Unavailable } from "@/components/domain/unavailable";
@@ -12,6 +13,7 @@ import { matchStatusLabels } from "@/lib/format/labels";
 import { pageMeta } from "@/lib/navigation";
 import { useMatch, useMatches } from "@/lib/query/hooks";
 import type { MatchSummary } from "@/types/api";
+import { isHistoricalMatchIdentity } from "@/types/api";
 import Link from "next/link";
 
 const meta = pageMeta["/analytics"];
@@ -23,6 +25,11 @@ export function AnalyticsView() {
   return (
     <div className="space-y-6">
       <PageHeader eyebrow={meta.eyebrow} title={meta.title} description={meta.description} />
+
+      <PrototypeNotice>
+        Les statistiques de cette page suivent le catalogue de navigation. Aucun indicateur
+        avancé du moteur football n&apos;est inventé ici.
+      </PrototypeNotice>
 
       <QueryBoundary
         query={list}
@@ -62,7 +69,17 @@ function DetailedComparison({ matchId }: { matchId: string }) {
 
   return (
     <QueryBoundary query={query} skeleton={<CardSkeleton rows={5} />}>
-      {(match) => (
+      {(match) =>
+        isHistoricalMatchIdentity(match) ? (
+          <Card>
+            <CardBody>
+              <Unavailable
+                label="Comparaison statistique"
+                reason="Cet identifiant ne renvoie qu'une identité structurelle archivée, sans statistiques."
+              />
+            </CardBody>
+          </Card>
+        ) : (
         <Card>
           <CardHeader>
             <CardTitle>
@@ -83,7 +100,8 @@ function DetailedComparison({ matchId }: { matchId: string }) {
             )}
           </CardBody>
         </Card>
-      )}
+        )
+      }
     </QueryBoundary>
   );
 }

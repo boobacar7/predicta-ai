@@ -37,6 +37,10 @@ Le moins cher n'est pas retenu par défaut.
 
 **Rôle V1 validé** : fournisseur **principal football live + stats**, plan **Growth**. Voir [ADR 0005](adr/0005-data-providers-v1.md).
 
+Le catalogue historique DATA ajoute la **MLS** (id Sportmonks 779) au même adapter,
+sans second provider. La profondeur réelle dépend du plan et de la réponse API ;
+elle est constatée au run, jamais supposée.
+
 ### API-Football (API-Sports)
 
 - **Couverture** : ~1 000+ ligues, surface large (fixtures, events, lineups, injuries, players, standings, odds in-play/pre-match).

@@ -56,6 +56,15 @@ export function ErrorState({
     >
       <h2 className="text-lg font-medium text-foreground">{title}</h2>
       <p className="mx-auto mt-2 max-w-md text-sm text-muted">{message}</p>
+      {normalized?.problem?.title ? (
+        <p className="mt-2 text-sm text-muted-strong">
+          {normalized.status ? `${normalized.status} · ` : ""}
+          {normalized.problem.title}
+        </p>
+      ) : null}
+      {normalized?.problem?.type ? (
+        <p className="mt-1 font-mono text-xs text-faint">{normalized.problem.type}</p>
+      ) : null}
       {normalized?.requestId ? (
         <p className="mt-2 font-mono text-xs text-faint">request_id {normalized.requestId}</p>
       ) : null}

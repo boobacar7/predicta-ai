@@ -3,9 +3,9 @@
 import { useMockScenario } from "@/data/mock/scenario-context";
 import { getDataSource } from "@/lib/api";
 import { queryKeys } from "@/lib/query/keys";
-import type { CatalogFilters, MatchFilters } from "@/types/api";
+import type { AiPicksFilters, CatalogFilters, MatchFilters } from "@/types/api";
 import type { DataSource } from "@/types/datasource";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 /**
@@ -86,6 +86,45 @@ export function usePicks(filters?: MatchFilters) {
   });
 }
 
+/**
+ * `GET /football/ai-picks`.
+ *
+ * `placeholderData: keepPreviousData` keeps the current page on screen while the
+ * next one loads, so paging or nudging a threshold does not blank the list.
+ */
+export function useFootballAiPicks(filters?: AiPicksFilters) {
+  const { source, scenario } = useSource();
+
+  return useQuery({
+    queryKey: queryKeys.footballAiPicks.list(scenario, filters),
+    queryFn: () => source.getFootballAiPicks(filters),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useFootballPrediction(matchId: string, cutoffAt?: string) {
+  const { source, scenario } = useSource();
+
+  return useQuery({
+    queryKey: queryKeys.footballPredictions.detail(scenario, matchId, cutoffAt),
+    queryFn: () => source.getFootballPrediction(matchId, cutoffAt),
+    enabled: Boolean(matchId),
+  });
+}
+
+export function useFootballValue(matchId: string, cutoffAt?: string) {
+  const { source, scenario } = useSource();
+
+  return useQuery({
+    queryKey: queryKeys.footballValue.detail(scenario, matchId, cutoffAt),
+    queryFn: () => source.getFootballValue(matchId, cutoffAt),
+    enabled: Boolean(matchId),
+  });
+}
+
+/**
+ * Legacy `GET /value`. The football Value Finder uses `useFootballValue`.
+ */
 export function useValueOpportunities(filters?: MatchFilters) {
   const { source, scenario } = useSource();
 
@@ -139,6 +178,16 @@ export function usePlayer(id: string) {
     queryKey: queryKeys.players.detail(scenario, id),
     queryFn: () => source.getPlayer(id),
     enabled: Boolean(id),
+  });
+}
+
+export function useFootballAiAnalyst(matchId: string, cutoffAt?: string) {
+  const { source, scenario } = useSource();
+
+  return useQuery({
+    queryKey: queryKeys.footballAiAnalyst.detail(scenario, matchId, cutoffAt),
+    queryFn: () => source.getFootballAiAnalyst(matchId, cutoffAt),
+    enabled: Boolean(matchId),
   });
 }
 

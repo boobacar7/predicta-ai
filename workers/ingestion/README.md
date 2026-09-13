@@ -3,6 +3,10 @@
 Fondation DATA : adapters, raw immuable, validation, normalisation, résolution
 d'identités et lectures point-in-time.
 
+Le CLI charge `workers/ingestion/.env` tout seul (via python-dotenv), même si
+la commande est lancée depuis la racine du monorepo. Les variables déjà
+présentes dans le process restent prioritaires. Le token n'est jamais affiché.
+
 Le mode par défaut est `mock`. L'ingestion Sportmonks réelle est opt-in.
 
 ## Démarrage (mock / tests)
@@ -45,8 +49,36 @@ python -m predicta_ingestion ingest-football \
 `--dry-run` fetch / valide / normalise **sans** écrire PostgreSQL ni le store raw.
 Retirer `--dry-run` pour persister.
 
-Ligues V1 : `premier-league`, `la-liga`, `bundesliga`, `serie-a`, `ligue-1`,
-`champions-league`, ou `all`.
+Ligues V1 : `mls` (alias `MLS`), `premier-league`, `la-liga`, `bundesliga`, `serie-a`,
+`ligue-1`, `champions-league`, ou `all`.
+
+## Historique + dataset ML
+
+La MLS est la compétition historique de référence. Le pipeline **découvre** les
+saisons Sportmonks ; il n'en suppose aucune.
+
+```bash
+python -m predicta_ingestion ingest-history --league MLS --dry-run
+python -m predicta_ingestion ingest-history \
+  --league mls \
+  --season 2024 \
+  --date-from 2024-03-01 \
+  --date-to 2024-11-30
+python -m predicta_ingestion build-ml-dataset \
+  --league MLS \
+  --write-dataset ./var/football-1x2-history.json
+```
+
+Par défaut, la MLS ingère toutes les saisons découvertes. Les ligues européennes V1
+sont limitées aux 3 saisons les plus récentes sauf `--all-seasons` ou `--season`.
+
+Le rapport JSON liste saisons découvertes vs ingérées, volumes, quarantaine et
+`ingestion_run_id`. Les chiffres canned dans `fixtures/sportmonks` ne sont pas
+la couverture réelle du provider.
+
+`--dry-run` ne persiste ni PostgreSQL ni le raw store.
+
+Aucun modèle n'est entraîné ici. Voir [docs/ml-dataset.md](../../docs/ml-dataset.md).
 
 Données V1 : compétitions, équipes, fixtures (statut, coup d'envoi UTC,
 domicile/extérieur, score final si terminé). Pas de stats, joueurs, blessures,
@@ -62,6 +94,79 @@ Vérifier qu'un run a utilisé Sportmonks :
 Si `ENABLE_LIVE=false` ou token absent, le processus échoue. Il n'y a pas de
 bascule silencieuse vers les fixtures mock.
 
+## Ingestion cotes (The Odds API)
+
+Opt-in, même flags live. La clé ne quitte pas `.env` :
+
+```bash
+PREDICTA_INGESTION_THE_ODDS_API_KEY=
+# ou THE_ODDS_API_KEY=
+python -m predicta_ingestion ingest-odds --league premier-league --dry-run
+python -m predicta_ingestion ingest-odds --league all --as-of 2026-09-08T15:55:00Z
+```
+
+`--as-of` utilise l'endpoint historical documenté (plans payants, 10 crédits par
+région et marché). Sans `--as-of`, l'endpoint courant `h2h` / région `eu`.
+Aucun appel live dans la CI.
+
+Pilote historique borné (Premier League + Ligue 1, 2 timestamps, max 4 requêtes) :
+
+```bash
+python -m predicta_ingestion historical-odds-pilot --dry-run
+```
+
+Persistance bornée du weekend 21–24 août 2026 (1 snapshot / ligue / jour de
+coup d'envoi, max 8 requêtes). Le run QA s'exécute **sans** `--dry-run` :
+
+```bash
+python -m predicta_ingestion persist-historical-odds-pilot
+```
+
+Élargissement borné (PL + Ligue 1, fenêtres mai 2026 + 28 août–6 sept. 2026,
+réutilise le weekend 21–24 août, max 40 requêtes). Estimer les crédits avant
+l'appel live :
+
+```bash
+python -m predicta_ingestion expand-historical-odds-pilot --estimate-only
+python -m predicta_ingestion expand-historical-odds-pilot
+```
+
+Fenêtres d'évaluation `final_test` supplémentaires, définies avant scoring dans
+[final-test-windows.json](../../docs/qa/final-test-windows.json) (PL + Ligue 1,
+1 snapshot / ligue / jour, max 120 requêtes). Estimer les crédits avant l'appel
+live. Pas de `--dry-run` pour la persistance réelle :
+
+```bash
+python -m predicta_ingestion expand-final-test-history --estimate-only
+python -m predicta_ingestion expand-final-test-history
+```
+
+Odds historiques pour la fenêtre OOS vraie (`2026-07-01` → `2026-09-10T02:30:01Z`,
+les sept compétitions V1, 1 snapshot / ligue / jour, max 85 requêtes). Réutilise
+les snapshots PL + Ligue 1 déjà persistés. Estimer **avant** tout appel live :
+
+```bash
+python -m predicta_ingestion expand-oos-historical-odds --estimate-only
+python -m predicta_ingestion expand-oos-historical-odds
+python -m predicta_ingestion expand-oos-final-odds-batch --estimate-only
+python -m predicta_ingestion expand-oos-final-odds-batch
+```
+
+Le scoring 0 crédit :
+
+```bash
+cd apps/api
+python -m app.backtesting persisted-expanded
+python -m app.backtesting persisted-final-test-history
+```
+
+Ce n'est **pas** un backfill. Détail : [odds-provider.md](../../docs/data/odds-provider.md),
+[historical-odds-pilot.md](../../docs/qa/historical-odds-pilot.md) et
+[historical-odds-value-ai-picks-pilot.md](../../docs/qa/historical-odds-value-ai-picks-pilot.md).
+
+Les matchs Sportmonks doivent déjà exister pour lier les cotes. Le worker ne
+calcule ni EV, ni edge, ni no-vig.
+
 ## Règles
 
 - Les fixtures de `fixtures/mock` portent `data_mode: mock`.
@@ -72,4 +177,6 @@ bascule silencieuse vers les fixtures mock.
 
 Documentation : [data-strategy.md](../../docs/data-strategy.md),
 [data-pipeline.md](../../docs/data-pipeline.md),
-[data-providers.md](../../docs/data-providers.md).
+[data-providers.md](../../docs/data-providers.md),
+[odds-provider.md](../../docs/data/odds-provider.md),
+[ml-dataset.md](../../docs/ml-dataset.md).

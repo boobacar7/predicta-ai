@@ -7,6 +7,8 @@
  * Do not silently diverge from the documented endpoints.
  */
 
+import type { components } from "@/types/generated/api";
+
 export type DataMode = "mock" | "live";
 export type SportCode = "football" | "basketball" | "tennis";
 export type AvailabilityStatus = "available" | "unavailable" | "partial" | "stale";
@@ -360,6 +362,111 @@ export interface AnalystSession {
   llm_model: string;
   prompt_version: string;
   disclaimer: string;
+}
+
+/* -------------------------------------------------------------------------
+ * AI Picks Engine (ai-picks-0.1) and historical match identity
+ *
+ * These types are aliases of the schemas generated from
+ * `contracts/openapi.yaml` by `npm run generate:api-types`. They are not
+ * transcribed by hand.
+ *
+ * The distinction matters: this surface previously drifted from the contract
+ * when the engine started publishing team identity, and a hand-written mirror
+ * gave no signal. Deriving from the generated file turns any future contract
+ * change into a typecheck failure instead of a silently stale UI.
+ *
+ * Ratios are raw decimals: `0.072` means 7.2 points.
+ * ---------------------------------------------------------------------- */
+
+type Schemas = components["schemas"];
+
+export type FootballModelStatus = Schemas["FootballModelStatus"];
+export type Football1x2Selection = AiPick["selection"];
+export type AiPickExclusionReason = Schemas["AiPickExclusionReason"];
+
+/**
+ * One ranked opportunity.
+ *
+ * `home_team` and `away_team` are nullable in the contract: the engine
+ * publishes the canonical label when the point-in-time archive resolves it,
+ * and `null` when it does not. `kickoff_at` is required and non-nullable.
+ */
+export type AiPick = Schemas["AiPick"];
+
+/** A rejected selection. The engine never drops a candidate silently. */
+export type AiPickExclusion = Schemas["AiPickExclusion"];
+
+export type AiPicksMetadata = Schemas["AiPicksMetadata"];
+export type AiPicksResult = Schemas["AiPicksResult"];
+
+/**
+ * Structural identity of a match that exists in the point-in-time archive but
+ * has no projection in the frontend repository.
+ *
+ * `GET /matches/{match_id}` returns this instead of `MatchDetail` for those
+ * ids. It deliberately carries no score, status, timeline or statistics, so a
+ * consumer must never treat it as a partial `MatchDetail`.
+ */
+export type HistoricalMatchIdentity = Schemas["HistoricalMatchIdentity"];
+
+/** Discriminates the two shapes `GET /matches/{match_id}` can return. */
+export type MatchDetailResponse = MatchDetail | HistoricalMatchIdentity;
+
+export function isHistoricalMatchIdentity(
+  value: MatchDetailResponse,
+): value is HistoricalMatchIdentity {
+  return "resource_scope" in value && value.resource_scope === "structural_identity";
+}
+
+/**
+ * Football AI Analyst (`GET /football/ai-analyst/{match_id}`).
+ *
+ * Aliases of the generated OpenAPI schemas. The view copies these figures;
+ * it never recomputes a favorite, an edge or an EV.
+ */
+export type FootballAnalystFactor = Schemas["FootballAnalystFactor"];
+export type FootballAnalystPrediction = Schemas["FootballAnalystPrediction"];
+export type FootballAnalystValue = Schemas["FootballAnalystValue"];
+export type FootballAnalystConfidence = Schemas["FootballAnalystConfidence"];
+export type FootballAnalystDataQuality = Schemas["FootballAnalystDataQuality"];
+export type FootballAnalystExplanation = Schemas["FootballAnalystExplanation"];
+export type FootballAiAnalystReport = Schemas["FootballAiAnalystReport"];
+
+/**
+ * Candidate football 1X2 model (`GET /football/predictions/{match_id}`).
+ *
+ * Aliases of the generated OpenAPI schemas. The UI copies these probabilities
+ * and never infers a favorite from them.
+ */
+export type FootballModelPrediction = Schemas["FootballModelPrediction"];
+
+/**
+ * Canonical Value Engine (`GET /football/value/{match_id}`).
+ *
+ * Distinct from the handwritten `ValueOpportunity` used by the legacy
+ * `GET /value` catalogue. The product football surface reads this shape.
+ */
+export type FootballValueAnalysis = Schemas["FootballValueAnalysis"];
+export type FootballValueOdds = Schemas["FootballValueOdds"];
+export type FootballValueMarket = Schemas["FootballValueMarket"];
+export type FootballValueBySelection = Schemas["FootballValueBySelection"];
+export type FootballValueMetadata = Schemas["FootballValueMetadata"];
+export type SelectionValue = Schemas["SelectionValue"];
+
+/**
+ * Query parameters of `GET /football/ai-picks`.
+ *
+ * There is no sport parameter: the engine serves football only, as declared by
+ * the `sport` enum in the contract.
+ */
+export interface AiPicksFilters {
+  date?: string;
+  league?: string;
+  limit?: number;
+  offset?: number;
+  min_edge?: number;
+  min_ev?: number;
 }
 
 export interface MatchFilters {

@@ -1,0 +1,85 @@
+from __future__ import annotations
+
+import re
+
+FORBIDDEN_CLAIMS = (
+    "garanti",
+    "guarantee",
+    "sûr",
+    "sure win",
+    "safe bet",
+    "certain",
+    "100%",
+    "blessure",
+    "blessé",
+    "injury",
+    "injured",
+    "hurt",
+    "composition",
+    "lineup",
+    "line-up",
+    "mise",
+    "pari recommandé",
+    "should be played",
+    "must be played",
+    "gain",
+    "ce pari va gagner",
+    "pari sûr",
+    "gain garanti",
+    "expected goals",
+    "possession",
+    "tirs cadrés",
+    "shots on target",
+    "score final",
+    "a gagné le match",
+    "won the match",
+    "final score",
+    "classement",
+    "ranking",
+    "standings",
+)
+
+UNSUPPORTED_INVENTED_TOPICS = (
+    "xg",
+    "xG",
+    "expected goals",
+    "possession",
+    "tirs cadrés",
+    "shots on target",
+    "blessure",
+    "blessé",
+    "injury",
+    "injured",
+    "hurt",
+    "composition",
+    "lineup",
+    "line-up",
+    "score final",
+    "a gagné le match",
+    "won the match",
+    "final score",
+    "classement",
+    "ranking",
+    "standings",
+    "trois derniers matchs",
+    "last three matches",
+    "dernier résultat",
+    "last result",
+    "probable lineup",
+    "composition probable",
+)
+
+
+def first_blocked_term(text: str, terms: tuple[str, ...]) -> str | None:
+    """Word-boundary topic scan. Not a paraphrase engine for probabilities."""
+
+    lowered = text.casefold()
+    for term in terms:
+        needle = term.casefold()
+        if " " in needle or "%" in needle:
+            if needle in lowered:
+                return term
+            continue
+        if re.search(rf"\b{re.escape(needle)}\b", lowered):
+            return term
+    return None

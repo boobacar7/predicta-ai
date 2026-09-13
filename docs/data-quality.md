@@ -37,6 +37,9 @@ Une cote stale peut rester stockée (historique) mais le Value Engine devra la r
 | IDs provider non vides | quarantaine `missing_provider_id` |
 | Sport ∈ {football, basketball, tennis} | quarantaine `unknown_sport` |
 | Mapping statut de match | quarantaine `unknown_status` |
+| Saison identifiable sur un fixture historique | quarantaine `missing_season` |
+| Home team ≠ away team | quarantaine `same_team` |
+| Scores négatifs / finished sans scores | quarantaine `inconsistent_score` / `invalid_payload` |
 | `data_mode` cohérent avec la source | rejet du run si live revendiqué sur fixture |
 | Taille de payload | rejet `payload_too_large` |
 | Somme des scores incohérente avec événements (lorsque les deux existent) | quarantaine `inconsistent_score` |
@@ -52,6 +55,23 @@ Un replay après correction de mapping produit un nouvel ingest ; le raw d'origi
 ## 5. Déduplication et idempotence
 
 Rejouer le même payload (même checksum) ne crée pas de nouvelle entité. Un snapshot de cotes au même `(provider, bookmaker, match, market, available_at)` est un no-op.
+
+Relancer `ingest-history` sur la même saison Sportmonks : pas de doublon de matchs canoniques, raw inchangé, `ingestion_run_id` distinct. Le quota `rate_limit`, `subscription` et le curseur de pagination du JSON Sportmonks n'entrent pas dans le checksum. Si Sportmonks corrige un payload, le checksum change : nouveau raw immuable + upsert du match.
+
+## 5bis. Rapport d'ingestion historique
+
+Chaque saison ingérée produit :
+
+- `competition`, `season`, `season_id`, `fetched_count`, `normalized_count`, `inserted_count`
+- `duplicate_count`, `quarantined_count`, `missing_score_count`, `missing_team_count`
+- `finished_count`, `future_count`, `other_status_count`, `team_count`
+- `date_min`, `date_max`, `provider`, `data_mode`, `ingestion_run_id`
+
+Les saisons **découvertes** (réponse Sportmonks) sont listées même si elles ne sont pas sélectionnées. Ne pas extrapoler « N années d'historique MLS » au-delà de cette liste.
+
+Le rapport d'historique inclut aussi `identity` / `identity_summary` : pour chaque équipe, `provider_entity_id`, nom provider, canonical id/nom, `resolution_method`, `confidence`. Les ligues sont scopées par saison (`779:2024` ≠ `779:2025`). Un club qui apparaît dans une deuxième compétition **réutilise** le canonical id déjà lié au `provider_id` Sportmonks : une nouvelle identité n'est jamais créée seulement parce que le club joue la Champions League. Un mapping incertain n'est pas accepté : seuls `exact_id`, un alias MLS explicite, ou un nom normalisé **unique dans la compétition** sont retenus.
+
+`standings_probes` enregistre un GET `/standings/seasons/{seasonId}` (dernière saison sélectionnée) **sans persister**. Un 401/403/404 n'interrompt pas l'ingestion des fixtures. La table saisonnière Sportmonks est un snapshot courant, pas un classement Point-in-Time : l'historique PIT exigerait `/standings/rounds/{roundId}` avec `available_at`. Le dataset `football-1x2-history-0.3` n'utilise aucun standing.
 
 ## 6. Mocks vs réel
 
@@ -85,4 +105,4 @@ Pas de payload provider ni de clé dans les logs.
 
 ## 9. Tests de qualité exigés
 
-Le package ingestion couvre : parsing, validation, normalisation, mapping provider → canonique, timestamps UTC, déduplication, fraîcheur, point-in-time, ingestion bout-en-bout mock, erreurs provider. Les fixtures de test ne sont jamais étiquetées `live`.
+Le package ingestion couvre : parsing, validation, normalisation (fixtures **et** saisons Sportmonks séparément), mapping provider → canonique, timestamps UTC, déduplication, fraîcheur, point-in-time, ingestion bout-en-bout mock, erreurs provider, découverte de saisons, historique MLS, dataset 1X2, Elo pré-match, rolling 5/10, anti-leakage. Les fixtures de test ne sont jamais étiquetées `live`. Aucun test n'appelle le réseau.

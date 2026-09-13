@@ -1,0 +1,57 @@
+{
+  "timestamp": "2026-08-16T15:00:00Z",
+  "previous_timestamp": "2026-08-16T14:55:00Z",
+  "next_timestamp": "2026-08-16T15:05:00Z",
+  "data": [
+    {
+      "id": "fl1_marseille_monaco_20260816",
+      "sport_key": "soccer_france_ligue_one",
+      "sport_title": "Ligue 1",
+      "commence_time": "2026-08-16T18:45:00Z",
+      "home_team": "Marseille",
+      "away_team": "AS Monaco",
+      "bookmakers": [
+        {
+          "key": "pinnacle",
+          "title": "Pinnacle",
+          "last_update": "2026-08-16T14:58:00Z",
+          "markets": [
+            {
+              "key": "h2h",
+              "outcomes": [
+                { "name": "Marseille", "price": 2.30 },
+                { "name": "Draw", "price": 3.25 },
+                { "name": "AS Monaco", "price": 3.15 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fl1_paris_fc_angers_20260816",
+      "sport_key": "soccer_france_ligue_one",
+      "sport_title": "Ligue 1",
+      "commence_time": "2026-08-16T18:45:00Z",
+      "home_team": "Paris FC",
+      "away_team": "Angers",
+      "bookmakers": [
+        {
+          "key": "pinnacle",
+          "title": "Pinnacle",
+          "last_update": "2026-08-16T14:59:00Z",
+          "markets": [
+            {
+              "key": "h2h",
+              "outcomes": [
+                { "name": "Paris FC", "price": 2.35 },
+                { "name": "Draw", "price": 3.25 },
+                { "name": "Angers", "price": 3.20 }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

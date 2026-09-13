@@ -1,0 +1,97 @@
+{
+  "timestamp": "2026-08-21T18:55:00Z",
+  "previous_timestamp": "2026-08-21T18:50:00Z",
+  "next_timestamp": "2026-08-21T19:00:00Z",
+  "data": [
+    {
+      "id": "epl_helix_meridian_20260821",
+      "sport_key": "soccer_epl",
+      "sport_title": "EPL",
+      "commence_time": "2026-08-21T19:00:00Z",
+      "home_team": "Helix FC",
+      "away_team": "Meridian Athletic",
+      "bookmakers": [
+        {
+          "key": "pinnacle",
+          "title": "Pinnacle",
+          "last_update": "2026-08-21T18:48:00Z",
+          "markets": [
+            {
+              "key": "h2h",
+              "outcomes": [
+                { "name": "Helix FC", "price": 1.80 },
+                { "name": "Draw", "price": 3.70 },
+                { "name": "Meridian Athletic", "price": 4.40 }
+              ]
+            }
+          ]
+        },
+        {
+          "key": "betfair_ex_eu",
+          "title": "Betfair Exchange",
+          "last_update": "2026-08-21T18:49:00Z",
+          "markets": [
+            {
+              "key": "h2h",
+              "outcomes": [
+                { "name": "Helix FC", "price": 1.82 },
+                { "name": "Draw", "price": 3.65 },
+                { "name": "Meridian Athletic", "price": 4.30 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "epl_bournemouth_brentford_20260821",
+      "sport_key": "soccer_epl",
+      "sport_title": "EPL",
+      "commence_time": "2026-08-21T19:00:00Z",
+      "home_team": "Bournemouth",
+      "away_team": "Brentford",
+      "bookmakers": [
+        {
+          "key": "pinnacle",
+          "title": "Pinnacle",
+          "last_update": "2026-08-21T18:50:00Z",
+          "markets": [
+            {
+              "key": "h2h",
+              "outcomes": [
+                { "name": "Bournemouth", "price": 2.10 },
+                { "name": "Draw", "price": 3.40 },
+                { "name": "Brentford", "price": 3.60 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "epl_unknown_borough_20260821",
+      "sport_key": "soccer_epl",
+      "sport_title": "EPL",
+      "commence_time": "2026-08-21T19:00:00Z",
+      "home_team": "Unknown Borough",
+      "away_team": "Helix FC",
+      "bookmakers": [
+        {
+          "key": "pinnacle",
+          "title": "Pinnacle",
+          "last_update": "2026-08-21T18:51:00Z",
+          "markets": [
+            {
+              "key": "h2h",
+              "outcomes": [
+                { "name": "Unknown Borough", "price": 4.10 },
+                { "name": "Draw", "price": 3.60 },
+                { "name": "Helix FC", "price": 1.90 }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
