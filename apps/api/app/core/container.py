@@ -134,5 +134,5 @@ class AppContainer:
         if self.settings.repository == "sql":
             from app.repositories.sql import SqlRepositoryBundle
 
-            return SqlRepositoryBundle()
+            return SqlRepositoryBundle(self.settings)
         return MockRepositoryBundle(self.clock)
