@@ -1,11 +1,11 @@
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal, Self
+from typing import Annotated, Literal, Self
 from urllib.parse import unquote, urlparse
 
 from pydantic import Field, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from app.value_engine.calculator import VALUE_ENGINE_VERSION
 
@@ -60,10 +60,10 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     database_url: str = "postgresql+psycopg://predicta:predicta@localhost:5432/predicta"
     redis_url: str | None = None
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+    cors_origins: Annotated[list[str], NoDecode] = Field(default_factory=lambda: ["http://localhost:3000"])
     request_id_header: str = "X-Request-ID"
     auth_bypass: bool = False
-    invite_allowlist: list[str] = Field(default_factory=list)
+    invite_allowlist: Annotated[list[str], NoDecode] = Field(default_factory=list)
     session_cookie_name: str = "predicta_session"
     csrf_cookie_name: str = "predicta_csrf"
     csrf_header_name: str = "X-CSRF-Token"

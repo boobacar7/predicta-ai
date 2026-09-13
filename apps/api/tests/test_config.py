@@ -109,6 +109,24 @@ def test_football_paths_reject_object_store_uris() -> None:
         Settings(_env_file=None, football_registry_dir="s3://predicta/registry")
 
 
+def test_staging_env_accepts_csv_cors_and_empty_allowlist(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PREDICTA_API_ENV", "staging")
+    monkeypatch.setenv("PREDICTA_API_REPOSITORY", "sql")
+    monkeypatch.setenv("PREDICTA_API_DATA_MODE", "live")
+    monkeypatch.setenv("PREDICTA_API_AUTH_BYPASS", "false")
+    monkeypatch.setenv("PREDICTA_API_CORS_ORIGINS", "http://localhost:3000")
+    monkeypatch.setenv("PREDICTA_API_INVITE_ALLOWLIST", "")
+    monkeypatch.setenv(
+        "PREDICTA_API_DATABASE_URL",
+        "postgresql+psycopg://predicta:predicta@postgres:5432/predicta",
+    )
+    settings = Settings(_env_file=None)
+    assert settings.cors_origins == ["http://localhost:3000"]
+    assert settings.invite_allowlist == []
+    assert settings.database_url.endswith("@postgres:5432/predicta")
+    assert settings.auth_bypass is False
+
+
 def test_missing_artefact_does_not_fail_settings_boot(tmp_path: Path) -> None:
     settings = Settings(
         _env_file=None,

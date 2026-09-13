@@ -1,12 +1,12 @@
 """Alembic environment. Migrations are the only schema change path."""
 
+import os
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
-
 from app.core.config import Settings
 from app.db.models import Base
+from sqlalchemy import engine_from_config, pool
 
 config = context.config
 if config.config_file_name is not None:
@@ -14,11 +14,13 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
+_env_database_url = (os.environ.get("PREDICTA_API_DATABASE_URL") or "").strip()
 try:
     settings = Settings()
     config.set_main_option("sqlalchemy.url", settings.database_url)
 except Exception:
-    pass
+    if _env_database_url:
+        config.set_main_option("sqlalchemy.url", _env_database_url)
 
 
 def run_migrations_offline() -> None:
