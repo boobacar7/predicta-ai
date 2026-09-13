@@ -1,7 +1,7 @@
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 
 from dotenv import load_dotenv
 from pydantic import Field, field_validator, model_validator
@@ -62,10 +62,26 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.env == "production"
 
+    @property
+    def is_deployed(self) -> bool:
+        return self.env in ("staging", "production")
+
     def resolved_data_mode(self) -> DataMode:
         if not self.enable_live:
             return "mock"
         return self.data_mode
+
+    @model_validator(mode="after")
+    def refuse_mock_in_deployed_envs(self) -> Self:
+        if self.env in ("staging", "production") and self.data_mode == "mock":
+            raise ValueError(f"data_mode=mock is forbidden when PREDICTA_INGESTION_ENV={self.env}.")
+        if self.enable_live and self.data_mode == "mock":
+            raise ValueError("Live ingestion cannot run with data_mode=mock.")
+        if self.data_mode == "live" and not self.enable_live:
+            raise ValueError(
+                "data_mode=live requires PREDICTA_INGESTION_ENABLE_LIVE=true; refusing to relabel as mock."
+            )
+        return self
 
 
 def local_env_candidates(*, env_file: Path | None = None) -> list[Path]:
@@ -112,9 +128,4 @@ def _skip_dotenv() -> bool:
 @lru_cache
 def get_settings() -> Settings:
     load_local_env()
-    settings = Settings()
-    if settings.is_production and settings.data_mode == "mock":
-        raise RuntimeError("data_mode=mock is forbidden when PREDICTA_INGESTION_ENV=production.")
-    if settings.enable_live and settings.data_mode == "mock":
-        raise RuntimeError("Live ingestion cannot run with data_mode=mock.")
-    return settings
+    return Settings()

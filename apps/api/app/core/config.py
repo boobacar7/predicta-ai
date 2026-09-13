@@ -1,9 +1,9 @@
 from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.value_engine.calculator import VALUE_ENGINE_VERSION
@@ -71,18 +71,27 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.env == "production"
 
+    @property
+    def is_deployed(self) -> bool:
+        return self.env in ("staging", "production")
+
     def resolved_data_mode(self) -> DataMode:
         """Mock repositories cannot be advertised as live data."""
         if self.repository == "mock":
             return "mock"
         return self.data_mode
 
+    @model_validator(mode="after")
+    def refuse_mock_in_deployed_envs(self) -> Self:
+        if not self.is_deployed:
+            return self
+        if self.repository == "mock":
+            raise ValueError(f"Mock repositories are forbidden when PREDICTA_API_ENV={self.env}.")
+        if self.data_mode == "mock":
+            raise ValueError(f"data_mode=mock is forbidden when PREDICTA_API_ENV={self.env}.")
+        return self
+
 
 @lru_cache
 def get_settings() -> Settings:
-    settings = Settings()
-    if settings.is_production and settings.repository == "mock":
-        raise RuntimeError("Mock repositories are forbidden when PREDICTA_API_ENV=production.")
-    if settings.is_production and settings.data_mode == "mock":
-        raise RuntimeError("data_mode=mock is forbidden when PREDICTA_API_ENV=production.")
-    return settings
+    return Settings()

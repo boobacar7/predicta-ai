@@ -38,7 +38,8 @@ export type DataResource = (typeof DATA_RESOURCES)[number];
  * `NODE_ENV` is `production` for any optimised build, including a local
  * `next build` of the mock prototype. Gating the mock safety rule on it would
  * make the phase-1 prototype impossible to build. This variable describes where
- * the bundle is actually served, so the rule protects real users only.
+ * the bundle is actually served. Staging and production both refuse silent
+ * fixtures; only a local development deployment may serve mock data.
  */
 export type DeploymentEnv = "development" | "staging" | "production";
 
@@ -157,6 +158,12 @@ export function buildConfig(env: EnvRecord): WebConfig {
   ) as Record<DataResource, DataSourceMode>;
 
   const usesMock = Object.values(resourceModes).includes("mock");
+
+  if (deploymentEnv === "staging" && usesMock) {
+    throw new ConfigError(
+      "Mock fixtures are blocked in staging. Route every resource to http. There is no staging mock escape hatch.",
+    );
+  }
 
   if (deploymentEnv === "production" && usesMock && !allowMockInProd) {
     throw new ConfigError(
