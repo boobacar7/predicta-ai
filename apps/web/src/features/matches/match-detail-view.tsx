@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { CardSkeleton } from "@/components/ui/skeleton";
 import { isCataloguePrototypeModel } from "@/lib/football/catalogue";
+import { footballAnalystPath } from "@/lib/football/routes";
 import { formatAbsolute, formatKickoff } from "@/lib/format/dates";
 import { formatKickoffOrUnknown, formatMatchup } from "@/lib/format/identity";
 import { matchStatusLabels, sportLabels } from "@/lib/format/labels";
@@ -160,6 +161,13 @@ function MatchDetailContent({ match }: { match: MatchDetail }) {
         </Card>
       </div>
 
+      <Link
+        href={footballAnalystPath(match.id)}
+        className="inline-block text-sm text-ai-strong hover:underline"
+      >
+        Ouvrir dans l&apos;AI Analyst
+      </Link>
+
       {match.unavailable_fields.length > 0 ? (
         <section className="space-y-2">
           <h2 className="text-sm font-medium">Données non fournies</h2>
@@ -219,7 +227,7 @@ function HistoricalIdentityContent({ identity }: { identity: HistoricalMatchIden
       />
 
       <Link
-        href={`/ai-analyst?match_id=${identity.match_id}`}
+        href={footballAnalystPath(identity.match_id)}
         className="inline-block text-sm text-ai-strong hover:underline"
       >
         Ouvrir dans l&apos;AI Analyst

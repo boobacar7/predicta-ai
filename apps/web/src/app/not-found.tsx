@@ -9,7 +9,7 @@ export default function NotFound() {
       description="Cette route n'existe pas dans le prototype PREDICTA AI."
       action={
         <Button asChild variant="primary">
-          <Link href="/">Retour au dashboard</Link>
+          <Link href="/football">Retour au dashboard</Link>
         </Button>
       }
     />

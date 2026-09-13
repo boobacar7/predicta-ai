@@ -1,18 +1,16 @@
 import type { NextConfig } from "next";
+import { LEGACY_FOOTBALL_REDIRECTS } from "./src/lib/football/routes";
 
 const nextConfig: NextConfig = {
   // Minimal image for infra/containers/compose.staging.yml (node server.js).
   output: "standalone",
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
   /**
-   * AI Picks and Value Finder moved to `/ai-picks` and `/value-finder`, the
-   * paths used by the product navigation. The previous prototype paths keep
-   * working so bookmarks and any fixture linking to them do not break.
+   * P1 product lives at `/football/*`. Previous prototype paths redirect so
+   * bookmarks and in-app leftovers do not 404.
    */
   async redirects() {
-    return [
-      { source: "/picks", destination: "/ai-picks", permanent: true },
-      { source: "/value", destination: "/value-finder", permanent: true },
-    ];
+    return [...LEGACY_FOOTBALL_REDIRECTS];
   },
 };
 

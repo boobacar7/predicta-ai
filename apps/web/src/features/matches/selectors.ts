@@ -1,4 +1,3 @@
-import { isoDaysFromNow } from "@/data/mock/clock";
 import type { MatchSummary } from "@/types/api";
 
 /**
@@ -8,11 +7,28 @@ import type { MatchSummary } from "@/types/api";
  * are sent to the data source. Free-text search is applied client side over the
  * returned page, so it stays a display concern until the API exposes a search
  * parameter.
+ *
+ * Calendar dates use the wall clock (injectable for tests). Feature views must
+ * not import the mock fixture clock.
  */
 
-/** Calendar strip dates, as `YYYY-MM-DD`, starting from the current day. */
-export function upcomingDays(count: number): string[] {
-  return Array.from({ length: count }, (_, offset) => isoDaysFromNow(offset).slice(0, 10));
+function pad(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+export function toIsoDate(date: Date): string {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** Calendar strip dates, as `YYYY-MM-DD`, starting from local today unless `from` is given. */
+export function upcomingDays(count: number, from: Date = new Date()): string[] {
+  const start = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+
+  return Array.from({ length: count }, (_, offset) => {
+    const day = new Date(start);
+    day.setDate(start.getDate() + offset);
+    return toIsoDate(day);
+  });
 }
 
 function normalize(value: string): string {

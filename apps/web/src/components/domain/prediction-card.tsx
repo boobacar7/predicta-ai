@@ -1,6 +1,7 @@
 import { AIConfidence } from "@/components/domain/ai-confidence";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
+import { footballMatchPath } from "@/lib/football/routes";
 import { formatKickoff } from "@/lib/format/dates";
 import { formatProbability } from "@/lib/format/numbers";
 import type { Pick } from "@/types/api";
@@ -29,7 +30,7 @@ export function PredictionCard({ pick }: { pick: Pick }) {
         </p>
         <p className="text-sm leading-6 text-muted">{pick.rationale}</p>
         <p className="text-xs text-faint">Critère : {pick.criteria}</p>
-        <Link href={`/matches/${pick.match.id}`} className="text-sm text-ai-strong hover:underline">
+        <Link href={footballMatchPath(pick.match.id)} className="text-sm text-ai-strong hover:underline">
           Ouvrir le match
         </Link>
       </CardBody>

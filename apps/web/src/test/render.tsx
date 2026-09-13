@@ -35,7 +35,7 @@ export function createTestQueryClient(): QueryClient {
 
 export function renderWithProviders(
   ui: ReactElement,
-  { sport = "all", scenario = "success", theme = "dark", ...options }: RenderWithProvidersOptions = {},
+  { sport = "football", scenario = "success", theme = "dark", ...options }: RenderWithProvidersOptions = {},
 ): RenderResult & { queryClient: QueryClient } {
   resetThemeStore();
   setThemeStore(theme, false);

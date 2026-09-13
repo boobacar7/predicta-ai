@@ -186,11 +186,11 @@ describe("AiPicksView", () => {
     expect(screen.getByLabelText("Sport")).toBeDisabled();
   });
 
-  it("states that the engine has no coverage for another sport, without faking one", async () => {
+  it("still loads football picks when a leftover sport filter is tennis", async () => {
     renderWithProviders(<AiPicksView />, { sport: "tennis" });
 
-    expect(await screen.findByText("Moteur limité au football")).toBeInTheDocument();
-    expect(screen.queryByText(/^Rang /)).not.toBeInTheDocument();
+    expect(await screen.findByText("Rang 1")).toBeInTheDocument();
+    expect(screen.queryByText("Moteur limité au football")).not.toBeInTheDocument();
   });
 
   it("distinguishes an empty result from an error, and offers no retry", async () => {

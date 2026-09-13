@@ -4,6 +4,7 @@ import { TeamLogo } from "@/components/domain/team-logo";
 import { ValueBadge } from "@/components/domain/value-badge";
 import { Badge } from "@/components/ui/badge";
 import { isCataloguePrototypeModel } from "@/lib/football/catalogue";
+import { footballMatchPath } from "@/lib/football/routes";
 import { formatClock, formatKickoff } from "@/lib/format/dates";
 import { matchStatusLabels, sportLabels } from "@/lib/format/labels";
 import { formatProbability, formatScore } from "@/lib/format/numbers";
@@ -17,7 +18,7 @@ export function MatchCard({ match }: { match: MatchSummary }) {
 
   return (
     <Link
-      href={`/matches/${match.id}`}
+      href={footballMatchPath(match.id)}
       className="block rounded-2xl border border-border bg-surface p-5 shadow-[var(--shadow-card)] transition-colors hover:border-border-strong hover:bg-surface-elevated"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">

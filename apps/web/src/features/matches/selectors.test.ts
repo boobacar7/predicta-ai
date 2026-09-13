@@ -50,20 +50,20 @@ describe("searchMatches", () => {
 
 describe("upcomingDays", () => {
   it("returns the requested number of consecutive ISO dates", () => {
-    const days = upcomingDays(7);
+    const days = upcomingDays(7, new Date(2026, 8, 13));
 
     expect(days).toHaveLength(7);
     expect(days.every((day) => /^\d{4}-\d{2}-\d{2}$/.test(day))).toBe(true);
   });
 
-  it("starts at the injected mock clock, keeping the calendar deterministic", () => {
-    expect(upcomingDays(1)).toEqual(["2026-09-09"]);
+  it("starts at the supplied local calendar day, not the mock fixture clock", () => {
+    expect(upcomingDays(1, new Date(2026, 8, 13, 18, 0, 0))).toEqual(["2026-09-13"]);
   });
 
-  it("advances by exactly one day", () => {
-    const [first, second] = upcomingDays(2);
+  it("advances by exactly one local day", () => {
+    const [first, second] = upcomingDays(2, new Date(2026, 8, 13));
 
-    expect(second).toBe("2026-09-10");
-    expect(first).toBe("2026-09-09");
+    expect(first).toBe("2026-09-13");
+    expect(second).toBe("2026-09-14");
   });
 });

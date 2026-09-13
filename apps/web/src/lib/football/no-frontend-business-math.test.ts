@@ -16,7 +16,9 @@ function source(relative: string): string {
 
 const PRODUCT_VIEWS = [
   "features/dashboard/dashboard-view.tsx",
+  "features/matches/match-center-view.tsx",
   "features/matches/match-detail-view.tsx",
+  "features/matches/selectors.ts",
   "features/value/value-finder-view.tsx",
   "features/picks/ai-picks-view.tsx",
   "features/ai-analyst/ai-analyst-view.tsx",
@@ -60,5 +62,11 @@ describe("football product views do not recompute business math", () => {
     const panel = source("components/domain/football-prediction-panel.tsx");
     expect(panel).not.toContain("model_favorite");
     expect(panel).not.toContain("Math.max");
+  });
+
+  it("does not import mock clock or mock analyst ids from feature views", () => {
+    for (const relative of PRODUCT_VIEWS) {
+      expect(source(relative)).not.toMatch(/@\/data\/mock\/(clock|analyst|ai-analyst|football-engine)/);
+    }
   });
 });

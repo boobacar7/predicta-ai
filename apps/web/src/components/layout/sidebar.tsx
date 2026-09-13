@@ -1,6 +1,7 @@
 "use client";
 
 import { NavIcon } from "@/components/layout/nav-icon";
+import { FOOTBALL_PATHS, isFootballNavActive } from "@/lib/football/routes";
 import { navSections, profileNavItem } from "@/lib/navigation";
 import { cn } from "@/lib/cn";
 import Link from "next/link";
@@ -11,7 +12,11 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="flex h-full flex-col">
-      <Link href="/" className="flex items-center gap-3 px-4 py-5" onClick={onNavigate}>
+      <Link
+        href={FOOTBALL_PATHS.dashboard}
+        className="flex items-center gap-3 px-4 py-5"
+        onClick={onNavigate}
+      >
         <span className="flex size-9 items-center justify-center rounded-xl bg-ai-soft text-sm font-semibold text-ai-strong">
           P
         </span>
@@ -48,11 +53,14 @@ function NavLink({
   pathname,
   onNavigate,
 }: {
-  item: (typeof profileNavItem);
+  item: typeof profileNavItem;
   pathname: string;
   onNavigate?: () => void;
 }) {
-  const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+  const active =
+    item.href === "/profile"
+      ? pathname === item.href || pathname.startsWith(`${item.href}/`)
+      : isFootballNavActive(pathname, item.href);
 
   return (
     <Link

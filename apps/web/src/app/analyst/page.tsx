@@ -1,5 +1,6 @@
+import { FOOTBALL_PATHS } from "@/lib/football/routes";
 import { redirect } from "next/navigation";
 
 export default function AnalystRedirectPage() {
-  redirect("/ai-analyst");
+  redirect(FOOTBALL_PATHS.aiAnalyst);
 }

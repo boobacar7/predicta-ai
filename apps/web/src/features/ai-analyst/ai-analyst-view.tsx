@@ -14,41 +14,37 @@ import { StrengthsList } from "@/components/domain/strengths-list";
 import { ValueInformation } from "@/components/domain/value-information";
 import { Card, CardBody } from "@/components/ui/card";
 import { CardSkeleton } from "@/components/ui/skeleton";
-import {
-  ANALYST_MISSING_FACTORS_ID,
-  ANALYST_MISSING_IDENTITY_ID,
-  ANALYST_MISSING_VALUE_ID,
-  ANALYST_INVALID_KICKOFF_ID,
-  LINCOLN_ANALYST_MATCH_ID,
-  analystMatchOptions,
-} from "@/data/mock/ai-analyst";
-import { useFilters } from "@/lib/filters/context";
-import { formatKickoffOrUnknown, formatMatchup } from "@/lib/format/identity";
 import { isDataSourceError } from "@/lib/api/errors";
+import { footballMatchOptions } from "@/lib/football/match-options";
+import { FOOTBALL_PATHS, P1_SPORT } from "@/lib/football/routes";
+import { useFootballMatchId } from "@/lib/football/use-match-id";
+import { formatKickoffOrUnknown, formatMatchup } from "@/lib/format/identity";
 import { pageMeta } from "@/lib/navigation";
-import { useFootballAiAnalyst } from "@/lib/query/hooks";
+import { useFootballAiAnalyst, useFootballAiPicks, useMatches } from "@/lib/query/hooks";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 
-const meta = pageMeta["/ai-analyst"];
-
-const SELECTABLE_IDS = new Set<string>([
-  LINCOLN_ANALYST_MATCH_ID,
-  ANALYST_MISSING_IDENTITY_ID,
-  ANALYST_MISSING_VALUE_ID,
-  ANALYST_MISSING_FACTORS_ID,
-  ANALYST_INVALID_KICKOFF_ID,
-]);
+const meta = pageMeta[FOOTBALL_PATHS.aiAnalyst];
 
 export function AiAnalystView() {
-  const { sport } = useFilters();
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const matchId = searchParams.get("match_id") ?? LINCOLN_ANALYST_MATCH_ID;
-  const engineCoversSport = sport === "all" || sport === "football";
+  const { matchId, pending } = useFootballMatchId();
 
-  const query = useFootballAiAnalyst(engineCoversSport ? matchId : "");
+  const query = useFootballAiAnalyst(matchId);
+  const matches = useMatches({ sport: P1_SPORT });
+  const picks = useFootballAiPicks({ limit: 50 });
+
+  const options = useMemo(
+    () =>
+      footballMatchOptions({
+        matches: matches.data?.data.items,
+        picks: picks.data?.data.items,
+        currentId: matchId,
+      }),
+    [matches.data?.data.items, picks.data?.data.items, matchId],
+  );
 
   const onMatchChange = useCallback(
     (next: string) => {
@@ -59,13 +55,22 @@ export function AiAnalystView() {
     [pathname, router, searchParams],
   );
 
-  if (!engineCoversSport) {
+  if (pending) {
+    return (
+      <div className="space-y-6">
+        <PageHeader eyebrow={meta.eyebrow} title={meta.title} description={meta.description} />
+        <CardSkeleton rows={5} />
+      </div>
+    );
+  }
+
+  if (!matchId) {
     return (
       <div className="space-y-6">
         <PageHeader eyebrow={meta.eyebrow} title={meta.title} description={meta.description} />
         <EmptyState
-          title="Analyste limité au football"
-          description="La version ai-analyst-0.1 n'explique que le football 1X2. Aucune analyse n'est simulée pour le sport actif."
+          title="Aucun match à expliquer"
+          description="Passez un match_id dans l'URL ou attendez qu'un match football soit publié."
         />
       </div>
     );
@@ -75,7 +80,7 @@ export function AiAnalystView() {
     return (
       <div className="space-y-6">
         <PageHeader eyebrow={meta.eyebrow} title={meta.title} description={meta.description} />
-        <MatchPicker value={matchId} onChange={onMatchChange} />
+        <MatchPicker value={matchId} onChange={onMatchChange} options={options} />
         <EmptyState
           title="Aucune analyse disponible"
           description={query.error.message}
@@ -87,7 +92,7 @@ export function AiAnalystView() {
   return (
     <div className="space-y-6">
       <PageHeader eyebrow={meta.eyebrow} title={meta.title} description={meta.description} />
-      <MatchPicker value={matchId} onChange={onMatchChange} />
+      <MatchPicker value={matchId} onChange={onMatchChange} options={options} />
 
       <QueryBoundary
         query={query}
@@ -100,6 +105,11 @@ export function AiAnalystView() {
             </div>
           </div>
         }
+        isEmpty={(report) => report.analyst.summary.length === 0 && report.analyst.key_factors.length === 0}
+        empty={{
+          title: "Analyse vide",
+          description: "Le moteur a répondu sans explication. Aucun texte n'est inventé pour remplir la page.",
+        }}
       >
         {(report, envelope) => {
           const matchup = formatMatchup(report.home_team, report.away_team);
@@ -149,15 +159,22 @@ export function AiAnalystView() {
   );
 }
 
-function MatchPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+function MatchPicker({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: ReadonlyArray<{ id: string; label: string }>;
+}) {
   return (
     <section
       aria-label="Match analysé"
       className="rounded-2xl border border-border bg-surface px-4 py-3"
     >
       <SelectFilter label="Match" value={value} onChange={onChange}>
-        {SELECTABLE_IDS.has(value) ? null : <option value={value}>{value}</option>}
-        {analystMatchOptions.map((option) => (
+        {options.map((option) => (
           <option key={option.id} value={option.id}>
             {option.label}
           </option>

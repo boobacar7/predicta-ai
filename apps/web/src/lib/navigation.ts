@@ -1,3 +1,8 @@
+import {
+  FOOTBALL_PATHS,
+  isFootballNavActive,
+} from "@/lib/football/routes";
+
 export type NavItem = {
   href: string;
   label: string;
@@ -11,82 +16,44 @@ export type NavSection = {
   items: NavItem[];
 };
 
+/**
+ * Private-beta chrome. Basketball, tennis and undelivered catalogue surfaces
+ * stay out of the primary navigation.
+ */
 export const navSections: NavSection[] = [
   {
-    id: "analyse",
-    label: "Analyse",
+    id: "football",
+    label: "Football",
     items: [
       {
-        href: "/",
+        href: FOOTBALL_PATHS.dashboard,
         label: "Dashboard",
         description: "Vue d'ensemble des signaux du jour",
         icon: "layout",
       },
       {
-        href: "/matches",
+        href: FOOTBALL_PATHS.matches,
         label: "Match Center",
         description: "Calendrier, filtres et détails de match",
         icon: "calendar",
       },
       {
-        href: "/ai-picks",
+        href: FOOTBALL_PATHS.aiPicks,
         label: "AI Picks",
         description: "Opportunités classées par le moteur, jamais des garanties",
         icon: "spark",
       },
       {
-        href: "/value-finder",
+        href: FOOTBALL_PATHS.value,
         label: "Value Finder",
         description: "Écarts entre modèle et cotes observées",
         icon: "diamond",
       },
-    ],
-  },
-  {
-    id: "intelligence",
-    label: "Intelligence",
-    items: [
       {
-        href: "/analytics",
-        label: "Statistiques",
-        description: "Comparaisons et indicateurs disponibles",
-        icon: "chart",
-      },
-      {
-        href: "/performance",
-        label: "Performance",
-        description: "Calibration, log loss et historique",
-        icon: "activity",
-      },
-      {
-        href: "/ai-analyst",
+        href: FOOTBALL_PATHS.aiAnalyst,
         label: "AI Analyst",
         description: "Explication football 1X2 à partir du contexte validé",
         icon: "message",
-      },
-    ],
-  },
-  {
-    id: "catalogue",
-    label: "Catalogue",
-    items: [
-      {
-        href: "/leagues",
-        label: "Ligues",
-        description: "Compétitions et contextes de saison",
-        icon: "shield",
-      },
-      {
-        href: "/teams",
-        label: "Équipes",
-        description: "Profils et indicateurs d'équipe",
-        icon: "users",
-      },
-      {
-        href: "/players",
-        label: "Joueurs",
-        description: "Profils individuels lorsque disponibles",
-        icon: "user",
       },
     ],
   },
@@ -100,24 +67,52 @@ export const profileNavItem: NavItem = {
 };
 
 export const pageMeta: Record<string, { title: string; eyebrow: string; description: string }> = {
+  [FOOTBALL_PATHS.dashboard]: {
+    title: "Dashboard",
+    eyebrow: "Football · Vue d'ensemble",
+    description: "Signaux du jour, fraîcheur des données et performance récente des modèles.",
+  },
+  [FOOTBALL_PATHS.matches]: {
+    title: "Match Center",
+    eyebrow: "Football · Calendrier",
+    description: "Parcourez les matchs de football par date et compétition.",
+  },
+  [FOOTBALL_PATHS.aiPicks]: {
+    title: "AI Picks",
+    eyebrow: "Football · Signaux",
+    description:
+      "Opportunités statistiques identifiées par le modèle. Ce ne sont pas des conseils de mise.",
+  },
+  [FOOTBALL_PATHS.value]: {
+    title: "Value Finder",
+    eyebrow: "Football · Value Engine",
+    description: "Comparaison transparente entre probabilités calibrées et cotes observées.",
+  },
+  [FOOTBALL_PATHS.aiAnalyst]: {
+    title: "AI Analyst",
+    eyebrow: "Football Intelligence",
+    description:
+      "Rapport explicatif construit uniquement à partir du contexte validé. Ce n'est pas une recommandation.",
+  },
   "/": {
     title: "Dashboard",
-    eyebrow: "Vue d'ensemble",
+    eyebrow: "Football · Vue d'ensemble",
     description: "Signaux du jour, fraîcheur des données et performance récente des modèles.",
   },
   "/matches": {
     title: "Match Center",
-    eyebrow: "Calendrier",
-    description: "Parcourez les événements par sport, date et compétition.",
+    eyebrow: "Football · Calendrier",
+    description: "Parcourez les matchs de football par date et compétition.",
   },
   "/ai-picks": {
     title: "AI Picks",
-    eyebrow: "Signaux",
-    description: "Opportunités statistiques identifiées par le modèle. Ce ne sont pas des conseils de mise.",
+    eyebrow: "Football · Signaux",
+    description:
+      "Opportunités statistiques identifiées par le modèle. Ce ne sont pas des conseils de mise.",
   },
   "/value-finder": {
     title: "Value Finder",
-    eyebrow: "Value Engine",
+    eyebrow: "Football · Value Engine",
     description: "Comparaison transparente entre probabilités calibrées et cotes observées.",
   },
   "/analytics": {
@@ -138,7 +133,7 @@ export const pageMeta: Record<string, { title: string; eyebrow: string; descript
   },
   "/analyst": {
     title: "AI Analyst",
-    eyebrow: "Explication",
+    eyebrow: "Football Intelligence",
     description: "Synthèse à partir d'un paquet de faits validés. Aucune donnée n'est inventée.",
   },
   "/leagues": {
@@ -167,3 +162,5 @@ export const pageMeta: Record<string, { title: string; eyebrow: string; descript
     description: "Accès sur invitation. Les prédictions restent des probabilités, jamais des garanties.",
   },
 };
+
+export { isFootballNavActive };

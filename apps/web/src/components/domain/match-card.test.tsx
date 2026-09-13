@@ -23,7 +23,7 @@ describe("MatchCard", () => {
     const match = matches[0]!;
     render(<MatchCard match={match} />);
 
-    expect(screen.getByRole("link")).toHaveAttribute("href", `/matches/${match.id}`);
+    expect(screen.getByRole("link")).toHaveAttribute("href", `/football/matches/${match.id}`);
   });
 
   it("names both teams and the competition", () => {

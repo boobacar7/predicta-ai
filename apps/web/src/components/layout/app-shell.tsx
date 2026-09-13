@@ -24,7 +24,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const chrome = pathname !== "/login";
 
   return (
-    <FiltersProvider>
+    <FiltersProvider initialSport="football">
       <MockScenarioProvider>
         <a
           href="#contenu"

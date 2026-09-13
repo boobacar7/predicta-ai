@@ -1,13 +1,6 @@
-import { ValueFinderView } from "@/features/value";
-import type { Metadata } from "next";
-import { Suspense } from "react";
+import { FOOTBALL_PATHS } from "@/lib/football/routes";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Value Finder" };
-
-export default function ValueFinderPage() {
-  return (
-    <Suspense>
-      <ValueFinderView />
-    </Suspense>
-  );
+export default function ValueFinderRedirectPage() {
+  redirect(FOOTBALL_PATHS.value);
 }

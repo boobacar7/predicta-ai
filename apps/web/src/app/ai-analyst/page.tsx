@@ -1,13 +1,6 @@
-import { AiAnalystView } from "@/features/ai-analyst";
-import type { Metadata } from "next";
-import { Suspense } from "react";
+import { FOOTBALL_PATHS } from "@/lib/football/routes";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "AI Analyst" };
-
-export default function AiAnalystPage() {
-  return (
-    <Suspense>
-      <AiAnalystView />
-    </Suspense>
-  );
+export default function AiAnalystRedirectPage() {
+  redirect(FOOTBALL_PATHS.aiAnalyst);
 }

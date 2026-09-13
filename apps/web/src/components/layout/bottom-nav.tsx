@@ -2,15 +2,16 @@
 
 import { NavIcon } from "@/components/layout/nav-icon";
 import { cn } from "@/lib/cn";
+import { FOOTBALL_PATHS, isFootballNavActive } from "@/lib/football/routes";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const items = [
-  { href: "/", label: "Home", icon: "layout" as const },
-  { href: "/matches", label: "Matchs", icon: "calendar" as const },
-  { href: "/ai-picks", label: "Picks", icon: "spark" as const },
-  { href: "/value-finder", label: "Value", icon: "diamond" as const },
-  { href: "/ai-analyst", label: "Analyst", icon: "message" as const },
+  { href: FOOTBALL_PATHS.dashboard, label: "Accueil", icon: "layout" as const },
+  { href: FOOTBALL_PATHS.matches, label: "Matchs", icon: "calendar" as const },
+  { href: FOOTBALL_PATHS.aiPicks, label: "Picks", icon: "spark" as const },
+  { href: FOOTBALL_PATHS.value, label: "Value", icon: "diamond" as const },
+  { href: FOOTBALL_PATHS.aiAnalyst, label: "Analyst", icon: "message" as const },
 ];
 
 export function BottomNav() {
@@ -23,7 +24,7 @@ export function BottomNav() {
     >
       <ul className="grid grid-cols-5">
         {items.map((item) => {
-          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          const active = isFootballNavActive(pathname, item.href);
           return (
             <li key={item.href}>
               <Link
