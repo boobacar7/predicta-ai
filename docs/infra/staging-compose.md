@@ -135,7 +135,9 @@ Staging defaults `Secure` cookies. The example file sets `PREDICTA_API_COOKIE_SE
 
 ## Optional ingest
 
-Postgres is not on localhost, so ingest from the compose network:
+Postgres is not on localhost, so ingest from the compose network. Live ingest stays opt-in: compose defaults `PREDICTA_INGESTION_ENABLE_LIVE=false`. Pass tokens at runtime. Do not commit them and do not put them in `.env.staging`.
+
+Sportmonks fixtures first (canonical `matches` rows). Odds never create matches.
 
 ```bash
 docker compose -f infra/containers/compose.staging.yml \
@@ -146,7 +148,20 @@ docker compose -f infra/containers/compose.staging.yml \
   ingestion ingest-football --league all
 ```
 
-Pass the token at runtime. Do not commit it. Live ingest stays opt-in.
+Current pre-match 1X2 from The Odds API (`h2h`, region `eu`). No `--as-of` (historical is a paid endpoint and is not required for upcoming fixtures). `--league serie-a` is 1 credit; `--league all` is 1 credit per V1 league.
+
+```bash
+docker compose -f infra/containers/compose.staging.yml \
+  --env-file infra/containers/.env.staging \
+  --profile ingest run --rm \
+  -e THE_ODDS_API_KEY \
+  -e PREDICTA_INGESTION_ENABLE_LIVE=true \
+  ingestion ingest-odds --league serie-a
+```
+
+Unmatched Odds API events are quarantined (`unmatched_odds_event`) and insert **no** snapshot. The API does not fetch The Odds API; Value Finder reads `odds_snapshots` only. Empty SQL → RFC 9457 `422` `/problems/odds-unavailable`. No mock fallback.
+
+AI Picks V0.1 still evaluates only `PREDICTA_API_AI_PICKS_CANDIDATE_MATCH_IDS` (default is a mock fixture id). After live football ingest, pass the Sportmonks match ids for the matches you want ranked and recreate `api`. Do not invent ids.
 
 ## Config invariants
 
