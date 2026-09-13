@@ -57,8 +57,10 @@ def _alias(
 
 
 # Only mappings demonstrated on real The Odds API v4 events vs Sportmonks
-# (docs/qa/live-odds-real-validation.md §6). Paris / Paris FC / PSG are
+# (docs/qa/live-odds-real-validation.md §6, docs/qa/oos-odds-expansion.md,
+# staging Serie A ingest 2026-09-14). Paris / Paris FC / PSG are
 # intentionally absent: they stay distinct, even when a fixture looks related.
+# Inter Milan maps to Inter, never to AC Milan or Inter Miami.
 _RAW_TEAM_ALIASES: tuple[ProviderTeamAlias, ...] = (
     _alias(
         "Bournemouth",
@@ -113,6 +115,35 @@ _RAW_TEAM_ALIASES: tuple[ProviderTeamAlias, ...] = (
         canonical_team_id="tm_football-sportmonks-79",
         canonical_team_name="Olympique Lyonnais",
         evidence="2026-09-11 Odds API Lyon vs Olympique Lyonnais, prefix Olympique.",
+    ),
+    _alias(
+        "Inter Milan",
+        canonical_team_id="tm_football-sportmonks-2930",
+        canonical_team_name="Inter",
+        evidence=(
+            "Staging Serie A ingest Odds API Inter Milan vs Udinese "
+            "football|inter-milan|udinese|2026-09-14T18:45:00+00:00 vs Sportmonks Inter. "
+            "OOS uncovered Inter vs Monza mth_football-sportmonks-19713613."
+        ),
+    ),
+    _alias(
+        "AS Roma",
+        canonical_team_id="tm_football-sportmonks-37",
+        canonical_team_name="Roma",
+        evidence=(
+            "Staging Serie A ingest Odds API Torino vs AS Roma "
+            "football|torino|as-roma|2026-09-14T16:30:00+00:00 vs Sportmonks Roma. "
+            "OOS uncovered Roma vs Fiorentina mth_football-sportmonks-19713611."
+        ),
+    ),
+    _alias(
+        "Atalanta BC",
+        canonical_team_id="tm_football-sportmonks-708",
+        canonical_team_name="Atalanta",
+        evidence=(
+            "OOS unmatched Odds API names include Atalanta BC vs Sportmonks Atalanta. "
+            "Atalanta vs Sassuolo mth_football-sportmonks-19713617 kickoff 2026-08-23T18:45:00Z."
+        ),
     ),
 )
 
