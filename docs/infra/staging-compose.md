@@ -18,20 +18,54 @@ The API image includes `predicta_ml` / `predicta_ingestion` so it can load the f
 
 ## Artefact volume
 
-Git does not contain `artefact.joblib` or the PIT parquet. Copy the frozen files onto the host, then mount them.
+Git does not contain `artefact.joblib` or the PIT parquet. `**/var` is also dockerignored, so the API image never ships them. Staging must bind-mount real files to the paths the API already uses.
 
-Expected host layout (`PREDICTA_FOOTBALL_DATA_DIR`, default `var/football` at the repo root):
+### Container contract (do not change these)
+
+| Env | Path inside `api` |
+| --- | --- |
+| `PREDICTA_API_FOOTBALL_DATASET_PATH` | `/data/football/datasets/football-1x2-history.parquet` |
+| `PREDICTA_API_FOOTBALL_PREMATCH_DATASET_PATH` | `/data/football/datasets/football-1x2-prematch.parquet` (optional) |
+| `PREDICTA_API_FOOTBALL_REGISTRY_DIR` | `/data/football/registry` |
+| model version | `football-elo-v1-candidate` (artefact at `$REGISTRY_DIR/football-elo-v1-candidate/artefact.joblib`) |
+
+### Laptop source of truth (compose defaults)
+
+Compose bind-mounts the gitignored worker `var/` dirs:
+
+| Host (relative to `infra/containers/`) | Container |
+| --- | --- |
+| `../../workers/ingestion/var` | `/data/football/datasets` (ro) |
+| `../../workers/ml/var/registry` | `/data/football/registry` (ro) |
+| `../../workers/ingestion/var/raw` | `/data/football/raw` (ro on `api`) |
+
+On a Mac that already has the frozen files:
 
 ```text
-var/football/
-  registry/football-elo-v1-candidate/artefact.joblib
-  registry/football-elo-v1-candidate/registry.json
-  datasets/football-1x2-history.parquet
-  datasets/football-1x2-prematch.parquet   # optional
-  raw/                                     # optional Sportmonks archive
+workers/ingestion/var/football-1x2-history.parquet
+workers/ml/var/registry/football-elo-v1-candidate/artefact.joblib
+workers/ml/var/registry/football-elo-v1-candidate/registry.json
 ```
 
-From a machine that already has `workers/*/var`:
+those paths appear inside the API container as `/data/football/datasets/football-1x2-history.parquet` and `/data/football/registry/football-elo-v1-candidate/`. No extra copy is required.
+
+Confirm:
+
+```bash
+docker compose -f infra/containers/compose.staging.yml \
+  --env-file infra/containers/.env.staging \
+  exec api ls -lh /data/football/datasets/ /data/football/registry/
+```
+
+### Isolated copy (staging VM / shared host)
+
+When you do not want to mount the live worker tree, copy into `var/football` (still gitignored):
+
+```bash
+./infra/containers/prepare-staging-football-data.sh
+```
+
+Equivalent manual copy:
 
 ```bash
 mkdir -p var/football/registry var/football/datasets var/football/raw
@@ -40,23 +74,37 @@ cp workers/ingestion/var/football-1x2-history.parquet var/football/datasets/
 cp workers/ingestion/var/football-1x2-prematch.parquet var/football/datasets/ 2>/dev/null || true
 ```
 
-Inside the API container:
+Then in `.env.staging`:
 
-- `PREDICTA_API_FOOTBALL_REGISTRY_DIR=/data/football/registry`
-- `PREDICTA_API_FOOTBALL_DATASET_PATH=/data/football/datasets/football-1x2-history.parquet`
+```bash
+PREDICTA_FOOTBALL_DATASETS_HOST=../../var/football/datasets
+PREDICTA_FOOTBALL_REGISTRY_HOST=../../var/football/registry
+PREDICTA_FOOTBALL_RAW_HOST=../../var/football/raw
+```
 
-Filesystem paths and `file://` URIs are accepted. `s3://` is not implemented. If the artefact is missing, `GET /api/v1/football/predictions/{match_id}` returns RFC 9457 `503` `/problems/model-artefact-not-found`. The API does **not** fall back to mock probabilities.
+Do **not** commit the parquet or joblib. Placeholder files of the same names may be used only to prove the mount; production staging must copy the real frozen artefacts. Missing files stay honest RFC 9457 `503` `/problems/model-artefact-not-found` or `422` `/problems/pit-features-unavailable`. The API does **not** fall back to mock probabilities.
+
+Filesystem paths and `file://` URIs are accepted. `s3://` is not implemented.
 
 ## Boot
 
 ```bash
 cp infra/containers/.env.staging.example infra/containers/.env.staging
-# Edit CORS origin, invite allowlist, and PREDICTA_FOOTBALL_DATA_DIR.
+# Edit CORS origin, invite allowlist, and football HOST paths if you use the isolated tree.
 # Do not commit .env.staging. Do not put provider tokens in it.
 
+# Rebuild API so the new volume contract is applied (web rebuild is optional here).
 docker compose -f infra/containers/compose.staging.yml \
   --env-file infra/containers/.env.staging \
-  up --build
+  up --build --force-recreate api
+```
+
+Full stack (API + web + unpublished Postgres):
+
+```bash
+docker compose -f infra/containers/compose.staging.yml \
+  --env-file infra/containers/.env.staging \
+  up --build --force-recreate
 ```
 
 Open `http://localhost:3000`. The browser calls `http://localhost:8000/api/v1` (build-time `NEXT_PUBLIC_PREDICTA_WEB` / `PREDICTA_WEB_API_BASE_URL`). Rebuild `web` if that public API URL changes.
