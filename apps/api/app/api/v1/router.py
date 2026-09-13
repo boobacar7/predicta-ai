@@ -6,11 +6,13 @@ from fastapi import APIRouter, Query, Request
 
 from app.ai_picks.models import AiPicksQuery
 from app.api.deps import envelope, filter_market, get_container, paginate
+from app.api.v1.auth import router as auth_router
 from app.core.container import AppContainer
 from app.match_identity.models import HistoricalMatchIdentity
 from app.schemas import AnalystRequest, MatchStatus, SportCode
 
 router = APIRouter()
+router.include_router(auth_router)
 
 
 def _container(request: Request) -> AppContainer:

@@ -53,6 +53,10 @@ export interface WebConfig {
   readonly apiBaseUrl: string;
   /** Abort budget for a single HTTP read. */
   readonly requestTimeoutMs: number;
+  /** Non-HttpOnly CSRF cookie name issued by the API at login. */
+  readonly csrfCookieName: string;
+  /** Header that must mirror the CSRF cookie on cookie-authenticated POST. */
+  readonly csrfHeaderName: string;
 }
 
 export class ConfigError extends Error {
@@ -186,6 +190,8 @@ export function buildConfig(env: EnvRecord): WebConfig {
     resourceModes,
     apiBaseUrl,
     requestTimeoutMs: parseTimeout(env.NEXT_PUBLIC_PREDICTA_REQUEST_TIMEOUT_MS),
+    csrfCookieName: env.NEXT_PUBLIC_PREDICTA_CSRF_COOKIE_NAME?.trim() || "predicta_csrf",
+    csrfHeaderName: env.NEXT_PUBLIC_PREDICTA_CSRF_HEADER_NAME?.trim() || "X-CSRF-Token",
   };
 }
 
@@ -200,6 +206,8 @@ export function getConfig(): WebConfig {
     NEXT_PUBLIC_PREDICTA_MOCK_RESOURCES: process.env.NEXT_PUBLIC_PREDICTA_MOCK_RESOURCES,
     NEXT_PUBLIC_PREDICTA_API_BASE_URL: process.env.NEXT_PUBLIC_PREDICTA_API_BASE_URL,
     NEXT_PUBLIC_PREDICTA_REQUEST_TIMEOUT_MS: process.env.NEXT_PUBLIC_PREDICTA_REQUEST_TIMEOUT_MS,
+    NEXT_PUBLIC_PREDICTA_CSRF_COOKIE_NAME: process.env.NEXT_PUBLIC_PREDICTA_CSRF_COOKIE_NAME,
+    NEXT_PUBLIC_PREDICTA_CSRF_HEADER_NAME: process.env.NEXT_PUBLIC_PREDICTA_CSRF_HEADER_NAME,
   });
 
   return cached;

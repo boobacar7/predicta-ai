@@ -1,5 +1,6 @@
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { MockScenarioProvider } from "@/data/mock/scenario-context";
+import { AuthSessionProvider } from "@/features/auth/session-context";
 import { FiltersProvider } from "@/lib/filters/context";
 import { ThemeProvider } from "@/lib/theme/theme-provider";
 import type { Theme } from "@/lib/theme/theme";
@@ -46,7 +47,9 @@ export function renderWithProviders(
         <ThemeProvider initialTheme={theme} persist={false}>
           <TooltipProvider>
             <FiltersProvider initialSport={sport}>
-              <MockScenarioProvider initialScenario={scenario}>{children}</MockScenarioProvider>
+              <AuthSessionProvider>
+                <MockScenarioProvider initialScenario={scenario}>{children}</MockScenarioProvider>
+              </AuthSessionProvider>
             </FiltersProvider>
           </TooltipProvider>
         </ThemeProvider>

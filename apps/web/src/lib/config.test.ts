@@ -161,6 +161,12 @@ describe("mock fixtures must not reach real users", () => {
 });
 
 describe("request timeout", () => {
+  it("defaults CSRF cookie and header names for the opaque-session client", () => {
+    const config = buildConfig(base);
+    expect(config.csrfCookieName).toBe("predicta_csrf");
+    expect(config.csrfHeaderName).toBe("X-CSRF-Token");
+  });
+
   it("falls back to a bounded default", () => {
     expect(buildConfig(base).requestTimeoutMs).toBe(10_000);
   });

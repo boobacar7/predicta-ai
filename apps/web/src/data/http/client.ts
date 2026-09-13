@@ -1,3 +1,4 @@
+import { readCookie } from "@/data/http/cookies";
 import {
   DataSourceError,
   kindFromStatus,
@@ -23,24 +24,38 @@ export interface HttpClientOptions {
   requestTimeoutMs: number;
   /** Injectable for tests. Defaults to the platform `fetch`. */
   fetchImpl?: typeof fetch;
+  /** Non-HttpOnly CSRF cookie. Default `predicta_csrf`. */
+  csrfCookieName?: string;
+  /** Header that mirrors the CSRF cookie on POST. Default `X-CSRF-Token`. */
+  csrfHeaderName?: string;
 }
 
 export class HttpClient {
   private readonly baseUrl: string;
   private readonly requestTimeoutMs: number;
   private readonly fetchImpl: typeof fetch;
+  private readonly csrfCookieName: string;
+  private readonly csrfHeaderName: string;
 
-  constructor({ baseUrl, requestTimeoutMs, fetchImpl }: HttpClientOptions) {
+  constructor({
+    baseUrl,
+    requestTimeoutMs,
+    fetchImpl,
+    csrfCookieName = "predicta_csrf",
+    csrfHeaderName = "X-CSRF-Token",
+  }: HttpClientOptions) {
     this.baseUrl = baseUrl.replace(/\/+$/, "");
     this.requestTimeoutMs = requestTimeoutMs;
     this.fetchImpl = fetchImpl ?? globalThis.fetch.bind(globalThis);
+    this.csrfCookieName = csrfCookieName;
+    this.csrfHeaderName = csrfHeaderName;
   }
 
   get<T>(path: string, params?: QueryParams): Promise<Envelope<T>> {
     return this.request<T>("GET", path, params);
   }
 
-  post<T>(path: string, body: unknown): Promise<Envelope<T>> {
+  post<T>(path: string, body?: unknown): Promise<Envelope<T>> {
     return this.request<T>("POST", path, undefined, body);
   }
 
@@ -60,9 +75,11 @@ export class HttpClient {
       response = await this.fetchImpl(url, {
         method,
         signal: controller.signal,
+        credentials: "include",
         headers: {
           Accept: "application/json",
           ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+          ...this.csrfHeaders(method),
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
@@ -97,6 +114,13 @@ export class HttpClient {
     }
 
     return url.toString();
+  }
+
+  private csrfHeaders(method: "GET" | "POST"): Record<string, string> {
+    if (method !== "POST") return {};
+    const token = readCookie(this.csrfCookieName);
+    if (!token) return {};
+    return { [this.csrfHeaderName]: token };
   }
 }
 
