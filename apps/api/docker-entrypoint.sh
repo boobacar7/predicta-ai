@@ -1,4 +1,4 @@
-#!/bin/bin/env sh
+#!/bin/sh
 set -eu
 
 dataset="${PREDICTA_API_FOOTBALL_DATASET_PATH:-/data/football/datasets/football-1x2-history.parquet}"

@@ -125,6 +125,7 @@ def test_staging_settings_use_the_same_paths_as_compose() -> None:
 
 def test_entrypoint_reports_missing_dataset_and_artefact_without_mocking() -> None:
     text = ENTRYPOINT.read_text(encoding="utf-8")
+    assert text.startswith("#!/bin/sh\n")
     assert "PREDICTA_API_FOOTBALL_DATASET_PATH" in text
     assert "PREDICTA_API_FOOTBALL_REGISTRY_DIR" in text
     assert "football-elo-v1-candidate" in text
