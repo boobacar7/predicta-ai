@@ -86,5 +86,56 @@ def test_env_example_documents_staging_sql_live() -> None:
     assert "PREDICTA_API_DATA_MODE=live" in text
     assert "PREDICTA_API_AUTH_BYPASS=false" in text
     assert "PREDICTA_API_INVITE_ALLOWLIST=" in text
+    assert "PREDICTA_API_FOOTBALL_REGISTRY_DIR=" in text
+    assert "PREDICTA_API_FOOTBALL_DATASET_PATH=" in text
     assert "sk_live" not in text
     assert "SPORTMONKS_API_TOKEN=" not in text
+
+
+def test_football_paths_accept_file_uris(tmp_path: Path) -> None:
+    registry = tmp_path / "registry"
+    dataset = tmp_path / "football-1x2-history.parquet"
+    settings = Settings(
+        _env_file=None,
+        football_registry_dir=f"file://{registry}",
+        football_dataset_path=f"file://{dataset}",
+    )
+    assert settings.football_registry_dir == registry
+    assert settings.football_dataset_path == dataset
+
+
+def test_football_paths_reject_object_store_uris() -> None:
+    with pytest.raises(ValidationError, match="Unsupported URI scheme"):
+        Settings(_env_file=None, football_registry_dir="s3://predicta/registry")
+
+
+def test_staging_env_accepts_csv_cors_and_empty_allowlist(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PREDICTA_API_ENV", "staging")
+    monkeypatch.setenv("PREDICTA_API_REPOSITORY", "sql")
+    monkeypatch.setenv("PREDICTA_API_DATA_MODE", "live")
+    monkeypatch.setenv("PREDICTA_API_AUTH_BYPASS", "false")
+    monkeypatch.setenv("PREDICTA_API_CORS_ORIGINS", "http://localhost:3000")
+    monkeypatch.setenv("PREDICTA_API_INVITE_ALLOWLIST", "")
+    monkeypatch.setenv(
+        "PREDICTA_API_DATABASE_URL",
+        "postgresql+psycopg://predicta:predicta@postgres:5432/predicta",
+    )
+    settings = Settings(_env_file=None)
+    assert settings.cors_origins == ["http://localhost:3000"]
+    assert settings.invite_allowlist == []
+    assert settings.database_url.endswith("@postgres:5432/predicta")
+    assert settings.auth_bypass is False
+
+
+def test_missing_artefact_does_not_fail_settings_boot(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        env="staging",
+        repository="sql",
+        data_mode="live",
+        football_registry_dir=tmp_path / "missing-registry",
+        football_dataset_path=tmp_path / "missing.parquet",
+    )
+    artefact = settings.football_registry_dir / settings.football_model_version / "artefact.joblib"
+    assert artefact.is_file() is False
+    assert settings.football_model_version == "football-elo-v1-candidate"

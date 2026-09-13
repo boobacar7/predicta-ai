@@ -261,7 +261,7 @@ Chaque exécution enregistre :
 - environnement et versions de bibliothèques;
 - statut `candidate`, `challenger`, `champion` ou `retired`.
 
-Les artefacts binaires ne sont pas stockés dans Git. Le registre conserve leur URI et checksum.
+Les artefacts binaires ne sont pas stockés dans Git. Le registre conserve leur URI et checksum. En staging, l'URI est un volume ou `file://` (`PREDICTA_API_FOOTBALL_REGISTRY_DIR`, `PREDICTA_API_FOOTBALL_DATASET_PATH`) ; voir [staging compose](infra/staging-compose.md). Le candidat `football-elo-v1-candidate` n'est pas champion.
 
 ### Backtesting
 

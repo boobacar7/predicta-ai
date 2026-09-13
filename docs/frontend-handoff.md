@@ -57,7 +57,7 @@ endpoint.
 
 | Variable | Rôle |
 | --- | --- |
-| `NEXT_PUBLIC_PREDICTA_ENV` | Cible de déploiement. Seul `production` interdit les mocks. |
+| `NEXT_PUBLIC_PREDICTA_ENV` | Cible de déploiement. `staging` et `production` interdisent les mocks. |
 | `NEXT_PUBLIC_PREDICTA_DATA_SOURCE` | Mode par défaut : `mock` ou `http`. |
 | `NEXT_PUBLIC_PREDICTA_HTTP_RESOURCES` | Ressources basculées sur l'API. |
 | `NEXT_PUBLIC_PREDICTA_MOCK_RESOURCES` | Ressources maintenues sur fixtures. |

@@ -27,6 +27,8 @@ alembic upgrade head
 
 `PREDICTA_API_REPOSITORY=sql` active les repositories SQL. Sans ingestion, les catalogues et matchs restent vides : le backend ne fabrique pas d'événements sportifs réels.
 
+Déploiement staging-shaped (compose API + web, artefact en volume) : [docs/infra/staging-compose.md](../../docs/infra/staging-compose.md).
+
 ## Vérifications
 
 ```bash
