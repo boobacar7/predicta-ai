@@ -2,14 +2,22 @@
 
 import { safeNextPath } from "@/data/http/auth";
 import { useAuthSession } from "@/features/auth/session-context";
-import { getConfig } from "@/lib/config";
+import { getConfig, type WebConfig } from "@/lib/config";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 
-function needsAuthGate(pathname: string): boolean {
+/** Login stays mounted; product routes skip the gate when AUTH_BYPASS is on (never in production). */
+export function shouldGateAuth(
+  pathname: string,
+  config: Pick<WebConfig, "deploymentEnv" | "authBypass">,
+): boolean {
   if (pathname === "/login") return false;
-  const env = getConfig().deploymentEnv;
-  return env === "staging" || env === "production";
+  if (config.authBypass) return false;
+  return config.deploymentEnv === "staging" || config.deploymentEnv === "production";
+}
+
+function needsAuthGate(pathname: string): boolean {
+  return shouldGateAuth(pathname, getConfig());
 }
 
 export function AuthGate({ children }: { children: ReactNode }) {

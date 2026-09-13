@@ -149,13 +149,10 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
-    def refuse_auth_bypass_in_deployed_envs(self) -> Self:
-        if self.auth_bypass and self.is_deployed:
+    def refuse_auth_bypass_in_production(self) -> Self:
+        # Temporary product-testing hatch for local + staging. Production must never boot with it.
+        if self.auth_bypass and self.env == "production":
             raise ValueError(f"AUTH_BYPASS is forbidden when PREDICTA_API_ENV={self.env}.")
-        if self.auth_bypass and self.env not in ("development", "test"):
-            raise ValueError(
-                f"AUTH_BYPASS is only allowed when PREDICTA_API_ENV is development or test, not {self.env}."
-            )
         return self
 
 

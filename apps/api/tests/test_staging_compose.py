@@ -13,6 +13,9 @@ def test_staging_compose_keeps_postgres_off_the_host() -> None:
     assert "context: ../../apps/web" in text
     assert "PREDICTA_API_FOOTBALL_REGISTRY_DIR" in text
     assert "football-elo-v1-candidate" in text
+    assert "PREDICTA_API_AUTH_BYPASS: ${PREDICTA_API_AUTH_BYPASS:-false}" in text
+    assert "NEXT_PUBLIC_PREDICTA_AUTH_BYPASS: ${PREDICTA_API_AUTH_BYPASS:-false}" in text
+    assert 'PREDICTA_API_AUTH_BYPASS: "false"' not in text
 
 
 def test_staging_env_example_is_fail_closed_and_secret_free() -> None:
@@ -21,6 +24,7 @@ def test_staging_env_example_is_fail_closed_and_secret_free() -> None:
     assert "PREDICTA_API_REPOSITORY=sql" in text
     assert "PREDICTA_API_DATA_MODE=live" in text
     assert "PREDICTA_API_AUTH_BYPASS=false" in text
+    assert "NEXT_PUBLIC_PREDICTA_AUTH_BYPASS=false" in text
     assert "NEXT_PUBLIC_PREDICTA_ENV=staging" in text
     assert "NEXT_PUBLIC_PREDICTA_DATA_SOURCE=http" in text
     assert "PREDICTA_API_FOOTBALL_REGISTRY_DIR=" in text

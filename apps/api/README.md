@@ -44,7 +44,7 @@ Depuis la racine : `npm run verify:api`.
 
 Préfixe public : `/api/v1`. Santé opérationnelle hors contrat : `GET /health`, `GET /ready`.
 
-Auth Private Beta : sessions opaques (`HttpOnly; SameSite=Lax`, `Secure` en staging/prod), hash SHA-256 côté serveur, mots de passe Argon2id. Pas de JWT. `PREDICTA_API_AUTH_BYPASS` est refusé en staging/production. `/docs` est désactivé dans ces environnements. Provisionner un invité :
+Auth Private Beta : sessions opaques (`HttpOnly; SameSite=Lax`, `Secure` en staging/prod), hash SHA-256 côté serveur, mots de passe Argon2id. Pas de JWT. `PREDICTA_API_AUTH_BYPASS` est un hatch temporaire local/staging ; la production le refuse au boot. `/docs` est désactivé en staging/production. Provisionner un invité :
 
 ```bash
 PREDICTA_API_BOOTSTRAP_PASSWORD=... python -m app.auth.provision beta@example.com

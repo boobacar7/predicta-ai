@@ -479,7 +479,8 @@ export interface paths {
         /**
          * Return the current invited user, or 401
          * @description Public probe. Missing or expired cookies yield 401. `AUTH_BYPASS` (local
-         *     development/test only) returns `user: null` and `bypass: true`.
+         *     and staging product testing; never production) returns `user: null` and
+         *     `bypass: true`.
          */
         get: operations["getAuthSession"];
         put?: never;
@@ -1268,7 +1269,7 @@ export interface components {
         };
         AuthSession: {
             user: components["schemas"]["AuthUser"] | null;
-            /** @description True only when AUTH_BYPASS is enabled (development/test). */
+            /** @description True when AUTH_BYPASS is enabled (development, test, or staging). Never production. */
             bypass: boolean;
         };
         LoginEnvelope: components["schemas"]["EnvelopeMetadata"] & {

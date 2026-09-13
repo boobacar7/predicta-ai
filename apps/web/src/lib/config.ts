@@ -57,6 +57,12 @@ export interface WebConfig {
   readonly csrfCookieName: string;
   /** Header that must mirror the CSRF cookie on cookie-authenticated POST. */
   readonly csrfHeaderName: string;
+  /**
+   * Temporary product-testing hatch. True only when
+   * `NEXT_PUBLIC_PREDICTA_AUTH_BYPASS=true` and the deployment is not production.
+   * Production always reports false, even if the public flag is set.
+   */
+  readonly authBypass: boolean;
 }
 
 export class ConfigError extends Error {
@@ -128,6 +134,10 @@ function parseDeploymentEnv(value: string): DeploymentEnv {
   );
 }
 
+function parseAuthBypass(deploymentEnv: DeploymentEnv, raw: string | undefined): boolean {
+  return raw === "true" && deploymentEnv !== "production";
+}
+
 export type EnvRecord = Readonly<Record<string, string | undefined>>;
 
 export function buildConfig(env: EnvRecord): WebConfig {
@@ -192,6 +202,7 @@ export function buildConfig(env: EnvRecord): WebConfig {
     requestTimeoutMs: parseTimeout(env.NEXT_PUBLIC_PREDICTA_REQUEST_TIMEOUT_MS),
     csrfCookieName: env.NEXT_PUBLIC_PREDICTA_CSRF_COOKIE_NAME?.trim() || "predicta_csrf",
     csrfHeaderName: env.NEXT_PUBLIC_PREDICTA_CSRF_HEADER_NAME?.trim() || "X-CSRF-Token",
+    authBypass: parseAuthBypass(deploymentEnv, env.NEXT_PUBLIC_PREDICTA_AUTH_BYPASS),
   };
 }
 
@@ -208,6 +219,7 @@ export function getConfig(): WebConfig {
     NEXT_PUBLIC_PREDICTA_REQUEST_TIMEOUT_MS: process.env.NEXT_PUBLIC_PREDICTA_REQUEST_TIMEOUT_MS,
     NEXT_PUBLIC_PREDICTA_CSRF_COOKIE_NAME: process.env.NEXT_PUBLIC_PREDICTA_CSRF_COOKIE_NAME,
     NEXT_PUBLIC_PREDICTA_CSRF_HEADER_NAME: process.env.NEXT_PUBLIC_PREDICTA_CSRF_HEADER_NAME,
+    NEXT_PUBLIC_PREDICTA_AUTH_BYPASS: process.env.NEXT_PUBLIC_PREDICTA_AUTH_BYPASS,
   });
 
   return cached;
