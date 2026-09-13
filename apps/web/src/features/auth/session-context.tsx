@@ -29,8 +29,12 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function initialStatus(): AuthStatus {
+  return getConfig().apiBaseUrl ? "loading" : "disabled";
+}
+
 export function AuthSessionProvider({ children }: { children: ReactNode }) {
-  const [status, setStatus] = useState<AuthStatus>("loading");
+  const [status, setStatus] = useState<AuthStatus>(initialStatus);
   const [user, setUser] = useState<AuthUser | null>(null);
 
   const refresh = useCallback(async () => {
@@ -61,8 +65,33 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    if (!getConfig().apiBaseUrl) return;
+    let cancelled = false;
+    void fetchAuthSession()
+      .then((envelope) => {
+        if (cancelled) return;
+        if (envelope.data.bypass) {
+          setUser(envelope.data.user);
+          setStatus("bypassed");
+          return;
+        }
+        if (envelope.data.user) {
+          setUser(envelope.data.user);
+          setStatus("authenticated");
+          return;
+        }
+        setUser(null);
+        setStatus("anonymous");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setUser(null);
+        setStatus("anonymous");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     const envelope = await loginWithPassword(email, password);
