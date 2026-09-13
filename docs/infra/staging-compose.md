@@ -9,7 +9,7 @@ Laptop-only Postgres/Redis (published ports) remains [`infra/containers/docker-c
 | Service | Role |
 | --- | --- |
 | `postgres` | Source of truth. No host port. |
-| `api` | FastAPI, `repository=sql`, `data_mode=live`, `AUTH_BYPASS=false`, Alembic on start |
+| `api` | FastAPI, `repository=sql`, `data_mode=live`, `AUTH_BYPASS` from env (default false), Alembic on start |
 | `web` | Next.js standalone, `DATA_SOURCE=http` |
 | `ingestion` | Optional `--profile ingest` one-shot Sportmonks/odds CLI |
 | `redis` | Optional `--profile cache`. Unused by the API today. |
@@ -103,7 +103,7 @@ Pass the token at runtime. Do not commit it. Live ingest stays opt-in.
 ## Config invariants
 
 - `PREDICTA_API_ENV=staging` + `repository=sql` + `data_mode=live`
-- `AUTH_BYPASS=false` (staging refuses bypass at boot)
+- `AUTH_BYPASS` defaults to false. Set `PREDICTA_API_AUTH_BYPASS=true` for temporary product testing (skips login). Production still refuses bypass at boot. Rebuild `web` after changing it (`NEXT_PUBLIC_PREDICTA_AUTH_BYPASS` is inlined at build time and ignored when `NEXT_PUBLIC_PREDICTA_ENV=production`).
 - Web: `NEXT_PUBLIC_PREDICTA_ENV=staging` + `NEXT_PUBLIC_PREDICTA_DATA_SOURCE=http`
 - CORS origin is explicit and must include the web origin
 - Candidate model version remains `football-elo-v1-candidate`

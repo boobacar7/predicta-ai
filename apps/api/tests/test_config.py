@@ -44,15 +44,16 @@ def test_get_settings_refuses_staging_mock(monkeypatch: pytest.MonkeyPatch) -> N
         get_settings.cache_clear()
 
 
-def test_staging_refuses_auth_bypass() -> None:
-    with pytest.raises(ValidationError, match="AUTH_BYPASS is forbidden"):
-        Settings(
-            _env_file=None,
-            env="staging",
-            repository="sql",
-            data_mode="live",
-            auth_bypass=True,
-        )
+def test_staging_allows_auth_bypass() -> None:
+    settings = Settings(
+        _env_file=None,
+        env="staging",
+        repository="sql",
+        data_mode="live",
+        auth_bypass=True,
+    )
+    assert settings.auth_bypass is True
+    assert settings.env == "staging"
 
 
 def test_production_refuses_auth_bypass() -> None:
@@ -125,6 +126,25 @@ def test_staging_env_accepts_csv_cors_and_empty_allowlist(monkeypatch: pytest.Mo
     assert settings.invite_allowlist == []
     assert settings.database_url.endswith("@postgres:5432/predicta")
     assert settings.auth_bypass is False
+
+
+def test_staging_env_can_enable_auth_bypass(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PREDICTA_API_ENV", "staging")
+    monkeypatch.setenv("PREDICTA_API_REPOSITORY", "sql")
+    monkeypatch.setenv("PREDICTA_API_DATA_MODE", "live")
+    monkeypatch.setenv("PREDICTA_API_AUTH_BYPASS", "true")
+    monkeypatch.setenv("PREDICTA_API_CORS_ORIGINS", "http://localhost:3000")
+    settings = Settings(_env_file=None)
+    assert settings.auth_bypass is True
+
+
+def test_production_env_cannot_enable_auth_bypass(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PREDICTA_API_ENV", "production")
+    monkeypatch.setenv("PREDICTA_API_REPOSITORY", "sql")
+    monkeypatch.setenv("PREDICTA_API_DATA_MODE", "live")
+    monkeypatch.setenv("PREDICTA_API_AUTH_BYPASS", "true")
+    with pytest.raises(ValidationError, match="AUTH_BYPASS is forbidden"):
+        Settings(_env_file=None)
 
 
 def test_missing_artefact_does_not_fail_settings_boot(tmp_path: Path) -> None:

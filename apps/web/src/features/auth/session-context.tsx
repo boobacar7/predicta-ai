@@ -30,7 +30,9 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function initialStatus(): AuthStatus {
-  return getConfig().apiBaseUrl ? "loading" : "disabled";
+  const config = getConfig();
+  if (config.authBypass) return "bypassed";
+  return config.apiBaseUrl ? "loading" : "disabled";
 }
 
 export function AuthSessionProvider({ children }: { children: ReactNode }) {
@@ -39,6 +41,11 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     const config = getConfig();
+    if (config.authBypass) {
+      setUser(null);
+      setStatus("bypassed");
+      return;
+    }
     if (!config.apiBaseUrl) {
       setUser(null);
       setStatus("disabled");
@@ -65,6 +72,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (getConfig().authBypass) return;
     if (!getConfig().apiBaseUrl) return;
     let cancelled = false;
     void fetchAuthSession()

@@ -46,7 +46,7 @@ services:
       PREDICTA_API_ENV: staging
       PREDICTA_API_REPOSITORY: sql
       PREDICTA_API_DATA_MODE: live
-      PREDICTA_API_AUTH_BYPASS: "false"
+      PREDICTA_API_AUTH_BYPASS: ${PREDICTA_API_AUTH_BYPASS:-false}
       PREDICTA_API_LOG_LEVEL: ${PREDICTA_API_LOG_LEVEL:-INFO}
       PREDICTA_API_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-predicta}:${POSTGRES_PASSWORD:-predicta}@postgres:5432/${POSTGRES_DB:-predicta}
       PREDICTA_API_REDIS_URL: ${PREDICTA_API_REDIS_URL:-}
@@ -86,6 +86,7 @@ services:
         NEXT_PUBLIC_PREDICTA_DATA_SOURCE: http
         NEXT_PUBLIC_PREDICTA_API_BASE_URL: ${PREDICTA_WEB_API_BASE_URL:-http://localhost:8000/api/v1}
         NEXT_PUBLIC_PREDICTA_ALLOW_MOCK_IN_PROD: "false"
+        NEXT_PUBLIC_PREDICTA_AUTH_BYPASS: ${PREDICTA_API_AUTH_BYPASS:-false}
     depends_on:
       api:
         condition: service_healthy

@@ -719,7 +719,8 @@ paths:
       summary: Return the current invited user, or 401
       description: |
         Public probe. Missing or expired cookies yield 401. `AUTH_BYPASS` (local
-        development/test only) returns `user: null` and `bypass: true`.
+        and staging product testing; never production) returns `user: null` and
+        `bypass: true`.
       security: []
       parameters:
         - $ref: "#/components/parameters/XRequestId"
@@ -3115,7 +3116,7 @@ components:
             - type: "null"
         bypass:
           type: boolean
-          description: True only when AUTH_BYPASS is enabled (development/test).
+          description: True when AUTH_BYPASS is enabled (development, test, or staging). Never production.
 
     LoginEnvelope:
       allOf:

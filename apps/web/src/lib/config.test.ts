@@ -160,6 +160,41 @@ describe("mock fixtures must not reach real users", () => {
   });
 });
 
+describe("auth bypass", () => {
+  const stagingHttp: EnvRecord = {
+    NEXT_PUBLIC_PREDICTA_ENV: "staging",
+    NEXT_PUBLIC_PREDICTA_DATA_SOURCE: "http",
+    NEXT_PUBLIC_PREDICTA_API_BASE_URL: "https://api.staging.example.test/api/v1",
+  };
+
+  const productionHttp: EnvRecord = {
+    NEXT_PUBLIC_PREDICTA_ENV: "production",
+    NEXT_PUBLIC_PREDICTA_DATA_SOURCE: "http",
+    NEXT_PUBLIC_PREDICTA_API_BASE_URL: "https://api.example.test/api/v1",
+  };
+
+  it("lets staging skip login when the public flag is true", () => {
+    const config = buildConfig({ ...stagingHttp, NEXT_PUBLIC_PREDICTA_AUTH_BYPASS: "true" });
+    expect(config.authBypass).toBe(true);
+  });
+
+  it("keeps AuthGate on when staging bypass is false", () => {
+    expect(buildConfig(stagingHttp).authBypass).toBe(false);
+    expect(buildConfig({ ...stagingHttp, NEXT_PUBLIC_PREDICTA_AUTH_BYPASS: "false" }).authBypass).toBe(
+      false,
+    );
+  });
+
+  it("ignores the public flag on production", () => {
+    const config = buildConfig({ ...productionHttp, NEXT_PUBLIC_PREDICTA_AUTH_BYPASS: "true" });
+    expect(config.authBypass).toBe(false);
+  });
+
+  it("allows local development bypass", () => {
+    expect(buildConfig({ ...base, NEXT_PUBLIC_PREDICTA_AUTH_BYPASS: "true" }).authBypass).toBe(true);
+  });
+});
+
 describe("request timeout", () => {
   it("defaults CSRF cookie and header names for the opaque-session client", () => {
     const config = buildConfig(base);

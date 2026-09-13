@@ -176,6 +176,27 @@ def test_auth_bypass_client_skips_login() -> None:
     assert body["bypass"] is True
 
 
+def test_staging_auth_bypass_skips_login(tmp_path: Path) -> None:
+    client = _client(
+        tmp_path,
+        env="staging",
+        repository="sql",
+        data_mode="live",
+        auth_bypass=True,
+        cors_origins=["https://web.staging.example.com"],
+        client_base_url="https://testserver",
+    )
+    try:
+        matches = client.get("/api/v1/matches")
+        assert matches.status_code == 200
+        session = client.get("/api/v1/auth/session")
+        assert session.status_code == 200
+        assert session.json()["data"]["user"] is None
+        assert session.json()["data"]["bypass"] is True
+    finally:
+        reset_database_state()
+
+
 def test_staging_disables_docs_and_requires_auth(tmp_path: Path) -> None:
     client = _client(
         tmp_path,
