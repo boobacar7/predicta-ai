@@ -50,7 +50,9 @@ describe("football product views do not recompute business math", () => {
 
     expect(source("features/dashboard/dashboard-view.tsx")).toContain("useFootballAiPicks");
     expect(source("features/dashboard/dashboard-view.tsx")).toContain("useFootballValue");
-    expect(source("features/matches/match-detail-view.tsx")).toContain("useFootballPrediction");
+    expect(source("components/domain/football-prediction-slot.tsx")).toContain("useFootballPrediction");
+    expect(source("components/domain/match-card.tsx")).toContain("FootballPredictionSlot");
+    expect(source("features/matches/match-detail-view.tsx")).toContain("FootballPredictionSlot");
     expect(source("features/matches/match-detail-view.tsx")).toContain("useFootballValue");
     expect(source("features/value/value-finder-view.tsx")).toContain("useFootballValue");
     expect(source("features/value/value-finder-view.tsx")).not.toContain("useValueOpportunities");
@@ -62,6 +64,7 @@ describe("football product views do not recompute business math", () => {
     const panel = source("components/domain/football-prediction-panel.tsx");
     expect(panel).not.toContain("model_favorite");
     expect(panel).not.toContain("Math.max");
+    expect(source("components/domain/match-card.tsx")).not.toContain("leading_probability");
   });
 
   it("does not import mock clock or mock analyst ids from feature views", () => {

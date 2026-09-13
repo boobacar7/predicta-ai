@@ -1,20 +1,25 @@
-import { AIConfidence } from "@/components/domain/ai-confidence";
-import { ProbabilityBar } from "@/components/domain/probability-bar";
+"use client";
+
+import { FootballPredictionSlot } from "@/components/domain/football-prediction-slot";
 import { TeamLogo } from "@/components/domain/team-logo";
 import { ValueBadge } from "@/components/domain/value-badge";
 import { Badge } from "@/components/ui/badge";
 import { isCataloguePrototypeModel } from "@/lib/football/catalogue";
+import { shouldFetchFootballPrediction } from "@/lib/football/prediction-query";
 import { footballMatchPath } from "@/lib/football/routes";
 import { formatClock, formatKickoff } from "@/lib/format/dates";
 import { matchStatusLabels, sportLabels } from "@/lib/format/labels";
-import { formatProbability, formatScore } from "@/lib/format/numbers";
+import { formatScore } from "@/lib/format/numbers";
 import type { MatchSummary } from "@/types/api";
 import Link from "next/link";
 
 export function MatchCard({ match }: { match: MatchSummary }) {
   const live = match.status === "live";
-  const outcomes = match.prediction_preview?.outcomes ?? [];
   const prototype = isCataloguePrototypeModel(match.prediction_preview?.model_version);
+  const fetchPrediction = shouldFetchFootballPrediction({
+    status: match.status,
+    catalogueModelVersion: match.prediction_preview?.model_version,
+  });
 
   return (
     <Link
@@ -56,19 +61,12 @@ export function MatchCard({ match }: { match: MatchSummary }) {
               moteur football.
             </p>
           </div>
-        ) : match.prediction_preview ? (
-          <>
-            <div className="flex flex-wrap items-center gap-2">
-              <AIConfidence level={match.prediction_preview.confidence} />
-              <span className="text-xs text-muted">
-                Tête {formatProbability(match.prediction_preview.leading_probability)} ·{" "}
-                {match.prediction_preview.model_version}
-              </span>
-            </div>
-            {outcomes.length > 0 ? <ProbabilityBar outcomes={outcomes} /> : null}
-          </>
         ) : (
-          <p className="text-sm text-muted">Prédiction indisponible pour ce match.</p>
+          <FootballPredictionSlot
+            matchId={match.id}
+            enabled={fetchPrediction}
+            variant="compact"
+          />
         )}
         {prototype ? null : match.value_preview ? <ValueBadge preview={match.value_preview} /> : null}
       </div>
@@ -92,4 +90,3 @@ function TeamBlock({
     </div>
   );
 }
-

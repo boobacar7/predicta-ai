@@ -10,6 +10,10 @@ import { createAnalystSession } from "@/data/mock/analyst";
 import { leagues, players, sports, teams } from "@/data/mock/catalog";
 import { MOCK_NOW_ISO } from "@/data/mock/clock";
 import {
+  engineCatalogSummaries,
+  getEngineCatalogMatch,
+} from "@/data/mock/engine-catalog-matches";
+import {
   getFootballPredictionFixture,
   getFootballValueFixture,
 } from "@/data/mock/football-engine";
@@ -132,7 +136,10 @@ export class MockDataSource implements DataSource {
   async getMatches(filters: MatchFilters = {}) {
     await this.begin();
 
-    const items = applyMatchListScenario(matchSummaries, this.scenario).filter((match) => {
+    const items = applyMatchListScenario(
+      [...matchSummaries, ...engineCatalogSummaries],
+      this.scenario,
+    ).filter((match) => {
       if (!matchesSport(match.sport, filters.sport)) return false;
       if (filters.league_id && filters.league_id !== "all" && match.league.id !== filters.league_id) {
         return false;
@@ -151,6 +158,11 @@ export class MockDataSource implements DataSource {
     const historical = historicalMatchIdentities.find((item) => item.match_id === id);
     if (historical) {
       return envelope(historical);
+    }
+
+    const catalog = getEngineCatalogMatch(id);
+    if (catalog) {
+      return envelope(applyMatchDetailScenario(catalog, this.scenario));
     }
 
     const match = matches.find((item) => item.id === id);

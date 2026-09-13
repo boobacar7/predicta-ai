@@ -92,11 +92,76 @@ export const lincolnFootballValue: FootballValueAnalysis = {
   },
 };
 
+/**
+ * Staging-verified `GET /football/predictions` payloads.
+ *
+ * Probabilities are copied from the live candidate response. The UI must not
+ * recompute them. Odds and statistics are intentionally absent.
+ */
+export const TORINO_ROMA_MATCH_ID = "mth_football-sportmonks-19713579";
+export const INTER_UDINESE_MATCH_ID = "mth_football-sportmonks-19713584";
+export const UDINESE_LAZIO_MATCH_ID = "mth_football-sportmonks-19713588";
+
+export const UDINESE_LAZIO_KICKOFF = "2026-09-07T18:45:00Z";
+
+export const torinoRomaFootballPrediction: FootballModelPrediction = {
+  match_id: TORINO_ROMA_MATCH_ID,
+  sport: "football",
+  market: "1X2",
+  home_probability: 0.2766,
+  draw_probability: 0.2344,
+  away_probability: 0.489,
+  model_version: FOOTBALL_MODEL_VERSION,
+  dataset_version: FOOTBALL_DATASET_VERSION,
+  feature_schema_version: FOOTBALL_FEATURE_SCHEMA_VERSION,
+  model_status: "candidate",
+  cutoff_at: "2026-09-14T18:45:00Z",
+  cutoff_policy: "pre_kickoff",
+  generated_at: MOCK_NOW_ISO,
+};
+
+export const interUdineseFootballPrediction: FootballModelPrediction = {
+  match_id: INTER_UDINESE_MATCH_ID,
+  sport: "football",
+  market: "1X2",
+  home_probability: 0.6197,
+  draw_probability: 0.2182,
+  away_probability: 0.1621,
+  model_version: FOOTBALL_MODEL_VERSION,
+  dataset_version: FOOTBALL_DATASET_VERSION,
+  feature_schema_version: FOOTBALL_FEATURE_SCHEMA_VERSION,
+  model_status: "candidate",
+  cutoff_at: "2026-09-14T16:00:00Z",
+  cutoff_policy: "pre_kickoff",
+  generated_at: MOCK_NOW_ISO,
+};
+
+/** Documented API parity row for Udinese–Lazio (`docs/qa/football-prediction-validation.md`). */
+export const udineseLazioFootballPrediction: FootballModelPrediction = {
+  match_id: UDINESE_LAZIO_MATCH_ID,
+  sport: "football",
+  market: "1X2",
+  home_probability: 0.3735742608321212,
+  draw_probability: 0.25831154862211475,
+  away_probability: 0.3681141905457641,
+  model_version: FOOTBALL_MODEL_VERSION,
+  dataset_version: FOOTBALL_DATASET_VERSION,
+  feature_schema_version: FOOTBALL_FEATURE_SCHEMA_VERSION,
+  model_status: "candidate",
+  cutoff_at: UDINESE_LAZIO_KICKOFF,
+  cutoff_policy: "pre_kickoff",
+  generated_at: MOCK_NOW_ISO,
+};
+
+const FOOTBALL_PREDICTIONS: Record<string, FootballModelPrediction> = {
+  [LINCOLN_MATCH_ID]: lincolnFootballPrediction,
+  [TORINO_ROMA_MATCH_ID]: torinoRomaFootballPrediction,
+  [INTER_UDINESE_MATCH_ID]: interUdineseFootballPrediction,
+  [UDINESE_LAZIO_MATCH_ID]: udineseLazioFootballPrediction,
+};
+
 export function getFootballPredictionFixture(matchId: string): FootballModelPrediction | undefined {
-  if (matchId === LINCOLN_MATCH_ID) {
-    return lincolnFootballPrediction;
-  }
-  return undefined;
+  return FOOTBALL_PREDICTIONS[matchId];
 }
 
 export function getFootballValueFixture(matchId: string): FootballValueAnalysis | undefined {
