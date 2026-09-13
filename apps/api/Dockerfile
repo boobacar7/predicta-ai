@@ -13,7 +13,9 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends libgomp1 \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --system predicta \
-    && useradd --system --gid predicta --create-home --home-dir /home/predicta predicta
+    && useradd --system --gid predicta --create-home --home-dir /home/predicta predicta \
+    && mkdir -p /data/football/datasets /data/football/registry /data/football/raw \
+    && chown -R predicta:predicta /data/football
 
 WORKDIR /app
 

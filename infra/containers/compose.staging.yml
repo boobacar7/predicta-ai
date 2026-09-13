@@ -2,10 +2,18 @@ name: predicta-staging
 
 # Staging-shaped topology: Postgres stays on the compose network (not published),
 # API and web are the only host ports. Redis is opt-in via --profile cache.
-# Frozen Elo candidate + parquet are mounted read-only; they are not in Git.
+# Frozen Elo candidate + parquet are bind-mounted read-only; they are not in Git
+# and are not copied into the API image (**/var is dockerignored).
+#
+# Laptop source of truth (defaults below):
+#   workers/ingestion/var/football-1x2-history.parquet
+#   workers/ml/var/registry/football-elo-v1-candidate/
+# Isolated copy: ./infra/containers/prepare-staging-football-data.sh
+# then set PREDICTA_FOOTBALL_DATASETS_HOST / PREDICTA_FOOTBALL_REGISTRY_HOST
+# to var/football/datasets and var/football/registry.
 #
 #   cp infra/containers/.env.staging.example infra/containers/.env.staging
-#   docker compose -f infra/containers/compose.staging.yml --env-file infra/containers/.env.staging up --build
+#   docker compose -f infra/containers/compose.staging.yml --env-file infra/containers/.env.staging up --build --force-recreate api
 #
 # See docs/infra/staging-compose.md
 
@@ -60,7 +68,9 @@ services:
       PREDICTA_API_FOOTBALL_PREMATCH_DATASET_PATH: ${PREDICTA_API_FOOTBALL_PREMATCH_DATASET_PATH:-/data/football/datasets/football-1x2-prematch.parquet}
       PREDICTA_API_FOOTBALL_RAW_ARCHIVE_DIR: ${PREDICTA_API_FOOTBALL_RAW_ARCHIVE_DIR:-/data/football/raw}
     volumes:
-      - ${PREDICTA_FOOTBALL_DATA_DIR:-../../var/football}:/data/football:ro
+      - ${PREDICTA_FOOTBALL_DATASETS_HOST:-../../workers/ingestion/var}:/data/football/datasets:ro
+      - ${PREDICTA_FOOTBALL_REGISTRY_HOST:-../../workers/ml/var/registry}:/data/football/registry:ro
+      - ${PREDICTA_FOOTBALL_RAW_HOST:-../../workers/ingestion/var/raw}:/data/football/raw:ro
     ports:
       - "${PREDICTA_API_HOST_PORT:-8000}:8000"
     healthcheck:
@@ -110,7 +120,9 @@ services:
       PREDICTA_INGESTION_RAW_STORE_PATH: /data/football/raw
       SPORTMONKS_API_TOKEN: ${SPORTMONKS_API_TOKEN:-}
     volumes:
-      - ${PREDICTA_FOOTBALL_DATA_DIR:-../../var/football}:/data/football
+      - ${PREDICTA_FOOTBALL_DATASETS_HOST:-../../workers/ingestion/var}:/data/football/datasets
+      - ${PREDICTA_FOOTBALL_REGISTRY_HOST:-../../workers/ml/var/registry}:/data/football/registry:ro
+      - ${PREDICTA_FOOTBALL_RAW_HOST:-../../workers/ingestion/var/raw}:/data/football/raw
     working_dir: /app/workers/ingestion
 
 volumes:
