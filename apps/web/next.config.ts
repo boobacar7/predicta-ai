@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Minimal image for infra/containers/compose.staging.yml (node server.js).
+  output: "standalone",
   /**
    * AI Picks and Value Finder moved to `/ai-picks` and `/value-finder`, the
    * paths used by the product navigation. The previous prototype paths keep

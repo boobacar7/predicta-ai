@@ -8,6 +8,7 @@ coverage
 .vercel
 .env
 .env.local
+.env.staging
 .env.*.local
 *.pem
 npm-debug.log*

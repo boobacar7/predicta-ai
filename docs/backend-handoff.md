@@ -14,12 +14,14 @@ cp .env.example .env
 python -m uvicorn app.main:app --reload --port 8000
 ```
 
-PostgreSQL / Redis locaux :
+PostgreSQL / Redis locaux (ports publiés, laptop) :
 
 ```bash
 docker compose -f infra/containers/docker-compose.yml up -d
 cd apps/api && alembic upgrade head
 ```
+
+Staging-shaped API + web (Postgres non publié) : [staging compose](infra/staging-compose.md).
 
 Le frontend bascule une ressource :
 

@@ -1,0 +1,116 @@
+name: predicta-staging
+
+# Staging-shaped topology: Postgres stays on the compose network (not published),
+# API and web are the only host ports. Redis is opt-in via --profile cache.
+# Frozen Elo candidate + parquet are mounted read-only; they are not in Git.
+#
+#   cp infra/containers/.env.staging.example infra/containers/.env.staging
+#   docker compose -f infra/containers/compose.staging.yml --env-file infra/containers/.env.staging up --build
+#
+# See docs/infra/staging-compose.md
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-predicta}
+      POSTGRES_USER: ${POSTGRES_USER:-predicta}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-predicta}
+    volumes:
+      - predicta_staging_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-predicta} -d ${POSTGRES_DB:-predicta}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    profiles: ["cache"]
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PREDICTA_API_ENV: staging
+      PREDICTA_API_REPOSITORY: sql
+      PREDICTA_API_DATA_MODE: live
+      PREDICTA_API_AUTH_BYPASS: "false"
+      PREDICTA_API_LOG_LEVEL: ${PREDICTA_API_LOG_LEVEL:-INFO}
+      PREDICTA_API_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-predicta}:${POSTGRES_PASSWORD:-predicta}@postgres:5432/${POSTGRES_DB:-predicta}
+      PREDICTA_API_REDIS_URL: ${PREDICTA_API_REDIS_URL:-}
+      PREDICTA_API_CORS_ORIGINS: ${PREDICTA_API_CORS_ORIGINS:-http://localhost:3000}
+      PREDICTA_API_INVITE_ALLOWLIST: ${PREDICTA_API_INVITE_ALLOWLIST:-}
+      PREDICTA_API_COOKIE_SECURE: ${PREDICTA_API_COOKIE_SECURE:-false}
+      PREDICTA_API_MIGRATE_ON_START: ${PREDICTA_API_MIGRATE_ON_START:-true}
+      PREDICTA_API_FOOTBALL_MODEL_VERSION: football-elo-v1-candidate
+      PREDICTA_API_FOOTBALL_REGISTRY_DIR: ${PREDICTA_API_FOOTBALL_REGISTRY_DIR:-/data/football/registry}
+      PREDICTA_API_FOOTBALL_DATASET_PATH: ${PREDICTA_API_FOOTBALL_DATASET_PATH:-/data/football/datasets/football-1x2-history.parquet}
+      PREDICTA_API_FOOTBALL_PREMATCH_DATASET_PATH: ${PREDICTA_API_FOOTBALL_PREMATCH_DATASET_PATH:-/data/football/datasets/football-1x2-prematch.parquet}
+      PREDICTA_API_FOOTBALL_RAW_ARCHIVE_DIR: ${PREDICTA_API_FOOTBALL_RAW_ARCHIVE_DIR:-/data/football/raw}
+    volumes:
+      - ${PREDICTA_FOOTBALL_DATA_DIR:-../../var/football}:/data/football:ro
+    ports:
+      - "${PREDICTA_API_HOST_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../../apps/web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_PREDICTA_ENV: staging
+        NEXT_PUBLIC_PREDICTA_DATA_SOURCE: http
+        NEXT_PUBLIC_PREDICTA_API_BASE_URL: ${PREDICTA_WEB_API_BASE_URL:-http://localhost:8000/api/v1}
+        NEXT_PUBLIC_PREDICTA_ALLOW_MOCK_IN_PROD: "false"
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${PREDICTA_WEB_HOST_PORT:-3000}:3000"
+    restart: unless-stopped
+
+  ingestion:
+    profiles: ["ingest"]
+    build:
+      context: ../../workers/ingestion
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PREDICTA_INGESTION_ENV: staging
+      PREDICTA_INGESTION_DATA_MODE: live
+      PREDICTA_INGESTION_ENABLE_LIVE: ${PREDICTA_INGESTION_ENABLE_LIVE:-false}
+      PREDICTA_INGESTION_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-predicta}:${POSTGRES_PASSWORD:-predicta}@postgres:5432/${POSTGRES_DB:-predicta}
+      PREDICTA_INGESTION_RAW_STORE_PATH: /data/football/raw
+      SPORTMONKS_API_TOKEN: ${SPORTMONKS_API_TOKEN:-}
+    volumes:
+      - ${PREDICTA_FOOTBALL_DATA_DIR:-../../var/football}:/data/football
+    working_dir: /app/workers/ingestion
+
+volumes:
+  predicta_staging_pg:

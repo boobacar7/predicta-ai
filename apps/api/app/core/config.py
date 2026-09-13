@@ -2,6 +2,7 @@ from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal, Self
+from urllib.parse import unquote, urlparse
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -14,6 +15,33 @@ DataMode = Literal["mock", "live"]
 RepositoryKind = Literal["mock", "sql"]
 AppEnv = Literal["development", "test", "staging", "production"]
 AnalystNarrator = Literal["deterministic", "llm"]
+
+
+def parse_filesystem_path(value: object) -> object:
+    """Accept a local path or ``file://`` URI. Object-store URIs are not implemented."""
+
+    if value is None or isinstance(value, Path):
+        return value
+    if not isinstance(value, str):
+        return value
+    text = value.strip()
+    if not text:
+        raise ValueError("Filesystem path cannot be empty.")
+    if "://" not in text:
+        return Path(text)
+    parsed = urlparse(text)
+    if parsed.scheme != "file":
+        raise ValueError(
+            f"Unsupported URI scheme '{parsed.scheme}'. "
+            "Mount the frozen football-elo-v1-candidate artefact and PIT parquet as a "
+            "filesystem volume or file:// URI. Object-store URIs are not implemented."
+        )
+    if parsed.netloc not in ("", "localhost", "127.0.0.1"):
+        raise ValueError(f"Only local file:// URIs are supported, not host '{parsed.netloc}'.")
+    path = unquote(parsed.path)
+    if not path:
+        raise ValueError(f"Invalid file URI: {text}")
+    return Path(path)
 
 
 class Settings(BaseSettings):
@@ -78,6 +106,17 @@ class Settings(BaseSettings):
         if value == "":
             return None
         return value
+
+    @field_validator(
+        "football_registry_dir",
+        "football_dataset_path",
+        "football_prematch_dataset_path",
+        "football_raw_archive_dir",
+        mode="before",
+    )
+    @classmethod
+    def parse_football_filesystem_uri(cls, value: object) -> object:
+        return parse_filesystem_path(value)
 
     @property
     def is_production(self) -> bool:

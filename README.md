@@ -92,3 +92,5 @@ Depuis la racine : `npm run dev:web`.
 Le prototype affiche exclusivement des fixtures fictives (`data_mode: mock`). Aucun secret ne doit être commité; les variables sont documentées dans `apps/web/.env.example`.
 
 L'API FastAPI se lance depuis `apps/api` (voir [handoff backend](docs/backend-handoff.md)). En mode mock elle sert le même contrat OpenAPI, toujours avec `data_mode: mock`.
+
+Staging-shaped (API + web + Postgres non publié, artefact Elo candidat en volume) : [docs/infra/staging-compose.md](docs/infra/staging-compose.md). Le candidat `football-elo-v1-candidate` n'est pas promu champion.

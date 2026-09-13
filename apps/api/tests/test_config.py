@@ -86,5 +86,38 @@ def test_env_example_documents_staging_sql_live() -> None:
     assert "PREDICTA_API_DATA_MODE=live" in text
     assert "PREDICTA_API_AUTH_BYPASS=false" in text
     assert "PREDICTA_API_INVITE_ALLOWLIST=" in text
+    assert "PREDICTA_API_FOOTBALL_REGISTRY_DIR=" in text
+    assert "PREDICTA_API_FOOTBALL_DATASET_PATH=" in text
     assert "sk_live" not in text
     assert "SPORTMONKS_API_TOKEN=" not in text
+
+
+def test_football_paths_accept_file_uris(tmp_path: Path) -> None:
+    registry = tmp_path / "registry"
+    dataset = tmp_path / "football-1x2-history.parquet"
+    settings = Settings(
+        _env_file=None,
+        football_registry_dir=f"file://{registry}",
+        football_dataset_path=f"file://{dataset}",
+    )
+    assert settings.football_registry_dir == registry
+    assert settings.football_dataset_path == dataset
+
+
+def test_football_paths_reject_object_store_uris() -> None:
+    with pytest.raises(ValidationError, match="Unsupported URI scheme"):
+        Settings(_env_file=None, football_registry_dir="s3://predicta/registry")
+
+
+def test_missing_artefact_does_not_fail_settings_boot(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        env="staging",
+        repository="sql",
+        data_mode="live",
+        football_registry_dir=tmp_path / "missing-registry",
+        football_dataset_path=tmp_path / "missing.parquet",
+    )
+    artefact = settings.football_registry_dir / settings.football_model_version / "artefact.joblib"
+    assert artefact.is_file() is False
+    assert settings.football_model_version == "football-elo-v1-candidate"

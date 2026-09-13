@@ -1,0 +1,55 @@
+# syntax=docker/dockerfile:1
+# Build from apps/web:
+#   docker build -f apps/web/Dockerfile apps/web
+
+FROM node:20-alpine AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# NEXT_PUBLIC_* is inlined at build time. Staging compose passes these as build args.
+ARG NEXT_PUBLIC_PREDICTA_ENV=staging
+ARG NEXT_PUBLIC_PREDICTA_DATA_SOURCE=http
+ARG NEXT_PUBLIC_PREDICTA_API_BASE_URL=http://localhost:8000/api/v1
+ARG NEXT_PUBLIC_PREDICTA_ALLOW_MOCK_IN_PROD=false
+ARG NEXT_PUBLIC_PREDICTA_HTTP_RESOURCES=
+ARG NEXT_PUBLIC_PREDICTA_MOCK_RESOURCES=
+ARG NEXT_PUBLIC_PREDICTA_REQUEST_TIMEOUT_MS=10000
+ARG NEXT_PUBLIC_PREDICTA_CSRF_COOKIE_NAME=predicta_csrf
+ARG NEXT_PUBLIC_PREDICTA_CSRF_HEADER_NAME=X-CSRF-Token
+
+ENV NEXT_PUBLIC_PREDICTA_ENV=$NEXT_PUBLIC_PREDICTA_ENV \
+    NEXT_PUBLIC_PREDICTA_DATA_SOURCE=$NEXT_PUBLIC_PREDICTA_DATA_SOURCE \
+    NEXT_PUBLIC_PREDICTA_API_BASE_URL=$NEXT_PUBLIC_PREDICTA_API_BASE_URL \
+    NEXT_PUBLIC_PREDICTA_ALLOW_MOCK_IN_PROD=$NEXT_PUBLIC_PREDICTA_ALLOW_MOCK_IN_PROD \
+    NEXT_PUBLIC_PREDICTA_HTTP_RESOURCES=$NEXT_PUBLIC_PREDICTA_HTTP_RESOURCES \
+    NEXT_PUBLIC_PREDICTA_MOCK_RESOURCES=$NEXT_PUBLIC_PREDICTA_MOCK_RESOURCES \
+    NEXT_PUBLIC_PREDICTA_REQUEST_TIMEOUT_MS=$NEXT_PUBLIC_PREDICTA_REQUEST_TIMEOUT_MS \
+    NEXT_PUBLIC_PREDICTA_CSRF_COOKIE_NAME=$NEXT_PUBLIC_PREDICTA_CSRF_COOKIE_NAME \
+    NEXT_PUBLIC_PREDICTA_CSRF_HEADER_NAME=$NEXT_PUBLIC_PREDICTA_CSRF_HEADER_NAME \
+    NEXT_TELEMETRY_DISABLED=1
+
+RUN npm run build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    HOSTNAME=0.0.0.0 \
+    PORT=3000
+
+RUN addgroup --system --gid 1001 predicta \
+    && adduser --system --uid 1001 predicta
+
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=predicta:predicta /app/.next/standalone ./
+COPY --from=builder --chown=predicta:predicta /app/.next/static ./.next/static
+
+USER predicta
+EXPOSE 3000
+CMD ["node", "server.js"]
