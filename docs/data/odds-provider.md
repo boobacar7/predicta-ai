@@ -150,9 +150,13 @@ python -m predicta_ingestion ingest-odds --league all --as-of 2026-09-08T15:55:0
 ```
 
 Les matchs football (Sportmonks) doivent déjà être ingérés pour lier les cotes
-via la clé naturelle `football|slugify(home)|slugify(away)|kickoff`. Un événement
-The Odds API sans match Sportmonks est quarantiné (`unmatched_odds_event`) et
-n'insère **aucun** snapshot. Le worker n'invente jamais un match.
+via la clé naturelle `football|slugify(home)|slugify(away)|kickoff`, puis la
+table explicite `the-odds-api-team-aliases-v1` (slug exact uniquement, pas de
+Levenshtein). Serie A documentée : `Inter Milan`→`Inter`, `AS Roma`→`Roma`,
+`Atalanta BC`→`Atalanta`. Coup d'envoi et home/away restent des garde-fous.
+Un événement The Odds API sans match Sportmonks est quarantiné
+(`unmatched_odds_event`) et n'insère **aucun** snapshot. Le worker n'invente
+jamais un match.
 
 `--dry-run` hydrate les clés naturelles depuis PostgreSQL (lecture seule) pour
 mesurer le matching, sans écrire le raw store ni les snapshots.
