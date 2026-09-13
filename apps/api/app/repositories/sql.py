@@ -1,7 +1,8 @@
 from datetime import UTC, date, datetime, timedelta
+from typing import Any
 
 from sqlalchemy import Select, or_, select
-from sqlalchemy.orm import AliasedClass, Session, aliased
+from sqlalchemy.orm import Session, aliased
 
 from app.core.config import Settings
 from app.db.models import League as LeagueRow
@@ -279,7 +280,7 @@ class SqlMatchRepository:
                 mapped.append(item)
         return mapped
 
-    def _apply_data_mode[T](self, statement: Select[T]) -> Select[T]:
+    def _apply_data_mode(self, statement: Select[Any]) -> Select[Any]:
         return statement.where(MatchRow.data_mode == self._settings.resolved_data_mode())
 
 
@@ -329,10 +330,7 @@ class SqlRepositoryBundle:
         self.signals = EmptySignalRepository()
 
 
-def _match_join(
-    home: AliasedClass[TeamRow],
-    away: AliasedClass[TeamRow],
-) -> Select[tuple[MatchRow, SportRow, LeagueRow, TeamRow, TeamRow]]:
+def _match_join(home: Any, away: Any) -> Select[Any]:
     return (
         select(MatchRow, SportRow, LeagueRow, home, away)
         .join(SportRow, SportRow.id == MatchRow.sport_id)

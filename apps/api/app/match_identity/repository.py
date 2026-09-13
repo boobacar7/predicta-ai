@@ -17,6 +17,13 @@ class MatchIdentityRepository(Protocol):
     def get(self, match_id: str) -> MatchIdentity | None: ...
 
 
+class NullMatchIdentityRepository:
+    """Used when the historical archive is not mounted. Never invents identity."""
+
+    def get(self, match_id: str) -> MatchIdentity | None:
+        return None
+
+
 class ParquetArchiveMatchIdentityRepository:
     """Project canonical IDs from PIT parquet and structural labels from its raw provenance."""
 

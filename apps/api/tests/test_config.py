@@ -1,9 +1,8 @@
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
-
 from app.core.config import Settings, get_settings
+from pydantic import ValidationError
 
 
 def test_staging_refuses_mock_repository() -> None:

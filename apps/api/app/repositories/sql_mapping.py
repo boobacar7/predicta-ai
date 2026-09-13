@@ -7,6 +7,7 @@ stats, predictions, standings, injuries, or scores.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import cast
 
 from app.db.models import League as LeagueRow
 from app.db.models import Match as MatchRow
@@ -74,14 +75,14 @@ def as_utc(value: datetime) -> datetime:
 
 
 def as_sport_code(value: str) -> SportCode | None:
-    if value == "football" or value == "basketball" or value == "tennis":
-        return value
+    if value in ("football", "basketball", "tennis"):
+        return cast(SportCode, value)
     return None
 
 
 def as_match_status(value: str) -> MatchStatus | None:
-    if value == "scheduled" or value == "live" or value == "finished" or value == "postponed":
-        return value
+    if value in ("scheduled", "live", "finished", "postponed"):
+        return cast(MatchStatus, value)
     return None
 
 

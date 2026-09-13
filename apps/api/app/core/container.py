@@ -9,6 +9,7 @@ from app.core.clock import Clock
 from app.core.config import Settings
 from app.match_identity.repository import (
     MatchIdentityRepository,
+    NullMatchIdentityRepository,
     ParquetArchiveMatchIdentityRepository,
     SqlMatchIdentityRepository,
 )
@@ -87,19 +88,20 @@ class AppContainer:
 
     def match_identities(self) -> MatchIdentityRepository:
         if self._match_identities is None:
-            self._match_identities = (
-                SqlMatchIdentityRepository(self.settings)
-                if self.settings.repository == "sql"
-                else ParquetArchiveMatchIdentityRepository(
+            if self.settings.repository == "sql":
+                self._match_identities = SqlMatchIdentityRepository(self.settings)
+            elif self.settings.football_dataset_path.is_file():
+                self._match_identities = ParquetArchiveMatchIdentityRepository(
                     self.settings.football_dataset_path,
                     self.settings.football_raw_archive_dir,
                 )
-            )
+            else:
+                self._match_identities = NullMatchIdentityRepository()
         return self._match_identities
 
     def match_resolution(self) -> MatchResolutionService:
         if self._match_resolution is None:
-            self._match_resolution = MatchResolutionService(self.matches, self.match_identities())
+            self._match_resolution = MatchResolutionService(self.matches, self.match_identities)
         return self._match_resolution
 
     def football_ai_analyst(self) -> FootballAnalystService:

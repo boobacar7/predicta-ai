@@ -3,11 +3,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
-from sqlalchemy import create_engine
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.ext.compiler import compiles
-from sqlalchemy.orm import Session, sessionmaker
-
 from app.core.config import Settings
 from app.db.models import Base
 from app.db.models import League as LeagueRow
@@ -16,6 +11,10 @@ from app.db.models import Player as PlayerRow
 from app.db.models import Sport as SportRow
 from app.db.models import Team as TeamRow
 from app.db.session import reset_database_state
+from sqlalchemy import create_engine
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.orm import Session, sessionmaker
 from tests.conftest import TestSettings
 
 NOW = datetime(2026, 9, 12, 15, 0, tzinfo=UTC)
