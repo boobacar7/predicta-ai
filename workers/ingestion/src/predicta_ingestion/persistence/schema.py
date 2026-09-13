@@ -4,6 +4,13 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
 REQUIRED_ODDS_HISTORY_REVISION = "0004_odds_history"
+PRE_ODDS_HISTORY_REVISIONS = frozenset(
+    {
+        "0001_initial",
+        "0002_data_ingestion",
+        "0003_league_competition_identity",
+    }
+)
 REQUIRED_ODDS_SNAPSHOT_COLUMNS = frozenset(
     {
         "provider_id",
@@ -22,8 +29,10 @@ class OddsHistorySchemaError(RuntimeError):
 def require_odds_history_schema(engine: Engine) -> str:
     """Fail fast before live odds persist if 0004 is not applied.
 
-    This inspects an already-configured runtime database. It is not a CI
-    Postgres fixture and does not invent schema.
+    Later heads (for example ``0005_users_sessions``) are accepted when the
+    0004 columns are present. Equality to 0004 as the current head is not
+    required. This inspects an already-configured runtime database. It is
+    not a CI Postgres fixture and does not invent schema.
     """
     with engine.connect() as connection:
         try:
@@ -31,13 +40,15 @@ def require_odds_history_schema(engine: Engine) -> str:
         except Exception as exc:
             raise OddsHistorySchemaError(
                 "Odds persistence requires Alembic "
-                f"{REQUIRED_ODDS_HISTORY_REVISION}, but alembic_version is unreadable. "
+                f"{REQUIRED_ODDS_HISTORY_REVISION} or a later revision that includes it, "
+                "but alembic_version is unreadable. "
                 "Run: cd apps/api && alembic upgrade head"
             ) from exc
-        if revision != REQUIRED_ODDS_HISTORY_REVISION:
+        if not revision or revision in PRE_ODDS_HISTORY_REVISIONS:
             raise OddsHistorySchemaError(
                 "Odds persistence requires Alembic "
-                f"{REQUIRED_ODDS_HISTORY_REVISION}; current revision is {revision!r}. "
+                f"{REQUIRED_ODDS_HISTORY_REVISION} or a later revision that includes it; "
+                f"current revision is {revision!r}. "
                 "Run: cd apps/api && alembic upgrade head"
             )
         columns = {
@@ -59,4 +70,4 @@ def require_odds_history_schema(engine: Engine) -> str:
                 + ", ".join(missing)
                 + ". Run: cd apps/api && alembic upgrade head"
             )
-    return REQUIRED_ODDS_HISTORY_REVISION
+    return str(revision)
