@@ -9,7 +9,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "generate:api-types": "openapi-typescript ../../contracts/openapi.yaml --output src/types/generated/api.ts",
     "check:api-types": "npm run generate:api-types && git diff --exit-code -- apps/web/src/types/generated/api.ts",
     "verify": "npm run check:api-types && npm run typecheck && npm run lint && npm test && npm run build"
