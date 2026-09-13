@@ -429,6 +429,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create an opaque session for an invited user
+         * @description Invite allowlist plus Argon2id password check. On success the API sets
+         *     `predicta_session` (HttpOnly, SameSite=Lax, Secure in staging/prod) and
+         *     `predicta_csrf` (readable by the web client). The raw session token is
+         *     never stored; only its SHA-256 hash is persisted. Not a JWT.
+         */
+        post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke the current opaque session */
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Return the current invited user, or 401
+         * @description Public probe. Missing or expired cookies yield 401. `AUTH_BYPASS` (local
+         *     development/test only) returns `user: null` and `bypass: true`.
+         */
+        get: operations["getAuthSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1187,6 +1248,38 @@ export interface components {
         AnalystEnvelope: components["schemas"]["EnvelopeMetadata"] & {
             data: components["schemas"]["AnalystSession"];
         };
+        LoginRequest: {
+            /** Format: email */
+            email: string;
+            password: string;
+        };
+        AuthUser: {
+            id: components["schemas"]["Identifier"];
+            /** Format: email */
+            email: string;
+        };
+        LoginResult: {
+            user: components["schemas"]["AuthUser"];
+            /** @description Also set as the non-HttpOnly `predicta_csrf` cookie. */
+            csrf_token: string;
+        };
+        LogoutResult: {
+            logged_out: boolean;
+        };
+        AuthSession: {
+            user: components["schemas"]["AuthUser"] | null;
+            /** @description True only when AUTH_BYPASS is enabled (development/test). */
+            bypass: boolean;
+        };
+        LoginEnvelope: components["schemas"]["EnvelopeMetadata"] & {
+            data: components["schemas"]["LoginResult"];
+        };
+        LogoutEnvelope: components["schemas"]["EnvelopeMetadata"] & {
+            data: components["schemas"]["LogoutResult"];
+        };
+        AuthSessionEnvelope: components["schemas"]["EnvelopeMetadata"] & {
+            data: components["schemas"]["AuthSession"];
+        };
     };
     responses: {
         /** @description Request or server error */
@@ -1211,6 +1304,26 @@ export interface components {
         };
         /** @description Invalid request */
         ValidationProblem: {
+            headers: {
+                "X-Request-ID": components["headers"]["XRequestId"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["ProblemDetails"];
+            };
+        };
+        /** @description Missing or invalid opaque session */
+        Unauthorized: {
+            headers: {
+                "X-Request-ID": components["headers"]["XRequestId"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["ProblemDetails"];
+            };
+        };
+        /** @description CSRF check failed */
+        Forbidden: {
             headers: {
                 "X-Request-ID": components["headers"]["XRequestId"];
                 [name: string]: unknown;
@@ -1251,6 +1364,12 @@ export interface components {
         LeagueId: components["schemas"]["Identifier"];
         TeamId: components["schemas"]["Identifier"];
         PlayerId: components["schemas"]["Identifier"];
+        /**
+         * @description Required on cookie-authenticated POST. Must equal the `predicta_csrf`
+         *     cookie issued at login. Never send the session token in a header or
+         *     in localStorage.
+         */
+        CsrfToken: string;
     };
     requestBodies: never;
     headers: {
@@ -1905,6 +2024,12 @@ export interface operations {
             header?: {
                 /** @description Caller-provided correlation identifier. The API generates one when absent. */
                 "X-Request-ID"?: components["parameters"]["XRequestId"];
+                /**
+                 * @description Required on cookie-authenticated POST. Must equal the `predicta_csrf`
+                 *     cookie issued at login. Never send the session token in a header or
+                 *     in localStorage.
+                 */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
             };
             path?: never;
             cookie?: never;
@@ -1925,8 +2050,100 @@ export interface operations {
                     "application/json": components["schemas"]["AnalystEnvelope"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["ValidationProblem"];
+            default: components["responses"]["Problem"];
+        };
+    };
+    login: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Caller-provided correlation identifier. The API generates one when absent. */
+                "X-Request-ID"?: components["parameters"]["XRequestId"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Session created */
+            200: {
+                headers: {
+                    "X-Request-ID": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginEnvelope"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["ValidationProblem"];
+            default: components["responses"]["Problem"];
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Caller-provided correlation identifier. The API generates one when absent. */
+                "X-Request-ID"?: components["parameters"]["XRequestId"];
+                /**
+                 * @description Required on cookie-authenticated POST. Must equal the `predicta_csrf`
+                 *     cookie issued at login. Never send the session token in a header or
+                 *     in localStorage.
+                 */
+                "X-CSRF-Token"?: components["parameters"]["CsrfToken"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Session revoked */
+            200: {
+                headers: {
+                    "X-Request-ID": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogoutEnvelope"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            default: components["responses"]["Problem"];
+        };
+    };
+    getAuthSession: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Caller-provided correlation identifier. The API generates one when absent. */
+                "X-Request-ID"?: components["parameters"]["XRequestId"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current session */
+            200: {
+                headers: {
+                    "X-Request-ID": components["headers"]["XRequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthSessionEnvelope"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
             default: components["responses"]["Problem"];
         };
     };

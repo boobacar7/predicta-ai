@@ -17,6 +17,7 @@ def make_app(**overrides: object) -> FastAPI:
         "log_level": "WARNING",
         "cors_origins": ["http://localhost:3000"],
         "mock_now": "2026-09-09T18:00:00Z",
+        "auth_bypass": True,
     }
     values.update(overrides)
     return create_app(TestSettings(**values))  # type: ignore[arg-type]

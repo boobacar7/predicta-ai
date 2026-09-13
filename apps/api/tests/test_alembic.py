@@ -11,12 +11,13 @@ def test_alembic_heads_data_ingestion() -> None:
     script = ScriptDirectory.from_config(config)
     revisions = list(script.walk_revisions())
     assert [item.revision for item in revisions] == [
+        "0005_users_sessions",
         "0004_odds_history",
         "0003_league_competition_identity",
         "0002_data_ingestion",
         "0001_initial",
     ]
-    assert script.get_current_head() == "0004_odds_history"
+    assert script.get_current_head() == "0005_users_sessions"
 
 
 def test_odds_history_revision_is_append_only_and_backfills_provenance() -> None:

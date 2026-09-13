@@ -60,10 +60,48 @@ describe("request construction", () => {
 
     expect(init.method).toBe("POST");
     expect(init.body).toBe(JSON.stringify({ match_id: "mth_1" }));
+    expect(init.credentials).toBe("include");
+  });
+
+  it("sends credentials on GET so the HttpOnly session cookie is included", async () => {
+    const fetchImpl = spyFetch(() => jsonResponse(envelope({ items: [], total: 0 })));
+    await clientWith(fetchImpl as unknown as typeof fetch).get("/matches");
+
+    expect(fetchImpl.mock.calls[0]![1].credentials).toBe("include");
+  });
+
+  it("copies the CSRF cookie onto POST as X-CSRF-Token", async () => {
+    document.cookie = "predicta_csrf=csrf-test-token";
+    const fetchImpl = spyFetch(() => jsonResponse(envelope({ ok: true })));
+    await clientWith(fetchImpl as unknown as typeof fetch).post("/ai/analyze", {
+      match_id: "mth_1",
+    });
+
+    const headers = fetchImpl.mock.calls[0]![1].headers as Record<string, string>;
+    expect(headers["X-CSRF-Token"]).toBe("csrf-test-token");
+    expect(headers.Accept).toBe("application/json");
+    expect(window.localStorage.getItem("predicta_session")).toBeNull();
+    expect(window.localStorage.getItem("jwt")).toBeNull();
   });
 });
 
 describe("RFC 9457 problem details", () => {
+  it("maps 401 to a non-retryable unauthorized error", async () => {
+    const fetchImpl = async () =>
+      jsonResponse(
+        { title: "Unauthorized", detail: "Authentication required.", status: 401, request_id: "req_401" },
+        { status: 401 },
+      );
+
+    const error = (await clientWith(fetchImpl as unknown as typeof fetch)
+      .get("/matches")
+      .catch((caught: unknown) => caught)) as DataSourceError;
+
+    expect(error.kind).toBe("unauthorized");
+    expect(error.retryable).toBe(false);
+    expect(error.message).toBe("Authentication required.");
+  });
+
   it("maps 404 to a non-retryable not_found error", async () => {
     const fetchImpl = async () =>
       jsonResponse(

@@ -17,7 +17,9 @@ export type DataSourceErrorKind =
   /** The endpoint is not wired yet in the active data source. */
   | "not_implemented"
   /** A mock scenario deliberately simulated a provider failure. */
-  | "mock_scenario";
+  | "mock_scenario"
+  /** Missing or expired opaque session. */
+  | "unauthorized";
 
 /** RFC 9457 Problem Details, the documented error format of the API. */
 export interface ProblemDetails {
@@ -51,6 +53,7 @@ const DEFAULT_MESSAGES: Record<DataSourceErrorKind, string> = {
   invalid_response: "La réponse reçue ne respecte pas le contrat attendu.",
   not_implemented: "Cet endpoint n'est pas encore branché sur l'API.",
   mock_scenario: "Scénario mock « erreur » : échec provider simulé volontairement.",
+  unauthorized: "Session expirée ou absente. Connectez-vous pour continuer.",
 };
 
 export interface DataSourceErrorOptions {
@@ -93,6 +96,7 @@ export function isDataSourceError(error: unknown): error is DataSourceError {
 
 /** Maps an HTTP status onto the transport-agnostic error kinds. */
 export function kindFromStatus(status: number): DataSourceErrorKind {
+  if (status === 401) return "unauthorized";
   if (status === 404) return "not_found";
   if (status === 501) return "not_implemented";
   return "server";

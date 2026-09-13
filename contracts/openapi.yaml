@@ -19,8 +19,11 @@ info:
 servers:
   - url: /api/v1
     description: Same-origin deployment
-security: []
+security:
+  - cookieAuth: []
 tags:
+  - name: Auth
+    description: Invite-only opaque-session login. Session id is an HttpOnly cookie, never a JWT.
   - name: Dashboard
     description: Aggregate payload used by the dashboard.
   - name: Matches
@@ -614,6 +617,10 @@ paths:
         It cannot create probabilities, odds, statistics or availability data.
       parameters:
         - $ref: "#/components/parameters/XRequestId"
+        - $ref: "#/components/parameters/CsrfToken"
+      security:
+        - cookieAuth: []
+          csrfHeader: []
       requestBody:
         required: true
         content:
@@ -630,6 +637,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AnalystEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
         "422":
@@ -637,7 +648,109 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
 
+  /auth/login:
+    post:
+      operationId: login
+      tags: [Auth]
+      summary: Create an opaque session for an invited user
+      description: |
+        Invite allowlist plus Argon2id password check. On success the API sets
+        `predicta_session` (HttpOnly, SameSite=Lax, Secure in staging/prod) and
+        `predicta_csrf` (readable by the web client). The raw session token is
+        never stored; only its SHA-256 hash is persisted. Not a JWT.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Session created
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/ValidationProblem"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [Auth]
+      summary: Revoke the current opaque session
+      security:
+        - cookieAuth: []
+          csrfHeader: []
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+        - $ref: "#/components/parameters/CsrfToken"
+      responses:
+        "200":
+          description: Session revoked
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogoutEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        default:
+          $ref: "#/components/responses/Problem"
+
+  /auth/session:
+    get:
+      operationId: getAuthSession
+      tags: [Auth]
+      summary: Return the current invited user, or 401
+      description: |
+        Public probe. Missing or expired cookies yield 401. `AUTH_BYPASS` (local
+        development/test only) returns `user: null` and `bypass: true`.
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/XRequestId"
+      responses:
+        "200":
+          description: Current session
+          headers:
+            X-Request-ID:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSessionEnvelope"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        default:
+          $ref: "#/components/responses/Problem"
+
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: predicta_session
+      description: Opaque session id. HttpOnly cookie; never a JWT and never stored in localStorage.
+    csrfHeader:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: Double-submit CSRF token matching the `predicta_csrf` cookie.
+
   parameters:
     XRequestId:
       name: X-Request-ID
@@ -778,6 +891,18 @@ components:
       required: true
       schema:
         $ref: "#/components/schemas/Identifier"
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: false
+      description: |
+        Required on cookie-authenticated POST. Must equal the `predicta_csrf`
+        cookie issued at login. Never send the session token in a header or
+        in localStorage.
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 256
 
   headers:
     XRequestId:
@@ -806,6 +931,24 @@ components:
             $ref: "#/components/schemas/ProblemDetails"
     ValidationProblem:
       description: Invalid request
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/XRequestId"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    Unauthorized:
+      description: Missing or invalid opaque session
+      headers:
+        X-Request-ID:
+          $ref: "#/components/headers/XRequestId"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    Forbidden:
+      description: CSRF check failed
       headers:
         X-Request-ID:
           $ref: "#/components/headers/XRequestId"
@@ -2915,3 +3058,88 @@ components:
           properties:
             data:
               $ref: "#/components/schemas/AnalystSession"
+
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        password:
+          type: string
+          minLength: 1
+          maxLength: 256
+
+    AuthUser:
+      type: object
+      additionalProperties: false
+      required: [id, email]
+      properties:
+        id:
+          $ref: "#/components/schemas/Identifier"
+        email:
+          type: string
+          format: email
+
+    LoginResult:
+      type: object
+      additionalProperties: false
+      required: [user, csrf_token]
+      properties:
+        user:
+          $ref: "#/components/schemas/AuthUser"
+        csrf_token:
+          type: string
+          minLength: 16
+          description: Also set as the non-HttpOnly `predicta_csrf` cookie.
+
+    LogoutResult:
+      type: object
+      additionalProperties: false
+      required: [logged_out]
+      properties:
+        logged_out:
+          type: boolean
+
+    AuthSession:
+      type: object
+      additionalProperties: false
+      required: [user, bypass]
+      properties:
+        user:
+          anyOf:
+            - $ref: "#/components/schemas/AuthUser"
+            - type: "null"
+        bypass:
+          type: boolean
+          description: True only when AUTH_BYPASS is enabled (development/test).
+
+    LoginEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: "#/components/schemas/LoginResult"
+
+    LogoutEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: "#/components/schemas/LogoutResult"
+
+    AuthSessionEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EnvelopeMetadata"
+        - type: object
+          required: [data]
+          properties:
+            data:
+              $ref: "#/components/schemas/AuthSession"

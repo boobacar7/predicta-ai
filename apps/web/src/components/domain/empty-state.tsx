@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { toDataSourceError } from "@/lib/api/errors";
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 /**
@@ -47,7 +48,8 @@ export function ErrorState({
 }) {
   const normalized = error === undefined ? undefined : toDataSourceError(error);
   const message = description ?? normalized?.message ?? "Cause inconnue.";
-  const canRetry = Boolean(onRetry) && (normalized?.retryable ?? true);
+  const unauthorized = normalized?.kind === "unauthorized";
+  const canRetry = Boolean(onRetry) && !unauthorized && (normalized?.retryable ?? true);
 
   return (
     <div
@@ -67,6 +69,11 @@ export function ErrorState({
       ) : null}
       {normalized?.requestId ? (
         <p className="mt-2 font-mono text-xs text-faint">request_id {normalized.requestId}</p>
+      ) : null}
+      {unauthorized ? (
+        <Button asChild className="mt-5" variant="primary">
+          <Link href="/login">Se connecter</Link>
+        </Button>
       ) : null}
       {canRetry ? (
         <Button className="mt-5" onClick={onRetry}>

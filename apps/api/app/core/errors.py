@@ -87,6 +87,26 @@ class ServiceUnavailableError(ApiError):
         )
 
 
+class UnauthorizedError(ApiError):
+    def __init__(self, detail: str = "Authentication required.") -> None:
+        super().__init__(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            title="Unauthorized",
+            detail=detail,
+            type_uri="/problems/unauthorized",
+        )
+
+
+class ForbiddenError(ApiError):
+    def __init__(self, detail: str = "Request rejected.") -> None:
+        super().__init__(
+            status_code=status.HTTP_403_FORBIDDEN,
+            title="Forbidden",
+            detail=detail,
+            type_uri="/problems/forbidden",
+        )
+
+
 def problem_response(
     *,
     request: Request,

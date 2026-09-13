@@ -34,6 +34,8 @@ export function createDataSource({
       httpSource ??= new HttpDataSource({
         baseUrl: config.apiBaseUrl,
         requestTimeoutMs: config.requestTimeoutMs,
+        csrfCookieName: config.csrfCookieName,
+        csrfHeaderName: config.csrfHeaderName,
       });
       return httpSource;
     }

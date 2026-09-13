@@ -159,6 +159,11 @@ export const pageMeta: Record<string, { title: string; eyebrow: string; descript
   "/profile": {
     title: "Profil",
     eyebrow: "Compte",
-    description: "L'authentification, les favoris et le tracker arriveront plus tard.",
+    description: "Session invite-only. Favoris et tracker arriveront plus tard.",
+  },
+  "/login": {
+    title: "Connexion",
+    eyebrow: "Private Beta",
+    description: "Accès sur invitation. Les prédictions restent des probabilités, jamais des garanties.",
   },
 };

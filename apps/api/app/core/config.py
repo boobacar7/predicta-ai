@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     redis_url: str | None = None
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
     request_id_header: str = "X-Request-ID"
+    auth_bypass: bool = False
+    invite_allowlist: list[str] = Field(default_factory=list)
+    session_cookie_name: str = "predicta_session"
+    csrf_cookie_name: str = "predicta_csrf"
+    csrf_header_name: str = "X-CSRF-Token"
+    session_ttl_seconds: int = Field(default=60 * 60 * 24 * 7, ge=60, le=60 * 60 * 24 * 30)
+    cookie_secure: bool | None = None
     mock_now: str = "2026-09-09T18:00:00Z"
     value_formula_version: str = VALUE_ENGINE_VERSION
     analyst_narrator: AnalystNarrator = "deterministic"
@@ -53,12 +60,17 @@ class Settings(BaseSettings):
     ai_picks_minimum_model_probability: Decimal = Decimal("0")
     ai_picks_maximum_odds_age_seconds: int = Field(default=86400, gt=0)
 
-    @field_validator("cors_origins", mode="before")
+    @field_validator("cors_origins", "invite_allowlist", mode="before")
     @classmethod
-    def parse_cors(cls, value: object) -> object:
+    def parse_csv_list(cls, value: object) -> object:
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
+
+    @field_validator("invite_allowlist")
+    @classmethod
+    def normalize_allowlist(cls, value: list[str]) -> list[str]:
+        return [item.strip().lower() for item in value if item.strip()]
 
     @field_validator("redis_url", mode="before")
     @classmethod
@@ -75,6 +87,12 @@ class Settings(BaseSettings):
     def is_deployed(self) -> bool:
         return self.env in ("staging", "production")
 
+    @property
+    def session_cookie_secure(self) -> bool:
+        if self.cookie_secure is not None:
+            return self.cookie_secure
+        return self.is_deployed
+
     def resolved_data_mode(self) -> DataMode:
         """Mock repositories cannot be advertised as live data."""
         if self.repository == "mock":
@@ -89,6 +107,16 @@ class Settings(BaseSettings):
             raise ValueError(f"Mock repositories are forbidden when PREDICTA_API_ENV={self.env}.")
         if self.data_mode == "mock":
             raise ValueError(f"data_mode=mock is forbidden when PREDICTA_API_ENV={self.env}.")
+        return self
+
+    @model_validator(mode="after")
+    def refuse_auth_bypass_in_deployed_envs(self) -> Self:
+        if self.auth_bypass and self.is_deployed:
+            raise ValueError(f"AUTH_BYPASS is forbidden when PREDICTA_API_ENV={self.env}.")
+        if self.auth_bypass and self.env not in ("development", "test"):
+            raise ValueError(
+                f"AUTH_BYPASS is only allowed when PREDICTA_API_ENV is development or test, not {self.env}."
+            )
         return self
 
 

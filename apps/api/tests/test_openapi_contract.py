@@ -52,8 +52,17 @@ def test_openapi_paths_are_implemented() -> None:
         "/value",
         "/performance",
         "/ai/analyze",
+        "/auth/login",
+        "/auth/logout",
+        "/auth/session",
     }
     assert set(spec["paths"]) == implemented
+    assert spec["security"] == [{"cookieAuth": []}]
+    schemes = spec["components"]["securitySchemes"]
+    assert schemes["cookieAuth"]["in"] == "cookie"
+    assert schemes["cookieAuth"]["name"] == "predicta_session"
+    assert schemes["csrfHeader"]["name"] == "X-CSRF-Token"
+    assert "httpBearer" not in schemes
     for path in ("/dashboard", "/sports", "/matches", "/picks", "/value", "/performance"):
         assert client.get(f"/api/v1{path}").status_code == 200
 

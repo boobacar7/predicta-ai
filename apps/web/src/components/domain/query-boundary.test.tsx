@@ -149,6 +149,17 @@ describe("error", () => {
    * Retrying a 404 or a contract violation would fail identically, so offering
    * the button would only invite a pointless second failure.
    */
+  it("offers a login link instead of retry for an expired session", async () => {
+    renderSubject({
+      queryFn: async () => {
+        throw new DataSourceError({ kind: "unauthorized" });
+      },
+    });
+
+    expect(await screen.findByRole("link", { name: "Se connecter" })).toHaveAttribute("href", "/login");
+    expect(screen.queryByRole("button", { name: "Réessayer" })).not.toBeInTheDocument();
+  });
+
   it("offers no retry for an error that cannot succeed on a second attempt", async () => {
     renderSubject({
       queryFn: async () => {

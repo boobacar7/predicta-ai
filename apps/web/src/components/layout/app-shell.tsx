@@ -21,6 +21,7 @@ import { useState, type ReactNode } from "react";
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
+  const chrome = pathname !== "/login";
 
   return (
     <FiltersProvider>
@@ -32,20 +33,26 @@ export function AppShell({ children }: { children: ReactNode }) {
           Aller au contenu
         </a>
         <div className="min-h-screen bg-background">
-          <MockBanner />
+          {chrome ? <MockBanner /> : null}
           <div className="flex">
-            <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-border bg-background lg:block">
-              <Sidebar />
-            </aside>
+            {chrome ? (
+              <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-border bg-background lg:block">
+                <Sidebar />
+              </aside>
+            ) : null}
             <div className="min-w-0 flex-1">
-              <TopBar onOpenNav={() => setNavOpen(true)} />
-              <main id="contenu" className="px-4 py-6 pb-24 md:px-8 md:pb-10">
+              {chrome ? <TopBar onOpenNav={() => setNavOpen(true)} /> : null}
+              <main id="contenu" className={chrome ? "px-4 py-6 pb-24 md:px-8 md:pb-10" : "px-4 py-10 md:px-8"}>
                 <PageFade key={pathname}>{children}</PageFade>
               </main>
             </div>
           </div>
-          <MobileNav open={navOpen} onOpenChange={setNavOpen} />
-          <BottomNav />
+          {chrome ? (
+            <>
+              <MobileNav open={navOpen} onOpenChange={setNavOpen} />
+              <BottomNav />
+            </>
+          ) : null}
         </div>
       </MockScenarioProvider>
     </FiltersProvider>
