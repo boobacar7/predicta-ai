@@ -1,0 +1,437 @@
+{
+  "kind": "walk-forward-2024-2026-protocol-freeze",
+  "protocol_id": "walk-forward-2024-2026-v1",
+  "audit_status": "PASS",
+  "backtest_execution": "NOT_RUN",
+  "paid_api_requests": 0,
+  "data_modified": false,
+  "promoted_to_production": false,
+  "go_nogo": {
+    "protocol_freeze": "YES",
+    "run_backtest_now": "NO-GO",
+    "meaning_of_go": "Protocol and persisted data are sufficiently defined to run the backtest. Does not mean the model is production-ready, profitable, validated, or should be promoted.",
+    "nogo_reasons": [
+      "Parquet football-1x2-history-0.3 with pinned SHA-256 is not on this VM.",
+      "PostgreSQL with the verified 7622/43280/203 inventory is not on this VM.",
+      "Evaluation B for 2024-2025 lacks a year-level PIT odds inventory."
+    ]
+  },
+  "recommended_next_step": "Restore the SHA-256-pinned football-1x2-history-0.3 parquet on an evaluation host that already has the verified PostgreSQL inventory, then execute evaluation A only for walk-forward-2024-2026-v1 (no Odds API calls, no Value/AI Picks on 2024-2025 until a live SQL year-level odds inventory exists).",
+  "discarded_unverified_claims": [
+    "637/1348 requests",
+    "436 new requests",
+    "~1114 PIT records",
+    "~4.8 hours remaining",
+    "credit arithmetic derived from those numbers"
+  ],
+  "audit_basis": {
+    "implementation_ref": "origin/agent/data/final-oos-odds-batch",
+    "implementation_sha": "1cde8f701e2fcdfd85f9574983b76abd810003cc",
+    "odds_inventory_source": "workers/ml/reports/oos-odds-final-batch.json",
+    "collection_stop_audit": "docs/qa/historical-2024-2026-collection-audit.md",
+    "live_postgres_on_this_vm": false,
+    "parquet_on_this_vm": false,
+    "odds_api_key_used": false
+  },
+  "verified_sql_inventory": {
+    "canonical_matches": 7622,
+    "live_odds_snapshots": 43280,
+    "mock_odds_snapshots": 0,
+    "odds_snapshots": 43280,
+    "odds_selections": 129839,
+    "raw_payloads_the_odds_api": 203,
+    "odds_ingestion_runs": 7,
+    "orphan_odds": 0,
+    "duplicate_snapshot_ids": 0,
+    "last_paid_historical_batch_requests": 10,
+    "last_paid_historical_batch_credits": 100,
+    "new_canonical_oos_matches_from_last_paid_batch": 0,
+    "reused_historical_requests": 77,
+    "unmatched_odds_api_names_quarantined": 3738,
+    "unmappable_champions_league_qualification_slots": 15,
+    "last_verified_odds_api_remaining_credits": 17010,
+    "note": "Snapshots are not matches. 43280 snapshots != 43280 matches."
+  },
+  "canonical_match_status": {
+    "canonical_matches": 7622,
+    "finished_labeled_1x2_rows": 5729,
+    "rejected_not_finished": 1893,
+    "rejected_breakdown": {
+      "scheduled": 1890,
+      "other_status": 3
+    },
+    "check_5729_plus_1893": 7622,
+    "scheduled_postponed_other_by_year": "UNAVAILABLE FROM CURRENT PERSISTED STATE"
+  },
+  "labeled_rows_by_calendar_event_at": {
+    "note": "From frozen WALK_FORWARD_BOUNDS on dataset 0.3, not live SQL. Not Sportmonks season labels.",
+    "windows": [
+      {
+        "start": "2024-02-22T00:00:00+00:00",
+        "end_exclusive": "2025-01-01T00:00:00+00:00",
+        "n": 1538,
+        "source": "fold_1_train"
+      },
+      {
+        "start": "2025-01-01T00:00:00+00:00",
+        "end_exclusive": "2026-01-01T00:00:00+00:00",
+        "n": 2556,
+        "source": "fold_1_val_1305_plus_fold_2_val_1251"
+      },
+      {
+        "start": "2026-01-01T00:00:00+00:00",
+        "end_exclusive": "2026-09-10T02:30:01+00:00",
+        "n": 1635,
+        "source": "fold_3_val_1248_plus_final_test_387"
+      }
+    ],
+    "labeled_total": 5729,
+    "period_start": "2024-02-22T01:00:00+00:00",
+    "period_end": "2026-09-10T02:30:00+00:00",
+    "june_2026_finished_matches": 0,
+    "canonical_matches_by_calendar_year": "UNAVAILABLE FROM CURRENT PERSISTED STATE"
+  },
+  "labeled_rows_by_competition": {
+    "mls": 1419,
+    "la-liga": 801,
+    "premier-league": 790,
+    "serie-a": 790,
+    "champions-league": 662,
+    "ligue-1": 637,
+    "bundesliga": 630,
+    "total": 5729
+  },
+  "historical_odds_layers": {
+    "A_raw_odds_api_payloads": 203,
+    "B_odds_snapshots_live": 43280,
+    "C_canonical_mappings": {
+      "orphan_odds": 0,
+      "unmatched_names_quarantined": 3738,
+      "false_identity_matches": 0
+    },
+    "D_valid_pre_kickoff_1x2": "counted_per_oos_match_not_as_global_snapshot_total",
+    "E_matches_with_at_least_one_valid_pit_1x2": {
+      "universe": "dataset_0.3_final_test_only",
+      "oos_start": "2026-07-01T00:00:00+00:00",
+      "oos_end_exclusive": "2026-09-10T02:30:01+00:00",
+      "covered": 181,
+      "universe_n": 387,
+      "coverage": 0.4677
+    },
+    "odds_coverage_by_year_outside_oos_window": "UNAVAILABLE FROM CURRENT PERSISTED STATE"
+  },
+  "oos_window_odds_coverage": {
+    "universe": 387,
+    "valid_pre_kickoff_1x2": 181,
+    "coverage": 0.4677,
+    "uncovered": 206,
+    "uncovered_reasons": {
+      "no_live_1x2_snapshot": 203,
+      "isolated_team_paris_fc": 3
+    },
+    "by_competition": {
+      "premier-league": {"matches": 30, "valid_pit": 30, "coverage": 1.0},
+      "ligue-1": {"matches": 27, "valid_pit": 24, "coverage": 0.8889, "isolated": 4},
+      "serie-a": {"matches": 30, "valid_pit": 22, "coverage": 0.7333},
+      "mls": {"matches": 139, "valid_pit": 80, "coverage": 0.5755},
+      "bundesliga": {"matches": 18, "valid_pit": 7, "coverage": 0.3889},
+      "la-liga": {"matches": 41, "valid_pit": 12, "coverage": 0.2927},
+      "champions-league": {"matches": 102, "valid_pit": 6, "coverage": 0.0588}
+    },
+    "provider": "the_odds_api",
+    "source": "the-odds-api-v4",
+    "requested_market": "h2h",
+    "canonical_market": "1X2",
+    "region": "eu",
+    "earliest_valid_snapshot_available_at": "2026-07-16T23:23:52Z",
+    "latest_valid_snapshot_available_at": "2026-09-09T23:55:30Z",
+    "valid_matches_with_multiple_snapshots": 181,
+    "snapshot_count_among_valid": {"min": 10, "max": 199, "mean": 79.34254143646409},
+    "post_kickoff_snapshots_persisted": 176,
+    "matches_with_post_kickoff_and_valid_pre_kickoff": 11,
+    "selected_post_kickoff": 0,
+    "pipeline_pit_passed": true,
+    "snapshot_age_field_caveat": "coverage JSON snapshot_age_seconds uses latest_available_at including post-kickoff; 11 MLS rows are negative. Freshness must be recomputed from the selected PIT snapshot."
+  },
+  "prediction_coverage_versus_odds_coverage": {
+    "prediction_coverage": {
+      "definition": "Finished labeled matches with valid pre-match Elo.",
+      "n": 5729,
+      "universe": 5729,
+      "elo_available": "5729/5729"
+    },
+    "odds_coverage": {
+      "definition": "Matches with a valid pre-kickoff complete 1X2 PIT snapshot.",
+      "verified_n": "181/387 in the 2026-07-01 OOS window only",
+      "year_2024_2025": "UNAVAILABLE FROM CURRENT PERSISTED STATE"
+    },
+    "missing_odds_is_not_a_failed_prediction": true
+  },
+  "dataset_and_model": {
+    "dataset_version": "football-1x2-history-0.3",
+    "dataset_sha256": "0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5",
+    "feature_schema_version": "football-1x2-features-0.3",
+    "cutoff_policy": "pre_kickoff",
+    "data_mode": "live",
+    "candidate_model_version": "football-elo-v1-candidate",
+    "candidate_status": "candidate",
+    "promoted_to_production": false,
+    "calibration_method_frozen": "sigmoid",
+    "candidate_code_version": "0.1.0+e8b76d7",
+    "elo": {
+      "initial": 1500.0,
+      "k": 20.0,
+      "home_advantage": 80.0,
+      "scale": 400.0,
+      "identity": "canonical_team_id",
+      "update_delay_hours": 3,
+      "chronological": true
+    },
+    "candidate_windows": {
+      "train": {"start": "2024-02-22T00:00:00+00:00", "end_exclusive": "2026-01-01T00:00:00+00:00", "n": 4094},
+      "calibration_fit": {"start": "2026-01-01T00:00:00+00:00", "end_exclusive": "2026-05-01T00:00:00+00:00", "n": 985},
+      "calibration_select": {"start": "2026-05-01T00:00:00+00:00", "end_exclusive": "2026-07-01T00:00:00+00:00", "n": 263},
+      "earliest_legitimate_oos_for_frozen_candidate": "2026-07-01T00:00:00+00:00",
+      "final_test": {"start": "2026-07-01T00:00:00+00:00", "end_exclusive": "2026-09-10T02:30:01+00:00", "n": 387}
+    },
+    "scoring_frozen_candidate_before_2026_07_01_is_not_oos": true
+  },
+  "lineage": [
+    "Sportmonks Football API",
+    "immutable raw envelopes",
+    "validation / normalisation / quarantine",
+    "PostgreSQL canonical entities",
+    "PointInTimeStore (available_at < cutoff AND event_at < cutoff)",
+    "reconstruct_pre_match_elo (snapshot at event_at, update at event_at+3h)",
+    "football-1x2-history-0.3 parquet",
+    "Elo 1X2 + sigmoid calibrator",
+    "FootballPredictionService",
+    "OddsService last complete 1X2 available_at <= cutoff",
+    "app.value_engine.calculator value-engine-0.1",
+    "AiPicksEngine deterministic eligibility and ranking",
+    "FootballAnalystService explanation only"
+  ],
+  "authoritative_modules": {
+    "historical_dataset": "predicta_ingestion.ml.dataset",
+    "pit_store_data": "predicta_ingestion.pit.store.PointInTimeStore",
+    "pit_store_serving": "app.predictions.features.ParquetPitFeatureStore",
+    "elo_walk_data": "predicta_ingestion.ml.elo.reconstruct_pre_match_elo",
+    "elo_walk_ml": "predicta_ml.models.elo_walk",
+    "training": "predicta_ml.models.elo.EloBaseline",
+    "calibration": "predicta_ml.calibration.methods.SigmoidCalibrator",
+    "prediction_service": "app.predictions.service.FootballPredictionService",
+    "historical_odds": "predicta_ingestion.oos_historical_odds / oos_final_odds_batch",
+    "odds_pit": "app.odds.service.OddsService.market_at",
+    "value_engine": "app.value_engine.calculator",
+    "legacy_value_engine": "deleted (app.domain.value_engine.py absent)",
+    "ai_picks": "app.ai_picks.service.AiPicksEngine",
+    "existing_oos": "predicta_ml.oos + app.backtesting.production_oos_sql"
+  },
+  "leakage_audit": {
+    "blockers": [],
+    "result": "PASS",
+    "checks": {
+      "elo_uses_only_previous_matches": "PASS",
+      "current_match_excluded_from_rolling_and_h2h": "PASS",
+      "future_results_cannot_change_historical_ratings": "PASS",
+      "post_kickoff_odds_cannot_be_selected": "PASS",
+      "post_kickoff_score_cannot_enter_features": "PASS",
+      "entity_resolution_no_future_information": "PASS",
+      "calibration_overlap_prevented_by_per_step_artefacts": "PASS_IF_PROTOCOL_FOLLOWED",
+      "oos_labels_not_used_for_fitting": "PASS_IF_PROTOCOL_FOLLOWED",
+      "value_odds_at_or_before_cutoff": "PASS",
+      "no_future_snapshot_selected": "PASS"
+    },
+    "published_asymmetry": {
+      "feature_pit": "available_at < cutoff AND event_at < cutoff",
+      "odds_pit": "available_at <= cutoff AND available_at <= kickoff",
+      "serving_cutoff": "cutoff_at == kickoff_at",
+      "not_a_blocker": true
+    }
+  },
+  "recommended_protocol": {
+    "id": "walk-forward-2024-2026-v1",
+    "window_type": "expanding",
+    "retraining_frequency": "once_per_step",
+    "calibration_frequency": "once_per_step_coefficients_only",
+    "calibration_method_frozen": "sigmoid",
+    "hyperparameters_frozen": true,
+    "elo_state": "continuous_causal_walk_not_reset",
+    "cutoff_policy": "pre_kickoff",
+    "rejected_alternatives": [
+      {
+        "id": "P0",
+        "idea": "Score frozen football-elo-v1-candidate on 2024-2026",
+        "verdict": "rejected",
+        "reason": "In-sample before 2026-07-01."
+      },
+      {
+        "id": "P2",
+        "idea": "Rolling 12-month train",
+        "verdict": "rejected",
+        "reason": "Discards 2024 when 2026 sample is smallest."
+      },
+      {
+        "id": "P3",
+        "idea": "Season-label folds",
+        "verdict": "rejected",
+        "reason": "MLS is calendar-year; existing splits are UTC calendar."
+      }
+    ],
+    "steps": [
+      {
+        "id": "WF-1",
+        "artefact": "football-elo-v1-wf-2024-2026-step-1",
+        "train": {
+          "start": "2024-02-22T00:00:00+00:00",
+          "end_exclusive": "2025-01-01T00:00:00+00:00",
+          "n": 1538
+        },
+        "calibration": {
+          "rule": "Trailing TRAIN rows so n_calib >= 200 and n_train_fit >= 1000. T_calib_start is data-driven, not a hand-picked calendar date.",
+          "n": "UNAVAILABLE FROM CURRENT PERSISTED STATE"
+        },
+        "oos": {
+          "start": "2025-01-01T00:00:00+00:00",
+          "end_exclusive": "2025-07-01T00:00:00+00:00",
+          "n": 1305
+        }
+      },
+      {
+        "id": "WF-2",
+        "artefact": "football-elo-v1-wf-2024-2026-step-2",
+        "train_fit": {
+          "start": "2024-02-22T00:00:00+00:00",
+          "end_exclusive": "2025-01-01T00:00:00+00:00",
+          "n": 1538
+        },
+        "calibration": {
+          "start": "2025-01-01T00:00:00+00:00",
+          "end_exclusive": "2025-07-01T00:00:00+00:00",
+          "n": 1305
+        },
+        "oos": {
+          "start": "2025-07-01T00:00:00+00:00",
+          "end_exclusive": "2026-01-01T00:00:00+00:00",
+          "n": 1251
+        }
+      },
+      {
+        "id": "WF-3",
+        "artefact": "football-elo-v1-wf-2024-2026-step-3",
+        "train_fit": {
+          "start": "2024-02-22T00:00:00+00:00",
+          "end_exclusive": "2026-01-01T00:00:00+00:00",
+          "n": 4094
+        },
+        "calibration": {
+          "start": "2026-01-01T00:00:00+00:00",
+          "end_exclusive": "2026-07-01T00:00:00+00:00",
+          "n": 1248,
+          "method_selection": "forbidden_method_is_frozen_sigmoid"
+        },
+        "oos": {
+          "start": "2026-07-01T00:00:00+00:00",
+          "end_exclusive": "2026-09-10T02:30:01+00:00",
+          "n": 387
+        }
+      }
+    ],
+    "never_overwrite_candidate": "football-elo-v1-candidate",
+    "frozen_candidate_scorecard": {
+      "keep_separate": true,
+      "protocol": "docs/ml/production-oos-protocol.md",
+      "earliest_legitimate_oos": "2026-07-01T00:00:00+00:00"
+    }
+  },
+  "evaluation_a_ml_prediction": {
+    "universe": "Every finished labeled OOS match with valid pre-match Elo.",
+    "missing_odds": "do_not_drop_row",
+    "metrics": [
+      "log_loss",
+      "multiclass_brier",
+      "accuracy",
+      "ece",
+      "class_level_calibration",
+      "prediction_count",
+      "confusion_matrix",
+      "frequency_baseline_from_train_prior",
+      "by_competition_with_n",
+      "by_year_with_n"
+    ]
+  },
+  "evaluation_b_value_ai_picks": {
+    "universe_requires": [
+      "valid_prediction",
+      "valid_pre_kickoff_complete_1x2",
+      "source_the-odds-api-v4",
+      "data_mode_live",
+      "value_engine_0.1_succeeds",
+      "ai_picks_0.1_eligibility"
+    ],
+    "formulas": {
+      "implied_probability": "1 / decimal_odds",
+      "overround": "sum(implied_probability)",
+      "no_vig_probability": "implied_probability / overround",
+      "edge": "model_probability - implied_probability",
+      "expected_value": "model_probability * decimal_odds - 1"
+    },
+    "value_engine_version": "value-engine-0.1",
+    "ai_picks_version": "ai-picks-0.1",
+    "llm_must_not_determine": ["selection", "probability", "odds", "ev", "edge", "ranking"],
+    "thresholds": {
+      "minimum_edge": 0,
+      "minimum_ev": 0,
+      "minimum_model_probability": 0,
+      "maximum_odds_age_seconds": 86400,
+      "optimized_on_oos": false,
+      "stake": 1.0,
+      "stake_policy": "fixed_unit_per_opportunity"
+    },
+    "metrics": [
+      "eligible_matches",
+      "n_picks",
+      "hit_rate",
+      "theoretical_roi",
+      "units_won_lost",
+      "max_drawdown",
+      "ev_distribution",
+      "edge_distribution",
+      "odds_coverage",
+      "excluded_matches_by_reason"
+    ],
+    "value_on_2024_2025": "NO-GO until live SQL year-level PIT odds inventory exists"
+  },
+  "sample_size_rules": {
+    "small_sample_n": 30,
+    "robust_profitability_n": 250,
+    "report_n_on_every_segment": true,
+    "forbid_profitable_or_validated_below_robust_n": true
+  },
+  "reproducibility_fingerprint": {
+    "protocol_id": "walk-forward-2024-2026-v1",
+    "dataset_version": "football-1x2-history-0.3",
+    "dataset_sha256": "0a11a3712c30e4f37c0ac0a75e0e321b70f93565fc994105d613a1361ce9d3c5",
+    "feature_schema_version": "football-1x2-features-0.3",
+    "candidate_model_version": "football-elo-v1-candidate",
+    "calibration_version": "sigmoid-ovr-platt",
+    "implementation_sha_audit_basis": "1cde8f701e2fcdfd85f9574983b76abd810003cc",
+    "cutoff_protocol": "pre_kickoff cutoff_at==kickoff_at",
+    "odds_plan_sha256": "36e100a576fcbb1f7523d113a6bceaf9ceab2d759362a7ecec3aa4f9c1ebc653",
+    "value_engine_version": "value-engine-0.1",
+    "ai_picks_version": "ai-picks-0.1",
+    "random_seed": 42
+  },
+  "quality_gates": {
+    "value_engine_odds_pit": {"passed": 34, "skipped": 2, "failed": 0},
+    "ml_oos_provenance_calibration_metrics": {"passed": 27, "failed": 0},
+    "ai_picks_analyst_frozen_oos": {"passed": 33, "failed": 0},
+    "production_oos_sql_prematch": {"passed": 18, "skipped": 1, "failed": 0},
+    "ingestion_pit_ml_dataset": {
+      "passed": 19,
+      "failed": 1,
+      "failed_test": "test_dataset_export_and_quality_report",
+      "failed_reason": "ModuleNotFoundError pyarrow in ingestion venv — export packaging, not a PIT leakage failure"
+    }
+  }
+}
